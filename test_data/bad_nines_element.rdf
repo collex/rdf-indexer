@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:role="http://www.loc.gov/loc.terms/relators/"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:test="http://www.patacriticism.org/test/schema#"
+         xmlns:nines="http://www.nines.org/schema#" xmlns:dcterms="http://purl.org/dc/terms/"
+         xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <test:works rdf:about="http://www.patacriticism.org/test/bad_nines_element">
+
+    <dc:title>Bad Nines Element</dc:title>
+
+    <role:AUT>Doe, John</role:AUT>
+
+    <dc:date>1834</dc:date>
+
+    <nines:archive>test</nines:archive>
+    <nines:genre>Poetry</nines:genre>
+    <nines:seeAlso rdf:resource="http://www.patacriticism.org"/>
+  </test:works>
+</rdf:RDF>

@@ -1,0 +1,4 @@
+bad_date.rdf	http://www.patacriticism.org/test/bad_nines_element	Invalid date format: 1869 November 15 (before 25 November)
+bad_nines_element.rdf	http://www.patacriticism.org/test/bad_nines_element	NINES does not support this property: http://www.nines.org/schema#seeAlso
+invalid_xml.rdf		org.xml.sax.SAXParseException: Content is not allowed in prolog.
+invalid_xml.rdf		No objects in this file.
