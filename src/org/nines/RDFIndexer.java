@@ -174,8 +174,8 @@ public class RDFIndexer {
     File rdfSource = new File(args[0]);
     RDFIndexerConfig config = new RDFIndexerConfig();
     
-    config.retrieveFullText = "--offline".equals(args[args.length - 1]);
-    log.info(config.retrieveFullText ? "OFFLINE" : "ONLINE");
+    config.retrieveFullText = !( "--offline".equals(args[args.length - 1]) );
+    log.info(config.retrieveFullText ? "OFFLINE" : "ONLINE"); 
 
     new RDFIndexer(rdfSource, config);
   }
@@ -238,8 +238,13 @@ public class RDFIndexer {
 		Set<String> keys = objects.keySet();
 	    for (String uri : keys) {
 	      HashMap<String, ArrayList<String>> object = objects.get(uri);
-	      archive = object.get("archive").get(0);
-
+	      ArrayList<String> objectArray = object.get("archive");
+              if( objectArray != null ) {
+                archive = objectArray.get(0);
+              } else {
+                errorReport.addError(new Error(file.getName(), uri, "Unable to determine archive for this object."));
+              }
+              
 	      ArrayList<Message> messages = ValidationUtility.validateObject(object);
 
 	      ListIterator<Message> lit = messages.listIterator();
