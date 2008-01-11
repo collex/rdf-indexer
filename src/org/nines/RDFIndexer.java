@@ -37,7 +37,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 
 public class RDFIndexer {
-  final static Logger log = Logger.getLogger(RDFIndexer.class.getName());
 
   private int numFiles = 0;
   private int numObjects = 0;
@@ -51,6 +50,7 @@ public class RDFIndexer {
   private int progressMilestone = 0;
   private long lastTime;
   private String solrURL;
+  private Logger log;
 
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
   private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
@@ -62,6 +62,9 @@ public class RDFIndexer {
   public RDFIndexer( File rdfSource, RDFIndexerConfig config )  {
 	  	
     initSystem();   
+    
+    log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text"); 
+
     this.config = config;
     this.solrURL = config.solrBaseURL + "/update";
     
@@ -94,7 +97,7 @@ public class RDFIndexer {
         log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
     } 
     else {
-    	errorReport.addError(new Error("","","No objects found"));
+    	errorReport.addError(new IndexerError("","","No objects found"));
     }
 
     if (config.commitToSolr && archive != null) {
@@ -118,7 +121,7 @@ public class RDFIndexer {
         }
     }
     catch( IOException e ) {
-        errorReport.addError(new Error("","","Unable to POST commit message to SOLR. "+e.getLocalizedMessage()));    		
+        errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR. "+e.getLocalizedMessage()));    		
     }
   }
   
@@ -153,29 +156,30 @@ public class RDFIndexer {
       
       FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), "indexer.log");
       BasicConfigurator.configure( fa );
+      log = Logger.getLogger(RDFIndexer.class.getName());
+
     }
     catch( IOException e ) {
         log.error("Error, unable to initialize logging, exiting.");
         System.exit(0);
     }
       
-//	    System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
-//	    System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
-//	    System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire.header", "debug");
-//	    System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "debug");
+    System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+    System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+//    System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire.header", "debug");
+//    System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "debug");
   }
   
   public static void main(String[] args) {
     if (args.length < 1) {
-      System.err.println("RdfFileIndexer <rdf dir> [<message url>] [--offline]");
+      System.err.println("RdfIndexer <rdf dir> [--fulltext]");
       System.exit(-1);
     }
 
     File rdfSource = new File(args[0]);
     RDFIndexerConfig config = new RDFIndexerConfig();
     
-    config.retrieveFullText = !( "--offline".equals(args[args.length - 1]) );
-    log.info(config.retrieveFullText ? "OFFLINE" : "ONLINE"); 
+    config.retrieveFullText = ( "--fulltext".equals(args[args.length - 1]) );
 
     new RDFIndexer(rdfSource, config);
   }
@@ -242,16 +246,16 @@ public class RDFIndexer {
               if( objectArray != null ) {
                 archive = objectArray.get(0);
               } else {
-                errorReport.addError(new Error(file.getName(), uri, "Unable to determine archive for this object."));
+                errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
               }
               
-	      ArrayList<Message> messages = ValidationUtility.validateObject(object);
+	      ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
 
-	      ListIterator<Message> lit = messages.listIterator();
+	      ListIterator<ErrorMessage> lit = messages.listIterator();
 
 	      while (lit.hasNext()) {
-	        Message message = lit.next();
-	        Error e = new Error(file.getName(), uri, message.getErrorMessage());
+	        ErrorMessage message = lit.next();
+	        IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
 	        errorReport.addError(e);
 	      }
 	    }
@@ -260,14 +264,14 @@ public class RDFIndexer {
 	    if (objectCount > 0) {
 	      postObjectsToSolr( client, objects );	
 	    } else {
-	      errorReport.addError(new Error(file.getName(), "", "No objects in this file."));
+	      errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
 	    }
 
 	    numObjects += objectCount;
 	    reportIndexingSpeed(numObjects);
 
     } catch (IOException e) {
-       errorReport.addError(new Error(file.getName(), "", e.getMessage()));
+       errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
  	}
     errorReport.flush();
   }
@@ -333,7 +337,7 @@ public class RDFIndexer {
    * batch identified by the guid
    */
   private void sendMessage(String guid, String messageUrl, HttpClient httpclient) throws IOException {
-    Summary summary = errorReport.getSummary();
+    ErrorSummary summary = errorReport.getSummary();
 
     GetMethod get = new GetMethod(messageUrl);
     NameValuePair guidParam = new NameValuePair("guid", guid);
@@ -378,7 +382,7 @@ public class RDFIndexer {
 	    postToSolr(solrXml,httpclient);
 	    postToSolr("<commit/>",httpclient);
     } catch( IOException e ) {
-    	errorReport.addError(new Error("","","Unable to POST commit message to SOLR during cleanup. "+e.getLocalizedMessage()));    		
+    	errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR during cleanup. "+e.getLocalizedMessage()));    		
     }
   }
 
@@ -409,7 +413,7 @@ public class RDFIndexer {
       } while(result != 200 && solrRequestNumRetries > 0);
 
       if (result != 200) {
-        errorReport.addError(new Error("","","cannot reach URL: " + solrUrl));
+        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
       }
 
       String response = get.getResponseBodyAsString();
@@ -422,11 +426,11 @@ public class RDFIndexer {
           numToDelete = Integer.parseInt(numFound);
       }
     } catch (NoHttpResponseException e) {
-      errorReport.addError(new Error("","","The SOLR server didn't respond to the http request to: " + solrUrl));
+      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
     } catch (ConnectTimeoutException e) {
-      errorReport.addError(new Error("","","The SOLR server timed out on the http request to: " + solrUrl));
+      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
     } catch (IOException e) {
-      errorReport.addError(new Error("","","An IO Error occurred attempting to access: " + solrUrl));
+      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
 	} 
     finally {
       get.releaseConnection();
