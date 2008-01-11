@@ -86,7 +86,7 @@ public class NinesStatementHandler implements StatementHandler {
           attribute.equals("image"))) {
 
         errorReport.addError(
-            new Error(filename, documentURI, "NINES does not support this property: " + predicate));
+            new IndexerError(filename, documentURI, "NINES does not support this property: " + predicate));
       
         return;
       }
@@ -173,7 +173,7 @@ public class NinesStatementHandler implements StatementHandler {
           addField(doc, "date_label", object);
         } catch (NumberFormatException e) {
           errorReport.addError(
-              new Error(filename, documentURI, "Invalid date format: " + object));
+              new IndexerError(filename, documentURI, "Invalid date format: " + object));
         }
       } else {
         BNodeNode bnode = (BNodeNode) value;
@@ -204,7 +204,7 @@ public class NinesStatementHandler implements StatementHandler {
           }
         } catch (NumberFormatException e) {
           errorReport.addError(
-              new Error(filename, documentURI, "Invalid date format: " + object));
+              new IndexerError(filename, documentURI, "Invalid date format: " + object));
         }
         return true;
       }
@@ -256,7 +256,7 @@ public class NinesStatementHandler implements StatementHandler {
       } catch (IOException e) {
         String uriVal = documentURI;
         errorReport.addError(
-            new Error(filename, uriVal, e.getMessage()));
+            new IndexerError(filename, uriVal, e.getMessage()));
       }
       return true;
     }

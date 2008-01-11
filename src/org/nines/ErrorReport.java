@@ -38,7 +38,7 @@ public class ErrorReport {
     objectCount = new HashSet<String>();
   }
   
-  public void addError( Error e ) {
+  public void addError( IndexerError e ) {
     try {
 		report.write(e.toString() + "\r\n");
 	} 
@@ -67,77 +67,11 @@ public class ErrorReport {
 	}
   }
 
-  public Summary getSummary() {
-    return new Summary(fileCount.size(), objectCount.size(), errorCount);
+  public ErrorSummary getSummary() {
+    return new ErrorSummary(fileCount.size(), objectCount.size(), errorCount);
   }
 
 	public int getErrorCount() {
 		return errorCount;
 	}
-}
-
-class Error {
-  private String filename,
-      uri,
-      errMsg;
-
-  public Error(String filename, String uri, String errMsg) {
-    this.filename = filename;
-    this.uri = uri;
-    this.errMsg = errMsg;
-  }
-
-  public String getFilename() {
-    return filename;
-  }
-
-  public String getUri() {
-    return uri;
-  }
-
-  public String toString() {
-    return filename + "\t" + uri + "\t" + errMsg;
-  }
-}
-
-class Message {
-  private boolean failureFlag;
-  private String errorMsg;
-
-  public Message(boolean flag, String msg) {
-    this.failureFlag = flag;
-    this.errorMsg = msg;
-  }
-
-  public boolean getStatus() {
-    return failureFlag;
-  }
-
-  public String getErrorMessage() {
-    return errorMsg;
-  }
-}
-
-class Summary {
-  private int fileCount = 0,
-      objectCount = 0,
-      errorCount = 0;
-
-  public Summary(int fileCount, int objectCount, int errorCount) {
-    this.fileCount = fileCount;
-    this.objectCount = objectCount;
-    this.errorCount = errorCount;
-  }
-
-  public int getFileCount() {
-    return fileCount;
-  }
-
-  public int getObjectCount() {
-    return objectCount;
-  }
-
-  public int getErrorCount() {
-    return errorCount;
-  }
 }
