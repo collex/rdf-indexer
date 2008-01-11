@@ -172,20 +172,26 @@ public class RDFIndexer {
   
   public static void main(String[] args) {
     if (args.length < 1) {
-      System.err.println("RdfIndexer <rdf dir> [--fulltext]");
+      System.err.println("java -jar rdf-indexer.jar <rdf dir> [<solr url>] [--fulltext]");
       System.exit(-1);
     }
 
+    String fullTextFlag = "--fulltext";
+    
     File rdfSource = new File(args[0]);
     RDFIndexerConfig config = new RDFIndexerConfig();
+
+    if( args.length > 1 && !args[1].equals(fullTextFlag)) {
+        config.solrBaseURL = args[1];
+    }
     
-    config.retrieveFullText = ( "--fulltext".equals(args[args.length - 1]) );
+    config.retrieveFullText = ( fullTextFlag.equals(args[args.length - 1]) );
 
     new RDFIndexer(rdfSource, config);
   }
 
   private void recursivelyQueueFiles( File dir )  {
-		log.error("loading directory: "+dir.getPath());
+		log.info("loading directory: "+dir.getPath());
 		
 		File fileList[] = dir.listFiles();
 		for( File entry : fileList ) {
