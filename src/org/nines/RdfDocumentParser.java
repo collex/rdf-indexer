@@ -66,11 +66,11 @@ public class RdfDocumentParser {
     try {
       parser.parse(new InputStreamReader(new FileInputStream(file), "UTF8"), "http://foo/bar");
     } catch (ParseException e) {   
-      errorReport.addError(new Error(file.getName(), "", "Parse Error on Line "+e.getLineNumber()+": "+e.getMessage() ));
+      errorReport.addError(new IndexerError(file.getName(), "", "Parse Error on Line "+e.getLineNumber()+": "+e.getMessage() ));
     } catch (StatementHandlerException e) {
-      errorReport.addError(new Error(file.getName(), "", "StatementHandler Exception: "+e.getMessage()));
+      errorReport.addError(new IndexerError(file.getName(), "", "StatementHandler Exception: "+e.getMessage()));
     } catch( Exception e ) {
-  	  errorReport.addError(new Error(file.getName(), "", "RDF Parser Error: "+e.getMessage()));
+  	  errorReport.addError(new IndexerError(file.getName(), "", "RDF Parser Error: "+e.getMessage()));
 	}
     
     // retrieve parsed data 

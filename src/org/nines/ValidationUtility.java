@@ -41,8 +41,8 @@ public class ValidationUtility {
     return true;
   }
 
-  public static ArrayList<Message> validateObject(HashMap<String, ArrayList<String>> object) {
-    ArrayList<Message> messages = new ArrayList<Message>();
+  public static ArrayList<ErrorMessage> validateObject(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
     messages.addAll(validateRequired(object));
     messages.addAll(validateGenre(object));
@@ -51,8 +51,8 @@ public class ValidationUtility {
     return messages;
   }
 
-  public static ArrayList<Message> validateRole(HashMap<String, ArrayList<String>> object) {
-    ArrayList<Message> messages = new ArrayList<Message>();
+  public static ArrayList<ErrorMessage> validateRole(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
     // look for all role_* keys in object, validate that they are in this list:
     //    ART, AUT, EDT, PBL, and TRL
@@ -65,7 +65,7 @@ public class ValidationUtility {
              "role_EDT".equals(key) ||
              "role_PBL".equals(key) ||
              "role_TRL".equals(key))) {
-        messages.add(new Message(false, "invalid role: " + key));
+        messages.add(new ErrorMessage(false, "invalid role: " + key));
       }
     }
 
@@ -75,14 +75,14 @@ public class ValidationUtility {
   /**
    * Confirms that required fields are present and non-null
    */
-  public static ArrayList<Message> validateRequired(HashMap<String, ArrayList<String>> object) {
-    ArrayList<Message> messages = new ArrayList<Message>();
+  public static ArrayList<ErrorMessage> validateRequired(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
     String[] requiredFields = new String[]{"archive", "title", "genre", "year"};
     String[] rdfTerm = new String[]{"nines:archive", "dc:title", "nines:genre", "dc:date"};
 
     for (int i = 0; i < requiredFields.length; i++) {
       if (!object.containsKey(requiredFields[i])) {
-        messages.add(new Message(false, "object must contain the " +
+        messages.add(new ErrorMessage(false, "object must contain the " +
             rdfTerm[i] + " field"));
       }
     }
@@ -97,7 +97,7 @@ public class ValidationUtility {
     }
 
     if (!hasRole) {
-      messages.add(new Message(false, "object must contain at least one role:XXX field"));
+      messages.add(new ErrorMessage(false, "object must contain at least one role:XXX field"));
     }
 
     return messages;
@@ -106,8 +106,8 @@ public class ValidationUtility {
   /**
    * The genre must be in a constrained list.
    */
-  public static ArrayList<Message> validateGenre(HashMap<String, ArrayList<String>> object) {
-    ArrayList<Message> messages = new ArrayList<Message>();
+  public static ArrayList<ErrorMessage> validateGenre(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
     Set<String> keys = object.keySet();
     for (String field : keys) {
@@ -119,7 +119,7 @@ public class ValidationUtility {
         while (lit.hasNext()) {
           String genre = lit.next();
           if (!validateGenreInList(genre)) {
-            messages.add(new Message(false,
+            messages.add(new ErrorMessage(false,
                 genre + " genre not approved by NINES"));
           }
         }
@@ -151,13 +151,13 @@ public class ValidationUtility {
     return false;
   }
 
-  public static ArrayList<Message> validateFreecultureElement(HashMap<String, ArrayList<String>> object) {
-    ArrayList<Message> messages = new ArrayList<Message>();
+  public static ArrayList<ErrorMessage> validateFreecultureElement(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
     ArrayList<String> fields = object.get("freeculture");
     String fieldVal = fields.get(0);
     if (!validateFreeculture(fieldVal)) {
-      messages.add(new Message(false,
+      messages.add(new ErrorMessage(false,
           fieldVal + " is not a valid value for nines:freeculture"));
     }
 
