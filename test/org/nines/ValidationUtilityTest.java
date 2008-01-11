@@ -60,7 +60,7 @@ public class ValidationUtilityTest extends TestCase {
     testMap.put("archive", genreVals);
     testMap.put("year", genreVals);
 
-    ArrayList<Message> messages = ValidationUtility.validateRequired(testMap);
+    ArrayList<ErrorMessage> messages = ValidationUtility.validateRequired(testMap);
 
     assertEquals(2, messages.size());
 

@@ -29,14 +29,14 @@ public class ErrorReportTest extends TestCase {
   }
 
   public void testSummary() {
-    errorReport.addError(new Error("file1.rdf", "abc1", "my error message"));
-    errorReport.addError(new Error("file1.rdf", "abc2", "my error message"));
-    errorReport.addError(new Error("file1.rdf", "abc3", "my error message"));
-    errorReport.addError(new Error("file2.rdf", "abc4", "my error message"));
-    errorReport.addError(new Error("file3.rdf", "abc5", "my error message"));
-    errorReport.addError(new Error("file3.rdf", "abc6", "my error message"));
+    errorReport.addError(new IndexerError("file1.rdf", "abc1", "my error message"));
+    errorReport.addError(new IndexerError("file1.rdf", "abc2", "my error message"));
+    errorReport.addError(new IndexerError("file1.rdf", "abc3", "my error message"));
+    errorReport.addError(new IndexerError("file2.rdf", "abc4", "my error message"));
+    errorReport.addError(new IndexerError("file3.rdf", "abc5", "my error message"));
+    errorReport.addError(new IndexerError("file3.rdf", "abc6", "my error message"));
 
-    Summary summary = errorReport.getSummary();
+    ErrorSummary summary = errorReport.getSummary();
 
     assertTrue(summary.getFileCount() == 3);
   }
