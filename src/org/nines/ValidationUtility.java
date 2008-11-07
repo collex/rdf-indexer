@@ -140,7 +140,10 @@ public class ValidationUtility {
         "Philosophy", "Photograph", "Poetry",
         "Religion", "Review",
         "Translation", "Travel",
-        "Visual Art", "Citation"};
+        "Visual Art", "Citation",
+        "Book History", "Family Life", "Folklore",
+        "Humor", "Law", "Reference Works"
+    };
 
     for (String aGenreList : genreList) {
       if (aGenreList.equals(genre)) {
