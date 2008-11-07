@@ -166,6 +166,12 @@ public class NinesStatementHandler implements StatementHandler {
         ArrayList<String> years = null;
         try {
           years = parseYears(object);
+          
+          if( years.size() == 0 ) {
+              errorReport.addError( new IndexerError(filename, documentURI, "Invalid date format: " + object) );
+              return false;
+          }
+          
           for (String year : years) {
             addField(doc, "year", year);
           }
@@ -320,7 +326,9 @@ public class NinesStatementHandler implements StatementHandler {
             start = range.substring(0, commaPos);
             finish = range.substring(commaPos + 1);
           }
-          years.addAll(enumerateYears(start.substring(0, 4), finish.substring(0, 4)));
+          if( start.length() >= 4 && finish.length() >= 4){
+            years.addAll(enumerateYears(start.substring(0, 4), finish.substring(0, 4)));            
+          }
         }
 
       }
