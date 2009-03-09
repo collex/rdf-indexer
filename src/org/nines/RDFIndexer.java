@@ -89,7 +89,7 @@ public class RDFIndexer {
 
     	indexDirectory(rdfSource);
         if( config.commitToSolr ) commitDocumentsToSolr(client);
-        else log.info("Skipping Commmit to SOLR...");
+        else log.info("Skipping Commit to SOLR...");
 	    
         // report done
         Date end = new Date();	
