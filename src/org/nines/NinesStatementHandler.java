@@ -387,16 +387,45 @@ public class NinesStatementHandler implements StatementHandler {
       String fullText = contentStream.toString("UTF-8");
       String cleanedFullText = fullText;
 
-      // if the text contains markup, remove it
-      if (fullText != null && fullText.indexOf("<") != -1) {
-        cleanedFullText = fullText.replaceAll("\\<.*?\\>", "");
-      }
-
+	  cleanedFullText = cleanText(fullText);
       return cleanedFullText;
     } finally {
       get.releaseConnection();
     }
   }
+
+	public String cleanText(String fullText) {
+		// If the text contains markup, remove it.
+		// We may be passed plain text, or we may be passed html, so any strategy we use needs to work for both.
+		// We can assume that if it is plain text, it won't have stuff that looks like tags in it.
+		if (fullText == null)
+			return fullText;
+
+		// remove everything between <head>...</head>
+		fullText = removeTag(fullText, "head");
+
+		// remove everything between <script>..</script>
+		fullText = removeTag(fullText, "script");
+
+		// remove all "&..;" encoding
+		fullText = fullText.replaceAll("\\&[a-z]{1,5}\\;", " ");
+
+		// remove everything between <...>
+		fullText = removeBracketed(fullText, "<", ">");
+
+		// Clean up the file a little bit
+		fullText = fullText.replaceAll("\t", " ");
+		fullText = fullText.replaceAll(" +", " ");
+		fullText = replaceMatch(fullText, " \n", "\n");
+		fullText = replaceMatch(fullText, "\n ", "\n");
+		fullText = replaceMatch(fullText, "\n\n", "\n");
+
+
+		//      if (fullText != null && fullText.indexOf("<") != -1) {
+		//        return fullText.replaceAll("\\<.*?\\>", "");
+		//      }
+		  return fullText;
+	}
 
   public static ArrayList<String> enumerateYears(String startYear, String endYear) {
     int y1 = Integer.parseInt(startYear);
@@ -416,4 +445,31 @@ public class NinesStatementHandler implements StatementHandler {
   public void setFilename(String filename) {
     this.filename = filename;
   }
+
+	private String replaceMatch(String fullText, String match, String newText) {
+		int start = fullText.indexOf(match);
+		while (start != -1) {
+			fullText = fullText.substring(0, start) + newText + fullText.substring(start + match.length());
+			start = fullText.indexOf(match);
+		}
+		return fullText;
+	}
+
+	private String removeBracketed(String fullText, String left, String right) {
+		int start = fullText.indexOf(left);
+		while (start != -1) {
+			int end = fullText.indexOf(right, start);
+			if (end == -1) {
+				start = -1;
+			} else {
+				fullText = fullText.substring(0, start) + "\n" + fullText.substring(end + right.length());
+				start = fullText.indexOf(left);
+			}
+		}
+		return fullText;
+	}
+
+	private String removeTag(String fullText, String tag) {
+		return removeBracketed(fullText, "<" + tag, "</" + tag + ">");
+	}
 }

@@ -21,7 +21,7 @@ package org.nines;
  * @author nicklaiacona
  */
 public class RDFIndexerConfig {   
-    public String solrBaseURL = "http://localhost:8989/solr";
+    public String solrBaseURL = "http://localhost:8983/solr";
     public boolean collectLinks = true;
     public boolean retrieveFullText = true;
     public boolean commitToSolr = true;

@@ -15,11 +15,20 @@
  **/
 package org.nines;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import junit.framework.TestCase;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Scanner;
 
 public class NinesStatementHandlerTest extends TestCase {
   private NinesStatementHandler sh;
@@ -29,6 +38,21 @@ public class NinesStatementHandlerTest extends TestCase {
     super.setUp();
     errorReport = new ErrorReport(new File("test_data","test_report.txt"));
     sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
+  }
+
+  public void testProblematicFullTextSource() {
+	File data = new File(System.getProperty("test.data.dir"),"test_data/problematic_full_text_source.html");
+
+	String text;
+		try {
+			text = readWholeFile(data);
+			String cleaned = sh.cleanText(text);
+			writeFile(data.getPath()+".txt", cleaned);
+			Logger.getLogger(NinesStatementHandlerTest.class.getName()).log(Level.SEVERE, null, cleaned);
+			assertTrue(false);
+		} catch (FileNotFoundException ex) {
+			assertTrue(false);
+		}
   }
 
   public void testAddField() {
@@ -67,4 +91,25 @@ public class NinesStatementHandlerTest extends TestCase {
     assertEquals(1, years.size());
     assertEquals("Uncertain", years.get(0));
   }
+
+	private static String readWholeFile(File file) throws FileNotFoundException
+	{
+		 Scanner scanner = new Scanner(file);
+		 scanner.useDelimiter("\\Z");
+		 String wholeFile = scanner.next();
+		 scanner.close();
+
+		 return wholeFile;
+	}
+	private static void writeFile(String fileName, String text) {
+		try {
+			BufferedWriter out = new BufferedWriter(new FileWriter(fileName));
+			out.write(text);
+			out.close();
+		}
+		catch (IOException e)
+		{
+			System.out.println("Exception ");
+		}
+	}
 }
