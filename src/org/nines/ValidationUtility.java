@@ -137,7 +137,7 @@ public class ValidationUtility {
         "History", "Leisure", "Letters",
         "Life Writing", "Manuscript", "Music",
         "Nonfiction", "Paratext", "Periodical",
-        "Philosophy", "Photograph", "Poetry",
+        "Philosophy", "Photograph", "Poetry", "Politics",
         "Religion", "Review",
         "Translation", "Travel",
         "Visual Art", "Citation",
