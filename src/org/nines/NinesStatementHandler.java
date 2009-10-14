@@ -27,9 +27,14 @@ import org.openrdf.sesame.sailimpl.memory.LiteralNode;
 import org.openrdf.sesame.sailimpl.memory.URINode;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
+
+import org.apache.commons.httpclient.ConnectTimeoutException;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.log4j.Logger;
 
 public class NinesStatementHandler implements StatementHandler {
@@ -38,12 +43,17 @@ public class NinesStatementHandler implements StatementHandler {
   private HashMap<String, HashMap<String, ArrayList<String>>> documents;
   private String dateBNodeId;
   private HashMap<String, ArrayList<String>> doc;
+  private Boolean title_sort_added = false;
+  private Boolean author_sort_added = false;
   private String filename; 
   private RDFIndexerConfig config;
   private ErrorReport errorReport;
   private HttpClient httpClient;
   private String documentURI;
   private LinkCollector linkCollector;
+  private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
+  private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
+  private Boolean ignore = false;
 
   public NinesStatementHandler( ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config  ) {
 	 this.errorReport = errorReport;
@@ -53,9 +63,15 @@ public class NinesStatementHandler implements StatementHandler {
 	 documentURI = "";
 	 documents = new HashMap<String, HashMap<String, ArrayList<String>>>();
 	 this.linkCollector = linkCollector;
+	System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+	System.setProperty ("org.apache.commons.logging.simplelog.showdatetime", "true");
+      System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "error");
   }
   
   public void handleStatement(Resource resource, URI uri, Value value) throws StatementHandlerException {
+	  if (ignore)
+		  return;
+
     String subject = resource.toString();
     String predicate = uri.getURI();
     String object = value.toString().trim();
@@ -66,17 +82,25 @@ public class NinesStatementHandler implements StatementHandler {
     
     // start of a new document
     if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate) && resource instanceof URINode) {
+		if (documents.size() >= config.maxDocsPerFolder) {
+			ignore = true;
+	       log.info("*** Ignoring rest of file starting here: " + subject);
+			return;
+		}
       if (documents.get(subject) != null) {
-        log.info("*** Duplicate: " + subject);
+        errorReport.addError(new IndexerError(filename, subject, "Duplicate URI"));
+		log.info("*** Duplicate: " + subject);
       }
       doc = new HashMap<String, ArrayList<String>>();
       addField(doc, "uri", subject);
       documents.put(subject, doc);
-      if( documentURI.equals("") ) documentURI = subject;
+	  title_sort_added = false;
+	  author_sort_added = false;
+      documentURI = subject;
+      //if( documentURI.equals("") ) documentURI = subject;
       log.info("Parsing RDF for document: "+subject );
       errorReport.flush();
     }
-
     // Check for any unsupported nines:* attributes and issue error if any exist
     if (predicate.startsWith("http://www.nines.org/schema#")) {
       String attribute = predicate.substring("http://www.nines.org/schema#".length());
@@ -130,6 +154,10 @@ public class NinesStatementHandler implements StatementHandler {
   public boolean handleTitle( String predicate, String object ) {
     if ("http://purl.org/dc/elements/1.1/title".equals(predicate)) {
       addField(doc, "title", object);
+	  if (!title_sort_added) {
+		  addField(doc, "title_sort", object);
+		  title_sort_added = true;
+	  }
       return true;
     }
     return false;
@@ -256,9 +284,19 @@ public class NinesStatementHandler implements StatementHandler {
         String text = object;
         if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
           addFieldEntry(doc, "text_url", text);
-          if( config.retrieveFullText ) text = fetchContent(object);
+		  if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
+			errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
+			text = "";
+		  }
+		  else {
+			 if( config.retrieveFullText ) text = fetchContent(object);
+			  if (config.reindexFullText)
+				  text = getFullText(doc.get("uri").get(0), httpClient );
+		  }
         }
-        addFieldEntry(doc, "text", text);
+		if (text.length() > 0)
+	        addFieldEntry(doc, "text", text);
+//        addFieldEntry(doc, "content", text);
       } catch (IOException e) {
         String uriVal = documentURI;
         errorReport.addError(
@@ -269,10 +307,132 @@ public class NinesStatementHandler implements StatementHandler {
     return false;
   }
   
+  private String getFullText(String uri, HttpClient httpclient ) {
+	  String fullText = "";
+    String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
+
+    GetMethod get = new GetMethod(solrUrl);
+    NameValuePair queryParam = new NameValuePair("q", "uri:\""+uri + "\"");
+    NameValuePair params[] = new NameValuePair[]{queryParam};
+    get.setQueryString(params);
+
+    int result;
+    try {
+      int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
+      do {
+        result = httpclient.executeMethod(get);
+        solrRequestNumRetries--;
+        if(result != 200) {
+          try {
+            Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+          } catch(InterruptedException e) {
+            log.info(">>>> Thread Interrupted");
+          }
+        }
+      } while(result != 200 && solrRequestNumRetries > 0);
+
+      if (result != 200) {
+        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
+      }
+
+      //String response = get.getResponseBodyAsString();
+//		BufferedReader reader = new BufferedReader(get.getResponseBodyAsStream());
+//		StringBuilder sb = new StringBuilder();
+//		String line = null;
+//		try {
+//			while ((line = reader.readLine()) != null) {
+//				sb.append(line + "\n");
+//			}
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//		fullText = sb.toString();
+
+//		BufferedInputStream bis = new BufferedInputStream(get.getResponseBodyAsStream());
+//	  byte[] b = new byte[4096];
+//	  int len;
+//	  while ((len = bis.read(b)) > 0) {
+//        String str = new String(b, 0, len, get.getResponseCharSet());
+//		  String start = "<arr name=\"text\"><str>";
+//		  String stop = "</str></arr>";
+//		  if (fullText.length() == 0) {
+//			  int iStart = str.indexOf(start);
+//			if (iStart >= 0) {
+//			  fullText = str.substring(iStart+start.length());
+//			  int iEnd = fullText.indexOf(stop);
+//			  if (iEnd >= 0) {
+//				  fullText = fullText.substring(0, iEnd);
+//				  break;
+//			  }
+//			}
+//		  } else {
+//			  int iEnd = str.indexOf(stop);
+//			  if (iEnd == -1)
+//				  fullText += str;
+//			  else {
+//				  fullText += str.substring(0, iEnd);
+//				  break;
+//			  }
+//		  }
+//      }
+	  //fullText = parseXML(response);
+	  fullText = get.getResponseBodyAsString();
+	  String start = "<arr name=\"text\"><str>";
+	  String stop = "</str></arr>";
+	 fullText = trimBracketed(fullText, start, stop);
+//	  if (uri.equals("http://www.rossettiarchive.org/docs/2-1881.sigdadd.delms.rad"))
+//	  {
+//		  int iQuote = fullText.indexOf("‚Äú");
+//		  int iDblQuote = fullText.indexOf("‚Äú‚Äú");
+//		  int iQuote2 = fullText.indexOf("“");
+//		  int iDblQuote2 = fullText.indexOf("““");
+//		  errorReport.addError(new IndexerError("","","Quotes: " + iQuote + "," + iDblQuote + "," + iQuote2 + "," + iDblQuote2));
+//		  String str = unescapeXML(fullText);
+//		  if (str.length() != fullText.length())
+//			  errorReport.addError(new IndexerError("","","Not same length"));
+//	  }
+
+    } catch (NoHttpResponseException e) {
+      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
+    } catch (ConnectTimeoutException e) {
+      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
+    } catch (IOException e) {
+      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
+	}
+    finally {
+      get.releaseConnection();
+    }
+
+    return unescapeXML(fullText);
+}
+
+  private String unescapeXML(String str) {
+	 str = str.replaceAll("&lt;", "<");
+	 str = str.replaceAll("&gt;", ">");
+	 str = str.replaceAll("&amp;", "&");
+	return str;
+  }
+
+//  private String parseXML(String str) {
+//	  String start = "<arr name=\"text\"><str>";
+//	  String stop = "</str></arr>";
+//	 String fullText = trimBracketed(str, start, stop);
+//	 fullText = replaceMatch(fullText, "&lt;", "<");
+//	 fullText = replaceMatch(fullText, "&gt;", ">");
+//	 fullText = replaceMatch(fullText, "&amp;", "&");
+//	return fullText;
+//    }
+
+
+
   public boolean handleRole( String predicate, String object ) {
     if (predicate.startsWith("http://www.loc.gov/loc.terms/relators/")) {
       String role = predicate.substring("http://www.loc.gov/loc.terms/relators/".length());
       addField(doc, "role_" + role, object);
+	  if (!author_sort_added && ((role.equals("AUT")) || (role.equals("ART")))) {
+		  addField(doc, "author_sort", object);
+		  author_sort_added = true;
+	  }
       return true;
     }
     return false;
@@ -467,6 +627,17 @@ public class NinesStatementHandler implements StatementHandler {
 			}
 		}
 		return fullText;
+	}
+
+	private String trimBracketed(String fullText, String left, String right) {
+		int start = fullText.indexOf(left);
+		if (start == -1)
+			return "";
+		start += left.length();
+		int end = fullText.indexOf(right, start);
+		if (end == -1)
+			return "";
+		return fullText.substring(start, end);
 	}
 
 	private String removeTag(String fullText, String tag) {

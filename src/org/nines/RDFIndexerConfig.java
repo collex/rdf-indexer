@@ -16,13 +16,21 @@
 
 package org.nines;
 
+import java.util.ArrayList;
+
 /**
  * Configuration for the RDFFileIndexer
  * @author nicklaiacona
  */
 public class RDFIndexerConfig {   
     public String solrBaseURL = "http://localhost:8983/solr";
+	public String solrExistingIndex = "/resources";
+	public String solrNewIndex = "/reindex_rdf";
     public boolean collectLinks = true;
-    public boolean retrieveFullText = true;
+    public boolean retrieveFullText = false;
+	public boolean reindexFullText = false;
+	public int maxDocsPerFolder = 99999999;
+	public ArrayList< String > ignoreFolders = new ArrayList < String >();
+	public ArrayList< String > includeFolders = new ArrayList < String >();
     public boolean commitToSolr = true;
 }

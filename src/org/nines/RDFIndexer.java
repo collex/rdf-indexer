@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.httpclient.HttpMethodBase;
+import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
@@ -40,8 +42,8 @@ public class RDFIndexer {
 
   private int numFiles = 0;
   private int numObjects = 0;
-  private int numToDelete = 0;
-  private String archive = null;
+  //private int numToDelete = 0;
+  private ArrayList< String > archives = new ArrayList<String>();
   private String guid = "";
   private RDFIndexerConfig config;
   private ConcurrentLinkedQueue<File> dataFileQueue;
@@ -49,7 +51,7 @@ public class RDFIndexer {
   private LinkCollector linkCollector;
   private int progressMilestone = 0;
   private long lastTime;
-  private String solrURL;
+  //private String solrURL;
   private Logger log;
 
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
@@ -66,10 +68,11 @@ public class RDFIndexer {
     log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text"); 
 
     this.config = config;
-    this.solrURL = config.solrBaseURL + "/update";
+    //this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
     
-    File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt");
-    
+    //File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the report file.
+    String reportFilename = rdfSource.getPath().substring(rdfSource.getPath().lastIndexOf('/') + 1);
+    File reportFile = new File(reportFilename + "_report.txt");	// keep report file in the same folder as the log file.
     try {
         errorReport = new ErrorReport(reportFile);
     } 
@@ -82,42 +85,45 @@ public class RDFIndexer {
 
     HttpClient client = new HttpClient();
 	
-    if (rdfSource.isDirectory()) {
+//    if (rdfSource.isDirectory()) {
     	createGUID(rdfSource);
     	Date start = new Date();
     	log.info("Started indexing at " + start);
 
     	indexDirectory(rdfSource);
-        if( config.commitToSolr ) commitDocumentsToSolr(client);
+        if( config.commitToSolr ) {
+			for (String archive : archives)
+				commitDocumentsToSolr(client, archive);
+		}
         else log.info("Skipping Commit to SOLR...");
 	    
         // report done
         Date end = new Date();	
         long duration = (end.getTime() - start.getTime()) / 60000;	
         log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
-    } 
-    else {
-    	errorReport.addError(new IndexerError("","","No objects found"));
-    }
+//    }
+//    else {
+//    	errorReport.addError(new IndexerError("","","No objects found"));
+//    }
 
-    if (config.commitToSolr && archive != null) {
-      // find out how many items will be deleted
-      numToDelete = numToDelete(guid, archive, client );
-      log.info("Deleting "+numToDelete+" duplicate existing documents from index.");
-
-      // remove content that isn't from this batch
-      cleanUp(guid, archive, client);
-    }
+//    if (config.commitToSolr && archive != null) {
+//      // find out how many items will be deleted
+//      numToDelete = numToDelete(guid, archive, client );
+//      log.info("Deleting "+numToDelete+" duplicate existing documents from index.");
+//
+//      // remove content that isn't from this batch
+//      cleanUp(guid, archive, client);
+//    }
 
     errorReport.close();
     linkCollector.close();
   }
   
-  private void commitDocumentsToSolr( HttpClient client ) {
+  private void commitDocumentsToSolr( HttpClient client, String archive ) {
     try {
         if (numObjects > 0) {
-            postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>",client);
-            postToSolr("<commit/>",client);
+            postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>",client, archive);
+            postToSolr("<commit/>",client, archive);
         }
     }
     catch( IOException e ) {
@@ -172,36 +178,107 @@ public class RDFIndexer {
   
   public static void main(String[] args) {
     if (args.length < 1) {
-      System.err.println("java -jar rdf-indexer.jar <rdf dir> [<solr url>] [--fulltext]");
+      System.err.println("java -jar rdf-indexer.jar <rdf dir|file> [--fulltext] [--reindex] [--ignore=ignore_filename] [--include=include_filename] [--maxDocs=99]");
       System.exit(-1);
     }
 
-    String fullTextFlag = "--fulltext";
+    String fullTextFlag = "--fulltext";	// This goes to the website to get the full text.
+    String reindexFlag = "--reindex";	// This gets the full text from the current index instead of going to the website.
+    String maxDocsFlag = "--maxDocs";	// This just looks at the first few docs in each folder.
+    String useIgnoreFile = "--ignore";	// This ignores the folders specified in the file.
+    String useIncludeFile = "--include";	// This ignores the folders specified in the file.
     
     File rdfSource = new File(args[0]);
     RDFIndexerConfig config = new RDFIndexerConfig();
 
-    if( args.length > 1 && !args[1].equals(fullTextFlag)) {
-        config.solrBaseURL = args[1];
-    }
-    
-    config.retrieveFullText = ( fullTextFlag.equals(args[args.length - 1]) );
+	for (int i = 1; i < args.length; i++) {
+		if (args[i].equals(fullTextFlag))
+			config.retrieveFullText = true;
+		else if (args[i].equals(reindexFlag))
+			config.reindexFullText = true;
+		else if (args[i].startsWith(maxDocsFlag))
+			config.maxDocsPerFolder = Integer.parseInt(args[i].substring(maxDocsFlag.length()+1));
+		else if (args[i].startsWith(useIgnoreFile)) {
+			String ignoreFile = rdfSource + "/" + args[i].substring(useIgnoreFile.length()+1);
+			try{
+				// Open the file that is the first
+				// command line parameter
+				FileInputStream fstream = new FileInputStream(ignoreFile);
+				// Get the object of DataInputStream
+				DataInputStream in = new DataInputStream(fstream);
+				BufferedReader br = new BufferedReader(new InputStreamReader(in));
+				String strLine;
+				//Read File Line By Line
+				while ((strLine = br.readLine()) != null)   {
+				  config.ignoreFolders.add(rdfSource + "/" + strLine);
+				}
+				//Close the input stream
+				in.close();
+				}catch (Exception e){//Catch exception if any
+				  System.err.println("Error: " + e.getMessage());
+				}
+		}
+		else if (args[i].startsWith(useIncludeFile)) {
+			String includeFile = rdfSource + "/" + args[i].substring(useIncludeFile.length()+1);
+			try{
+				// Open the file that is the first
+				// command line parameter
+				FileInputStream fstream = new FileInputStream(includeFile);
+				// Get the object of DataInputStream
+				DataInputStream in = new DataInputStream(fstream);
+				BufferedReader br = new BufferedReader(new InputStreamReader(in));
+				String strLine;
+				//Read File Line By Line
+				while ((strLine = br.readLine()) != null)   {
+				  config.includeFolders.add(rdfSource + "/" + strLine);
+				}
+				//Close the input stream
+				in.close();
+				}catch (Exception e){//Catch exception if any
+				  System.err.println("Error: " + e.getMessage());
+				}
+		}
+	}
 
     new RDFIndexer(rdfSource, config);
   }
 
-  private void recursivelyQueueFiles( File dir )  {
-		log.info("loading directory: "+dir.getPath());
-		
-		File fileList[] = dir.listFiles();
-		for( File entry : fileList ) {
-			if( entry.isDirectory() && !entry.getName().endsWith(".svn") ) {
-				recursivelyQueueFiles(entry);
+	private void recursivelyQueueFiles(File dir) {
+		if (dir.isDirectory()) {
+			log.info("loading directory: " + dir.getPath());
+			int numFilesInFolder = 0;
+
+			File fileList[] = dir.listFiles();
+			for (File entry : fileList) {
+				if (entry.isDirectory() && !entry.getName().endsWith(".svn")) {
+					String path = entry.toString();
+					if (config.ignoreFolders.size() > 0) {
+						int index = config.ignoreFolders.indexOf(path);
+						if (index == -1) {
+							recursivelyQueueFiles(entry);
+						}
+					} else if (config.includeFolders.size() > 0) {
+						int index = config.includeFolders.indexOf(path);
+						if (index != -1) {
+							recursivelyQueueFiles(entry);
+						}
+					} else {
+						recursivelyQueueFiles(entry);
+					}
+				}
+				if (entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml")) {
+					numFilesInFolder++;
+					if (numFilesInFolder < config.maxDocsPerFolder) {
+						dataFileQueue.add(entry);
+					}
+				}
 			}
-			if( entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml") ) {
-				dataFileQueue.add(entry);
-			}
-		}				
+		}
+		else // a file was passed in, not a folder
+		{
+			log.info("loading file: " + dir.getPath());
+			dataFileQueue.add(dir);
+		}
 	}
 	
   private void indexDirectory(File rdfDir) {
@@ -240,17 +317,37 @@ public class RDFIndexer {
     	}
     }
   }
- 
+
+  private String archiveToCore(String archive) {
+	  String core = archive.replaceAll(":", "_");
+	  core = core.replaceAll(" ", "_");
+	  core = core.replaceAll("-", "_");
+	  core = core.replaceAll(",", "_");
+	  return "archive_" + core;
+  }
   private void indexFile(File file, HttpClient client ) {
     try {
     	HashMap<String, HashMap<String, ArrayList<String>>> objects = RdfDocumentParser.parse( file, errorReport, linkCollector, config );
+		String archive = "";
+		HashMap<String, HashMap<String, HashMap<String, ArrayList<String>>>> objects_by_archive = new HashMap<String, HashMap<String, HashMap<String, ArrayList<String>>>>();
 
 		Set<String> keys = objects.keySet();
 	    for (String uri : keys) {
 	      HashMap<String, ArrayList<String>> object = objects.get(uri);
 	      ArrayList<String> objectArray = object.get("archive");
               if( objectArray != null ) {
-                archive = objectArray.get(0);
+                archive = archiveToCore(objectArray.get(0));
+				if (!objects_by_archive.containsKey(archive))
+					objects_by_archive.put(archive, new HashMap<String, HashMap<String, ArrayList<String>>>());
+				objects_by_archive.get(archive).put(uri, object);
+				Boolean found = false;
+				for (String a : archives)
+					if (a.equals(archive))
+						found = true;
+				if (!found) {
+					archives.add(archive);
+					beSureCoreExists(client, archive);
+				}
               } else {
                 errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
               }
@@ -267,10 +364,14 @@ public class RDFIndexer {
 	    }
 
 	    int objectCount = objects.size();
-	    if (objectCount > 0) {
-	      postObjectsToSolr( client, objects );	
-	    } else {
+		if (objectCount == 0)
 	      errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
+		else {
+			Set<String> archive_list = objects_by_archive.keySet();
+		    for (String arch : archive_list) {
+	          log.info("posting:" + arch + " (num=" + objects_by_archive.get(arch).size() + ")");
+		      postObjectsToSolr( client, objects_by_archive.get(arch), arch );
+			}
 	    }
 
 	    numObjects += objectCount;
@@ -296,13 +397,12 @@ public class RDFIndexer {
     }
   }
 
-  public void postToSolr(String xml, HttpClient httpclient ) throws IOException {
-    PostMethod post = new PostMethod(solrURL);
-    post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
-    post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
+  private void beSureCoreExists(HttpClient httpclient, String core) throws IOException {
+	  GetMethod post = new GetMethod(config.solrBaseURL + "/admin/cores?action=STATUS");
 
     httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-    // Execute request
+    httpclient.getHttpConnectionManager().getParams().setIntParameter( HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000*1024);
+// Execute request
     try {
       int result;
       int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
@@ -312,10 +412,64 @@ public class RDFIndexer {
         if(result != 200) {
           try {
             Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+			log.info(">>>> postToSolr error: "+result+" (retrying...)");
+			log.info(">>>> getting core information");
           } catch(InterruptedException e) {
             log.info(">>>> Thread Interrupted");
           }
         }
+      } while(result != 200 && solrRequestNumRetries > 0);
+
+      if (result != 200) {
+        throw new IOException("Non-OK response: " + result + "\n\n");
+      }
+	  String response = post.getResponseBodyAsString();
+	  int exists = response.indexOf(">" + core + "<");
+	  if (exists <= 0) {
+		  // The core doesn't exist: create it.
+		  post = new GetMethod(config.solrBaseURL + "/admin/cores?action=CREATE&name="+core + "&instanceDir=.");
+        result = httpclient.executeMethod(post);
+            log.info(">>>> Created core: " + core);
+          try {
+	         Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+          } catch(InterruptedException e) {
+            log.info(">>>> Thread Interrupted");
+          }
+	  }
+      } finally {
+      // Release current connection to the connection pool once you are done
+      post.releaseConnection();
+    }
+  }
+
+  public void postToSolr(String xml, HttpClient httpclient, String archive ) throws IOException {
+//	  beSureCoreExists(httpclient, archive);
+
+    PostMethod post = new PostMethod(config.solrBaseURL + "/" + archive + "/update");
+    //PostMethod post = new PostMethod(config.solrBaseURL + config.solrNewIndex + "/update");
+    post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
+    post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
+
+    httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
+    httpclient.getHttpConnectionManager().getParams().setIntParameter( HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000*1024);
+// Execute request
+    try {
+      int result;
+      int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
+      do {
+        result = httpclient.executeMethod(post);
+        if(result != 200) {
+          try {
+            Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+			log.info(">>>> postToSolr error in archive " + archive + ": "+result+" (retrying...)");
+          } catch(InterruptedException e) {
+            log.info(">>>> Thread Interrupted");
+          }
+        } else {
+			if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES)
+				log.info(">>>> postToSolr: " + archive + ":  (succeeded!)");
+		}
+        solrRequestNumRetries--;
       } while(result != 200 && solrRequestNumRetries > 0);
 
       if (result != 200) {
@@ -342,108 +496,108 @@ public class RDFIndexer {
    * Sends an http message to the adminapp to notify that indexing is finished for the
    * batch identified by the guid
    */
-  private void sendMessage(String guid, String messageUrl, HttpClient httpclient) throws IOException {
-    ErrorSummary summary = errorReport.getSummary();
-
-    GetMethod get = new GetMethod(messageUrl);
-    NameValuePair guidParam = new NameValuePair("guid", guid);
-    NameValuePair archiveParam = new NameValuePair("archive", this.archive);
-    NameValuePair stat1 = new NameValuePair("stats[totalFileCount]", Integer.toString(numFiles));
-    NameValuePair stat2 = new NameValuePair("stats[totalObjectCount]", Integer.toString(numObjects));
-    NameValuePair stat3 = new NameValuePair("stats[fileErrorCount]", Integer.toString(summary.getFileCount()));
-    NameValuePair stat4 = new NameValuePair("stats[objectErrorCount]", Integer.toString(summary.getObjectCount()));
-    NameValuePair stat5 = new NameValuePair("stats[totalErrorCount]", Integer.toString(summary.getErrorCount()));
-    NameValuePair stat6 = new NameValuePair("stats[objectsDeleted]", Integer.toString(numToDelete));
-    NameValuePair params[] = new NameValuePair[]{guidParam, archiveParam, stat1, stat2, stat3, stat4, stat5, stat6};
-    get.setQueryString(params);
-
-    int result;
-    try {
-      result = httpclient.executeMethod(get);
-
-      if (result != 200) {
-        if (result >= 400 && result < 500) {
-          throw new IOException(result+" code returned for URL: " + messageUrl);
-        }
-      }
-    } catch (NoHttpResponseException e) {
-      throw new IOException("The message server didn't respond to the http request to: " + messageUrl);
-    } catch (ConnectTimeoutException e) {
-      throw new IOException("The message server timed out on the http request to: " + messageUrl);
-    } finally {
-      get.releaseConnection();
-    }
-  }
+//  private void sendMessage(String guid, String messageUrl, HttpClient httpclient) throws IOException {
+//    ErrorSummary summary = errorReport.getSummary();
+//
+//    GetMethod get = new GetMethod(messageUrl);
+//    NameValuePair guidParam = new NameValuePair("guid", guid);
+//    NameValuePair archiveParam = new NameValuePair("archive", this.archive);
+//    NameValuePair stat1 = new NameValuePair("stats[totalFileCount]", Integer.toString(numFiles));
+//    NameValuePair stat2 = new NameValuePair("stats[totalObjectCount]", Integer.toString(numObjects));
+//    NameValuePair stat3 = new NameValuePair("stats[fileErrorCount]", Integer.toString(summary.getFileCount()));
+//    NameValuePair stat4 = new NameValuePair("stats[objectErrorCount]", Integer.toString(summary.getObjectCount()));
+//    NameValuePair stat5 = new NameValuePair("stats[totalErrorCount]", Integer.toString(summary.getErrorCount()));
+//    NameValuePair stat6 = new NameValuePair("stats[objectsDeleted]", Integer.toString(numToDelete));
+//    NameValuePair params[] = new NameValuePair[]{guidParam, archiveParam, stat1, stat2, stat3, stat4, stat5, stat6};
+//    get.setQueryString(params);
+//
+//    int result;
+//    try {
+//      result = httpclient.executeMethod(get);
+//
+//      if (result != 200) {
+//        if (result >= 400 && result < 500) {
+//          throw new IOException(result+" code returned for URL: " + messageUrl);
+//        }
+//      }
+//    } catch (NoHttpResponseException e) {
+//      throw new IOException("The message server didn't respond to the http request to: " + messageUrl);
+//    } catch (ConnectTimeoutException e) {
+//      throw new IOException("The message server timed out on the http request to: " + messageUrl);
+//    } finally {
+//      get.releaseConnection();
+//    }
+//  }
 
   /**
    * Connects to solr and removes all content for a given archive that is not part of the current batch,
    * as denoted by the guid.  This makes it possible to index all new content and to strip out the old as the
    * last operation.
    */
-  private void cleanUp(String guid, String archive, HttpClient httpclient)  {
-    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
-    String solrXml = "<delete><query>" + luceneQuery + "</query></delete>";
-
-    try {
-	    postToSolr(solrXml,httpclient);
-	    postToSolr("<commit/>",httpclient);
-    } catch( IOException e ) {
-    	errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR during cleanup. "+e.getLocalizedMessage()));    		
-    }
-  }
-
-  private int numToDelete(String guid, String archive, HttpClient httpclient ) {
-    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
-    int numToDelete = 0;
-    
-    String solrUrl = config.solrBaseURL + "/select";
-
-    GetMethod get = new GetMethod(solrUrl);
-    NameValuePair queryParam = new NameValuePair("q", luceneQuery);
-    NameValuePair params[] = new NameValuePair[]{queryParam};
-    get.setQueryString(params);
-
-    int result;
-    try {
-      int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-      do {
-        result = httpclient.executeMethod(get);
-        solrRequestNumRetries--;
-        if(result != 200) {
-          try {
-            Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-          } catch(InterruptedException e) {
-            log.info(">>>> Thread Interrupted");
-          }
-        }
-      } while(result != 200 && solrRequestNumRetries > 0);
-
-      if (result != 200) {
-        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
-      }
-
-      String response = get.getResponseBodyAsString();
-
-      Pattern pattern = Pattern.compile("numFound=\\\"(.)\\\"", Pattern.DOTALL);
-      Matcher matcher = pattern.matcher(response);
-      while (matcher.find()) {
-        String numFound = matcher.group(1);
-        if (numFound != null)
-          numToDelete = Integer.parseInt(numFound);
-      }
-    } catch (NoHttpResponseException e) {
-      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
-    } catch (ConnectTimeoutException e) {
-      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
-    } catch (IOException e) {
-      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
-	} 
-    finally {
-      get.releaseConnection();
-    }
-
-    return numToDelete;
-  }
+//  private void cleanUp(String guid, String archive, HttpClient httpclient)  {
+//    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
+//    String solrXml = "<delete><query>" + luceneQuery + "</query></delete>";
+//
+//    try {
+//	    postToSolr(solrXml,httpclient);
+//	    postToSolr("<commit/>",httpclient);
+//    } catch( IOException e ) {
+//    	errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR during cleanup. "+e.getLocalizedMessage()));
+//    }
+//  }
+//
+//  private int numToDelete(String guid, String archive, HttpClient httpclient ) {
+//    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
+//    int iNumToDelete = 0;
+//
+//    String solrUrl = config.solrBaseURL + config.solrNewIndex + "/select";
+//
+//    GetMethod get = new GetMethod(solrUrl);
+//    NameValuePair queryParam = new NameValuePair("q", luceneQuery);
+//    NameValuePair params[] = new NameValuePair[]{queryParam};
+//    get.setQueryString(params);
+//
+//    int result;
+//    try {
+//      int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
+//      do {
+//        result = httpclient.executeMethod(get);
+//        solrRequestNumRetries--;
+//        if(result != 200) {
+//          try {
+//            Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+//          } catch(InterruptedException e) {
+//            log.info(">>>> Thread Interrupted");
+//          }
+//        }
+//      } while(result != 200 && solrRequestNumRetries > 0);
+//
+//      if (result != 200) {
+//        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
+//      }
+//
+//      String response = get.getResponseBodyAsString();
+//
+//      Pattern pattern = Pattern.compile("numFound=\\\"(.)\\\"", Pattern.DOTALL);
+//      Matcher matcher = pattern.matcher(response);
+//      while (matcher.find()) {
+//        String numFound = matcher.group(1);
+//        if (numFound != null)
+//          iNumToDelete = Integer.parseInt(numFound);
+//      }
+//    } catch (NoHttpResponseException e) {
+//      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
+//    } catch (ConnectTimeoutException e) {
+//      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
+//    } catch (IOException e) {
+//      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
+//	}
+//    finally {
+//      get.releaseConnection();
+//    }
+//
+//    return iNumToDelete;
+//  }
   
   private Element convertObjectToSolrDOM( String documentName, HashMap<String, ArrayList<String>> fields) {
     
@@ -472,7 +626,12 @@ public class RDFIndexer {
     return doc;
   }
 
-  private void postObjectsToSolr( HttpClient client, HashMap<String, HashMap<String, ArrayList<String>>> documents ) throws IOException {
+  private class DocCollector {
+	  public Document solrDoc = new Document();
+	  public int documentCount = 0;
+  }
+
+  private void postObjectsToSolr( HttpClient client, HashMap<String, HashMap<String, ArrayList<String>>> documents, String archive ) throws IOException {
 	XMLOutputter outputter = new XMLOutputter();
 	Set<String> keys = documents.keySet();
 
@@ -489,7 +648,7 @@ public class RDFIndexer {
       if( documentCount++ >= DOCUMENTS_PER_POST ) {
 	      // post this set of documents
     	  String xml = outputter.outputString(solrDoc);
-	      postToSolr(xml,client);
+	      postToSolr(xml,client, archive);
 	      
 	      // reset for next post
 	      solrDoc = new Document();
@@ -501,7 +660,7 @@ public class RDFIndexer {
     
     if( documentCount > 0 ) {
 	 String xml = outputter.outputString(solrDoc);
-	 postToSolr(xml,client);
+	 postToSolr(xml,client, archive);
     }
   }
 
