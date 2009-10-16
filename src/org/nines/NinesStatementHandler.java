@@ -44,7 +44,6 @@ public class NinesStatementHandler implements StatementHandler {
   private String dateBNodeId;
   private HashMap<String, ArrayList<String>> doc;
   private Boolean title_sort_added = false;
-  private Boolean author_sort_added = false;
   private String filename; 
   private RDFIndexerConfig config;
   private ErrorReport errorReport;
@@ -95,7 +94,6 @@ public class NinesStatementHandler implements StatementHandler {
       addField(doc, "uri", subject);
       documents.put(subject, doc);
 	  title_sort_added = false;
-	  author_sort_added = false;
       documentURI = subject;
       //if( documentURI.equals("") ) documentURI = subject;
       log.info("Parsing RDF for document: "+subject );
@@ -103,20 +101,30 @@ public class NinesStatementHandler implements StatementHandler {
     }
     // Check for any unsupported nines:* attributes and issue error if any exist
     if (predicate.startsWith("http://www.nines.org/schema#")) {
-      String attribute = predicate.substring("http://www.nines.org/schema#".length());
+
+        errorReport.addError(
+            new IndexerError(filename, documentURI, "NINES is no longer a valid attribute: " + predicate));
+
+        return;
+    }
+
+    if (predicate.startsWith("http://www.collex.org/schema#")) {
+      String attribute = predicate.substring("http://www.collex.org/schema#".length());
       if (! (attribute.equals("archive") || attribute.equals("freeculture") ||
-          attribute.equals("source") ||
+          attribute.equals("source") || attribute.equals("federation") || attribute.equals("ocr") ||
           attribute.equals("genre") || attribute.equals("thumbnail") || attribute.equals("text") ||
           attribute.equals("image"))) {
 
         errorReport.addError(
-            new IndexerError(filename, documentURI, "NINES does not support this property: " + predicate));
+            new IndexerError(filename, documentURI, "Collex does not support this property: " + predicate));
       
         return;
       }
     }
     
     // parse RDF statements into fields, return when the statement has been handled    
+    if( handleFederation(predicate, object) ) return;
+    if( handleOcr(predicate, object) ) return;
     if( handleArchive(predicate, object) ) return;
     if( handleFreeCulture(predicate, object) ) return;
     if( handleTitle(predicate, object) ) return;
@@ -130,10 +138,68 @@ public class NinesStatementHandler implements StatementHandler {
     if( handleURL(predicate, object) ) return;
     if( handleText(predicate, object) ) return;
     if( handleRole(predicate, object) ) return;
+    if( handlePerson(predicate, object) ) return;
+    if( handleFormat(predicate, object) ) return;
+    if( handleLanguage(predicate, object) ) return;
+    if( handleGeospacial(predicate, object) ) return;
   }
   
+  public boolean handleFederation( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#federation".equals(predicate)) {
+		  if (object.equals("NINES") || object.equals("18th Connect"))
+		      addField(doc, "federation", object);
+		  else
+			   errorReport.addError(new IndexerError(filename, documentURI, "Unknown federation: " + object));
+	      return true;
+	  }
+	  return false;
+  }
+
+  public boolean handleOcr( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#ocr".equals(predicate)) {
+		if ("true".equalsIgnoreCase(object)) {
+        // only add a ocr field if it's true.  No field set implies "F"alse
+	      addField(doc, "is_ocr", "T");
+	      return true;
+		}
+	  }
+	  return false;
+  }
+
+  public boolean handlePerson( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#person".equals(predicate)) {
+	      addField(doc, "person", object);
+	      return true;
+	  }
+	  return false;
+  }
+
+  public boolean handleFormat( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#format".equals(predicate)) {
+	      addField(doc, "format", object);
+	      return true;
+	  }
+	  return false;
+  }
+
+  public boolean handleLanguage( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#language".equals(predicate)) {
+	      addField(doc, "language", object);
+	      return true;
+	  }
+	  return false;
+  }
+
+  public boolean handleGeospacial( String predicate, String object ) {
+	  if ("http://www.collex.org/schema#geospacial".equals(predicate)) {
+	      addField(doc, "geospacial", object);
+	      return true;
+	  }
+	  return false;
+  }
+
   public boolean handleArchive( String predicate, String object ) {
-	  if ("http://www.nines.org/schema#archive".equals(predicate)) {
+	  if ("http://www.collex.org/schema#archive".equals(predicate)) {
 	      addField(doc, "archive", object);
 	      return true;
 	  }
@@ -141,7 +207,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
     
   public boolean handleFreeCulture( String predicate, String object ) {
-    if ("http://www.nines.org/schema#freeculture".equals(predicate)) {
+    if ("http://www.collex.org/schema#freeculture".equals(predicate)) {
       if ("false".equalsIgnoreCase(object)) {
         // only add a freeculture field if its false.  No field set implies "T"rue
         addField(doc, "freeculture", "F");  // "F"alse     
@@ -172,7 +238,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
   
   public boolean handleGenre( String predicate, String object ) {
-    if ("http://www.nines.org/schema#genre".equals(predicate)) {
+    if ("http://www.collex.org/schema#genre".equals(predicate)) {
       // ignore deprecated genres for backward compatibility
       if (!"Primary".equals(object) && !"Secondary".equals(object)) {
         addField(doc, "genre", object);
@@ -255,7 +321,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
   
   public boolean handleThumbnail( String predicate, String object ) {
-    if ("http://www.nines.org/schema#thumbnail".equals(predicate)) {
+    if ("http://www.collex.org/schema#thumbnail".equals(predicate)) {
       addField(doc, "thumbnail", object);
       return true;
     }
@@ -263,7 +329,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
   
   public boolean handleImage( String predicate, String object ) {
-    if ("http://www.nines.org/schema#image".equals(predicate)) {
+    if ("http://www.collex.org/schema#image".equals(predicate)) {
       addField(doc, "image", object);
       return true;
     }
@@ -279,7 +345,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
   
   public boolean handleText( String predicate, String object ) {
-    if ("http://www.nines.org/schema#text".equals(predicate)) {
+    if ("http://www.collex.org/schema#text".equals(predicate)) {
       try {
         String text = object;
         if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
@@ -429,10 +495,6 @@ public class NinesStatementHandler implements StatementHandler {
     if (predicate.startsWith("http://www.loc.gov/loc.terms/relators/")) {
       String role = predicate.substring("http://www.loc.gov/loc.terms/relators/".length());
       addField(doc, "role_" + role, object);
-	  if (!author_sort_added && ((role.equals("AUT")) || (role.equals("ART")))) {
-		  addField(doc, "author_sort", object);
-		  author_sort_added = true;
-	  }
       return true;
     }
     return false;
@@ -522,7 +584,55 @@ public class NinesStatementHandler implements StatementHandler {
     }
   }
 
+  private String getFirstField(HashMap<String, ArrayList<String>> object, String field) {
+	ArrayList<String> objectArray = object.get(field);
+	if( objectArray != null ) {
+		return objectArray.get(0);
+	}
+	return "";
+  }
+
   public HashMap<String, HashMap<String, ArrayList<String>>> getDocuments() {
+	// add author_sort: we do that here because we have a few different fields we look at and the order they appear shouldn't matter, so we wait to the end to find them.
+	Set<String> keys = documents.keySet();
+	for (String uri : keys) {
+		HashMap<String, ArrayList<String>> object = documents.get(uri);
+		String author = getFirstField(object, "role_AUT");
+		String artist = getFirstField(object, "role_ART");
+		String editor = getFirstField(object, "role_EDT");
+		String publisher = getFirstField(object, "role_PUB");
+		String translator = getFirstField(object, "role_TRN");
+		String printer = getFirstField(object, "role_CRE");
+		String etcher = getFirstField(object, "role_ETR");
+		String engraver = getFirstField(object, "role_EGR");
+		if (author.length() > 0)
+			addField(object, "author_sort", author);
+		else if (artist.length() > 0)
+			addField(object, "author_sort", artist);
+		else if (editor.length() > 0)
+			addField(object, "author_sort", editor);
+		else if (publisher.length() > 0)
+			addField(object, "author_sort", publisher);
+		else if (translator.length() > 0)
+			addField(object, "author_sort", translator);
+		else if (printer.length() > 0)
+			addField(object, "author_sort", printer);
+		else if (etcher.length() > 0)
+			addField(object, "author_sort", etcher);
+		else if (engraver.length() > 0)
+			addField(object, "author_sort", engraver);
+
+		// add fulltext and ocr indicators
+		ArrayList<String> objectArray = object.get("text");
+		if( objectArray != null ) {	// If we have a text field
+			addField(object, "has_full_text", "T");
+			objectArray = object.get("is_ocr");
+			if( objectArray == null )	// If we weren't told differently, then it is not an ocr object
+				addField(object, "is_ocr", "F");
+		} else {
+			addField(object, "has_full_text", "F");
+		}
+	}
     return documents;
   }
 
