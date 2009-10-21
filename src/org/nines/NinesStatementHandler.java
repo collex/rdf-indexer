@@ -25,6 +25,7 @@ import org.openrdf.rio.StatementHandlerException;
 import org.openrdf.sesame.sailimpl.memory.BNodeNode;
 import org.openrdf.sesame.sailimpl.memory.LiteralNode;
 import org.openrdf.sesame.sailimpl.memory.URINode;
+import org.apache.commons.lang.StringEscapeUtils;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -32,6 +33,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
+import net.sf.saxon.functions.Substring;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.NoHttpResponseException;
@@ -112,7 +114,7 @@ public class NinesStatementHandler implements StatementHandler {
       String attribute = predicate.substring("http://www.collex.org/schema#".length());
       if (! (attribute.equals("archive") || attribute.equals("freeculture") ||
           attribute.equals("source") || attribute.equals("federation") || attribute.equals("ocr") ||
-          attribute.equals("genre") || attribute.equals("thumbnail") || attribute.equals("text") ||
+          attribute.equals("genre") || attribute.equals("thumbnail") || attribute.equals("text") || attribute.equals("fulltext") ||
           attribute.equals("image"))) {
 
         errorReport.addError(
@@ -125,6 +127,7 @@ public class NinesStatementHandler implements StatementHandler {
     // parse RDF statements into fields, return when the statement has been handled    
     if( handleFederation(predicate, object) ) return;
     if( handleOcr(predicate, object) ) return;
+    if( handleFullText(predicate, object) ) return;
     if( handleArchive(predicate, object) ) return;
     if( handleFreeCulture(predicate, object) ) return;
     if( handleTitle(predicate, object) ) return;
@@ -210,13 +213,24 @@ public class NinesStatementHandler implements StatementHandler {
     if ("http://www.collex.org/schema#freeculture".equals(predicate)) {
       if ("false".equalsIgnoreCase(object)) {
         // only add a freeculture field if its false.  No field set implies "T"rue
-        addField(doc, "freeculture", "F");  // "F"alse     
+        addField(doc, "freeculture", "F");  // "F"alse
       }
       return true;
     }
     return false;
   }
-  
+
+  public boolean handleFullText( String predicate, String object ) {
+    if ("http://www.collex.org/schema#fulltext".equals(predicate)) {
+      if ("false".equalsIgnoreCase(object)) {
+        // only add a fulltext field if its false.  No field set implies "T"rue
+        addField(doc, "has_full_text", "F");  // "F"alse
+      }
+      return true;
+    }
+    return false;
+  }
+
   public boolean handleTitle( String predicate, String object ) {
     if ("http://purl.org/dc/elements/1.1/title".equals(predicate)) {
       addField(doc, "title", object);
@@ -356,8 +370,283 @@ public class NinesStatementHandler implements StatementHandler {
 		  }
 		  else {
 			 if( config.retrieveFullText ) text = fetchContent(object);
-			  if (config.reindexFullText)
+			  if (config.reindexFullText) {
 				  text = getFullText(doc.get("uri").get(0), httpClient );
+
+					text = cleanText(text);
+					if (text.indexOf("Alexander Street Press : Trial Login") > 0)	// TODO: just cleaning up. Remove this.
+						text = "";
+					if (text.indexOf("Page Not Found") > 0)	{ // TODO: Just analyzing cather
+						errorReport.addError(new IndexerError(filename, documentURI, "Text contains Page Not Found"));
+						text = "";
+					}
+					text = text.replaceAll("\\.page \\{ padding\\: 1em\\; \\}", "");	// TODO: jstor had this.
+
+					String archive = doc.get("archive").get(0);
+					if (archive.equals("rc")) {
+						String jsText = "var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");\ndocument.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));\ntry {\nvar pageTracker = _gat._getTracker(\"UA-8863611-1\");\npageTracker._trackPageview();\n} catch(err) {}";
+						text = replaceMatch(text, jsText, "");
+						jsText = "function openFootnote(file) {";
+						text = replaceMatch(text, jsText, "");
+						jsText = "var PARAMS = \"resizable=yes,status=no,scrollbars=yes,toolbar=0,directories=0,menubar=0,location=0,copyhistory=0,width=600,height=200,left=100,top=100\";";
+						text = replaceMatch(text, jsText, "");
+						jsText = "var Footnotes = window.open(file,'Footnotes',PARAMS);";
+						text = replaceMatch(text, jsText, "");
+						jsText = "if (JSVer12 || JSVer11) Footnotes.focus() } }";
+						text = replaceMatch(text, jsText, "");
+						jsText = "if (isVer10) alert(\"This web page uses pop-up windows for footnotes. With your browser, it is best to close the footnote window each time after you are through reading a note. Thank you.\");";
+						text = replaceMatch(text, jsText, "");
+						jsText = "var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");\ndocument.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));\ntry {\nvar pageTracker = _gat._getTracker(\"UA-8863611-1\");\npageTracker._trackPageview();\n} catch(err) {}";
+						text = replaceMatch(text, jsText, "");
+						jsText = "0&&parent.frames.length) {";
+						text = replaceMatch(text, jsText, "");
+						jsText = "d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}";
+						text = replaceMatch(text, jsText, "");
+						jsText = "if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i";
+						text = replaceMatch(text, jsText, "");
+						jsText = "function MM_swapImgRestore() { //v3.0";
+						text = replaceMatch(text, jsText, "");
+						jsText = "var i,x,a=document.MM_sr; for(i=0;a&&i";
+						text = replaceMatch(text, jsText, "");
+						jsText = "function opensesame(t) {";
+						text = replaceMatch(text, jsText, "");
+						jsText = "t=window.open(t, \"opensesame\",\"scrollbars,resizable,width=620,height=550\");";
+						text = replaceMatch(text, jsText, "");
+						jsText = "t.focus();";
+						text = replaceMatch(text, jsText, "");
+					}
+
+					if (archive.substring(0, 4).equals("muse")) {
+						String[] matchList = new String[]{
+							"date.setTime(date.getTime() - skew);",
+							"}",
+							"//var expire_time = new Date();",
+							"//fixDate(expire_time);",
+							"//expire_time.setTime(expire_time.getTime() + 365 * 24 * 60 * 60 * 1000);",
+							"var searchpath = \"/;\";",
+							"var searchcheck = getCookie(\"resultstracker\");",
+							"//var searchdomain = \"muse.jhu.edu\";",
+							"function getSearchResults() {",
+							"window.history.go(\"otcgi\")",
+							"var loc = location.href",
+							"var last = loc.substring(loc.length-1, loc.length)",
+							"//If the article has been clicked on from a search results link, do the following.",
+							"if(last == '?'){",
+							"if (!searchcheck) {",
+							"document.writeln(\"\");",
+							"setCookie(\"resultstracker\", '', '', searchpath);",
+							"else {",
+							"document.writeln(searchcheck);",
+							"//If the article has been clicked on from a non-search results link, then do the following, which is:",
+							"//check for an existing search results cookie, and if found, display the back to search results button.",
+							"if (searchcheck) {",
+							"document.writeln(searchcheck);",
+							"*/",
+							"document.writeln('')",
+							"// -->",
+							"= 0) {",
+							"document.write(\"\");",
+							"} else {"
+						};
+
+						text = removeDirtyLines(text, matchList);
+					}
+
+					if (archive.equals("swrp")) {
+						String[] matchList = new String[]{
+							"var Url = {",
+							"// public method for url encoding",
+							"encode : function (string) {",
+							"return escape(this._utf8_encode(string));",
+							"},",
+							"// public method for url decoding",
+							"decode : function (string) {",
+							"return this._utf8_decode(unescape(string));",
+							"// private method for UTF-8 encoding",
+							"_utf8_encode : function (string) {",
+							"string = string.replace(/\\r\\n/g,\"\\n\");",
+							"var utftext = \"\";",
+							"for (var n = 0; n",
+							"127) && (c",
+							"> 6) | 192);",
+							"utftext += String.fromCharCode((c & 63) | 128);",
+							"}",
+							"else {",
+							"utftext += String.fromCharCode((c >> 12) | 224);",
+							"utftext += String.fromCharCode(((c >> 6) & 63) | 128);",
+							"utftext += String.fromCharCode((c & 63) | 128);",
+							"return utftext;",
+							"_utf8_decode : function (utftext) {",
+							"var string = \"\";",
+							"var i = 0;",
+							"var c = c1 = c2 = 0;",
+							"while ( i",
+							"191) && (c < 224)) {",
+							"c2 = utftext.charCodeAt(i+1);",
+							"string += String.fromCharCode(((c & 31) << 6) | (c2 & 63));",
+							"i += 2;",
+							"else {",
+							"c2 = utftext.charCodeAt(i+1);",
+							"c3 = utftext.charCodeAt(i+2);",
+							"string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));",
+							"i += 3;",
+							"return string;",
+							"function getBrowserWidth()",
+							"{",
+							"if (window.innerWidth){",
+							"return window.innerWidth;}",
+							"else if (document.documentElement && document.documentElement.clientWidth != 0){",
+							"return document.documentElement.clientWidth; }",
+							"else if (document.body){return document.body.clientWidth;}",
+							"return 0;",
+							"function addEvent( obj, type, fn )",
+							"if (obj.addEventListener){",
+							"obj.addEventListener( type, fn, false );",
+							"else if (obj.attachEvent){",
+							"obj[\"e\"+type+fn] = fn;",
+							"obj[type+fn] = function(){ obj[\"e\"+type+fn]( window.event ); }",
+							"obj.attachEvent( \"on\"+type, obj[type+fn] );",
+							"function dynamicLayout()",
+							"var browserWidth = getBrowserWidth();",
+							"// load small css rules",
+							"if (browserWidth < 801){",
+							"changeLayout(\"small\");",
+							"// set correct image banner",
+							"document.getElementById(\"imgLogo\").src = \"swrp.graphics/swrptoolbar795.jpg\";",
+							"function changeLayout(description)",
+							"var i, a;",
+							"for(i=0; (a = document.getElementsByTagName(\"link\")[i]); i++){",
+							"if(a.getAttribute(\"title\") == description){a.disabled = false;}",
+							"else if(a.getAttribute(\"title\") != \"default\"){a.disabled = true;}",
+							"// Run dynamicLayout function when page loads and when it resizes.",
+							"addEvent(window, 'load', dynamicLayout);",
+							"function ShowStaticURL(urlAddress)",
+							"window.open (\"swrp.static.url.aspx?url=\" + urlAddress, \"StaticURL\",\"status=0,toolbar=0,location=0,menubar=0,directories=0,resizable=0,scrollbars=0,height=160,width=550,top=50,left=50\");",
+							"function PrintPage(){",
+							"window.print();",
+							"function ShowHideDiv(divid)",
+							"var elediv = document.getElementById(divid);",
+							"if(elediv.style.display == \"none\")",
+							"elediv.style.display = \"block\";",
+							"else",
+							"elediv.style.display = \"none\";",
+							"function ShowObjectDetails(dorpID)",
+							"var newUrl = \"swrp.object.details.aspx?dorpID=\" + dorpID;",
+							"var fulltext = getQueryVariable(\"fulltext\");",
+							"if (fulltext != null){",
+							"newUrl += \"&fulltext=\" + fulltext;",
+							"window.location = newUrl;",
+							"function getQueryVariable(variable) {",
+							"var query = window.location.search.substring(1);",
+							"var vars = query.split(\"&\");",
+							"for (var i=0;i<vars.length;i++) {",
+							"var pair = vars[i].split(\"=\");",
+							"if (pair[0] == variable) {",
+							"if (pair[1].toString().trim() == \"\"){",
+							"return null;",
+							"}else{",
+							"return pair[1];",
+							"String.prototype.trim = function() {",
+							"a = this.replace(/^\\s+/, '');",
+							"return a.replace(/\\s+$/, '');",
+							"};",
+							"function toggleDiv()",
+							"var ele = document.getElementById(\"divMetadata\");",
+							"var img = document.getElementById(\"imgToggle\");",
+							"var txt = document.getElementById(\"spanToggleText\");",
+							"if(ele.style.display == \"none\")",
+							"ele.style.display = \"block\";",
+							"img.alt = \"hide metadata\";",
+							"img.title = \"hide metadata\";",
+							"img.src = \"swrp.graphics/minus.gif\";",
+							"txt.innerHTML = \"hide metadata\";",
+							"} else {",
+							"ele.style.display = \"none\";",
+							"img.alt = \"show metadata\";",
+							"img.title = \"show metadata\";",
+							"img.src = \"swrp.graphics/plus.gif\";",
+							"txt.innerHTML = \"show metadata\";",
+							"var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");",
+							"document.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));",
+							"try {",
+							"var pageTracker = _gat._getTracker(\"UA-5214612-4\");",
+							"pageTracker._trackPageview();",
+							"} catch(err) {}",
+							"// private method for UTF-8 decoding",
+							"191) && (c"
+						};
+
+						text = removeDirtyLines(text, matchList);
+					}
+
+
+					if (archive.equals("PQCh-EAF")) {
+						String[] matchList = new String[]{
+							"var contextRoot = \"/;jsessionid=D03E357175EB09C720913D2A7A553AE2\".split(';')[0];",
+							"var contextRoot = \"/;jsessionid=E7782EFACA80B1BDC54484D5A1D5AB3D\".split(';')[0];",
+							"function newToc(id,queryId,area,reqDiv)",
+							"{",
+							"fullyExpandParam = \"\";",
+							"divLevel = reqDiv;",
+							"if(reqDiv==null || reqDiv==\"\")",
+							"divLevel=\"9\";",
+							"fullyExpandParam=\"&extra_fullyExpand=Y\";",
+							"}",
+							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=no,scrollbars=yes,resizable=yes,width=700,height=600\";",
+							"tocWindow = window.open(contextRoot+\"toc.do?id=\"+id+\"&action=new&area=\"+area+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&mapping=toc\"+fullyExpandParam+\"#scroll\",'ilcstoc',windowPrefs);",
+							"tocWindow.focus();",
+							"function newTocHref(href)",
+							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=yes,scrollbars=yes,resizable=yes,width=480,height=480\";",
+							"tocWindow = window.open(href,'lion3toc',windowPrefs);",
+							"tocWindow.opener=top;",
+							"var title = top.document.title;",
+							"var title1 = title.replace('Full Text', 'Table of Contents');",
+							"tocWindow.document.title=title1;",
+							"tocWindow.focus();",
+							"function restrictedText(id,queryId,area,divLevel,restriction)",
+							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=no,scrollbars=yes,resizable=yes,width=800,height=600\";",
+							"if (restriction==\"1\")",
+							"tocWindow = window.open(contextRoot+\"searchFulltext.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
+							"if (restriction==\"2\")",
+							"tocWindow = window.open(contextRoot+\"searchFulltextRestricted2.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
+							"if (restriction==\"3\")",
+							"tocWindow = window.open(contextRoot+\"searchFulltextRestricted3.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
+							"tocWindow.focus();",
+							"function restrictedTextOnly(id,queryId,area,divLevel,size,restriction,textonly)",
+							"window.location = contextRoot+\"searchFulltext.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
+							"window.location = contextRoot+\"searchFulltextRestricted2.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
+							"window.location = contextRoot+\"searchFulltextRestricted3.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
+							"function selectAll(status)",
+							"selectAllMarkedList(status);",
+							"// Core marked list JavaScript.",
+							"// Switch for debugging alert boxes.",
+							"var DEBUG = false;",
+							"// Global variables for selecting all & signaling when a users' marked list is full.",
+							"var selAllMLActive = false;",
+							"var selAllMLSignal = \"\";",
+							"/*",
+							"** Select all marked list checkboxes on the page, adding the items to the users' marked list.",
+							"** Params: selected - whether the checkboxes should be checked (added) or unchecked (removed)",
+							"*/",
+							"function selectAllMarkedList(selected)",
+							"if (!selAllMLActive)",
+							"selAllMLActive = true;",
+							"selAllMLSignal = \"\";",
+							"// Loop through the marked list checkboxes, until there are either no more checkboxes,",
+							"// or the list limit has been reached & we're adding.",
+							"checkboxes = document.getElementsByName(\"mlcb\");",
+							"if( (checkboxes!=null && checkboxes.length>0) && !(selAllMLSignal == \"limit\" && selected) )",
+							"for(i=0; i"
+						};
+
+						text = removeDirtyLines(text, matchList);
+					}
+					// print out all lines with ampersands to see what we're up against.
+					printLinesContaining(text, "&");
+					printLinesContaining(text, "{");
+					printLinesContaining(text, "}");
+
+			  }
 		  }
         }
 		if (text.length() > 0)
@@ -372,7 +661,65 @@ public class NinesStatementHandler implements StatementHandler {
     }
     return false;
   }
-  
+
+  private String removeDirtyLines(String text, String [] matchList) {
+		String [] arr = text.split("\n");
+		Boolean foundOne = false;
+		for (int i = 0; i < arr.length; i++) {
+			String currLine = arr[i];
+			for (int j = 0; j < matchList.length; j++)
+				if (currLine.equals(matchList[j])) {
+					arr[i] = "";
+					foundOne = true;
+				}
+		}
+		if (foundOne) {
+			text = "";
+			for (int i = 0; i < arr.length; i++) {
+				if (arr[i].length() > 0)
+					text += arr[i] + "\n";
+			}
+		}
+		return text;
+  }
+
+  private void printLinesContaining(String text, String match) {
+		int amp = text.indexOf(match);
+		if ((text.indexOf("& ") == amp) || (text.indexOf("&c.") == amp) || (text.indexOf("&c ") == amp) || (text.indexOf("&\n") == amp))	// skip legitimate uses of &
+			amp = text.indexOf(match, amp + 1);
+		while (amp >= 0) {
+			int start = amp - 15;
+			if (start < 0) start = 0;
+			int end = amp + 30;
+			if (end >= text.length())
+				end = text.length() - 1;
+			String extract = text.substring(start, end);
+			extract = replaceMatch(extract, "\n", "\\n");
+			extract = replaceMatch(extract, "\r", "\\r");
+			Boolean skip = false;
+			if (text.length() > amp+3) {
+				if ((text.substring(amp, amp+2).equals("& ")) ||
+						(text.substring(amp, amp+2).equals("&\n")) ||
+						(text.substring(amp, amp+3).equals("&c ")) ||
+						(text.substring(amp-1, amp+3).equals("A&M ")) ||
+						(text.substring(amp-1, amp+3).equals("Q&A:")) ||
+						(text.substring(amp-1, amp+3).equals("1&2 ")) ||
+						(text.substring(amp-1, amp+3).equals("1&2\n")) ||
+						(text.substring(amp, amp+3).equals("&c.")))
+					skip = true;
+			}
+			if (!skip)
+				errorReport.addError(new IndexerError(filename, documentURI, "Text: " + extract));
+//			int nextAmp = text.indexOf(match, amp + 1);
+//			while ((amp >= 0) && ((text.indexOf("& ", amp + 1) == nextAmp) || (text.indexOf("&c.", amp + 1) == nextAmp) || (text.indexOf("&c ", amp + 1) == nextAmp))) {	// skip legitimate uses of &
+//				amp = nextAmp;
+//				nextAmp = text.indexOf(match, amp + 1);
+//			}
+//			amp = nextAmp;
+			amp = text.indexOf(match, amp + 1);
+		}
+  }
+
   private String getFullText(String uri, HttpClient httpclient ) {
 	  String fullText = "";
     String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
@@ -472,11 +819,224 @@ public class NinesStatementHandler implements StatementHandler {
     return unescapeXML(fullText);
 }
 
+//  private class StrPair {
+//	  public String first;
+//	  public String second;
+//	  public StrPair(String f, String s) {
+//		  first = f;
+//		  second = s;
+//	  }
+//  }
+
   private String unescapeXML(String str) {
-	 str = str.replaceAll("&lt;", "<");
-	 str = str.replaceAll("&gt;", ">");
-	 str = str.replaceAll("&amp;", "&");
+	// Do it twice because some text was double escaped.
+	str = StringEscapeUtils.unescapeHtml(str);
+	str = StringEscapeUtils.unescapeHtml(str);
+
+	// Some of the text we get is missing the final semi colon
+	str = str.replaceAll("&nbsp", " ");
+	str = str.replaceAll("&mdash", "-");
+	str = str.replaceAll("&#151", "-");
+	str = str.replaceAll("&hyphen", "-");
+	str = str.replaceAll("&colon", ":");
+
+	//for some reason, unescapeHtml doesn't get everything.
+	str = str.replaceAll("&#8226;", "•");
+	str = str.replaceAll("&quot;", "\"");
 	return str;
+
+//	String [] arr = str.split("&");
+//	StrPair[] matchList = new StrPair[]{
+//		new StrPair("lt;", "<"),
+//		new StrPair("gt;", ">"),
+//		new StrPair("nbsp;", " "),
+//		new StrPair("nbsp", " "),
+//		new StrPair("#034;", "\""),
+//		new StrPair("ldquo;", "\""),
+//		new StrPair("#039;", "'"),
+//		new StrPair("#39;", "'"),
+//		new StrPair("#8217;", "'"),
+//		new StrPair("#8216;", "'"),
+//		new StrPair("#146;", "'"),
+//		new StrPair("#339;", "œ"),
+//		new StrPair("#8226;", "•"),
+//		new StrPair("#8230;", "..."),
+//		new StrPair("mdash;", "-"),
+//		new StrPair("mdash", "-"),
+//		new StrPair("ndash;", "-"),
+//
+//		new StrPair("#8211;", "-"),
+//		new StrPair("hyphen;", "-"),
+//		new StrPair("hyphen", "-"),
+//		new StrPair("#151;", "-"),
+//		new StrPair("#151", "-"),
+//		new StrPair("colon;", ":"),
+//		new StrPair("colon", ":"),
+//		new StrPair("eacute;", "é"),
+//		new StrPair("ccedil;", "ç"),
+//		new StrPair("#147;", "\""),
+//		new StrPair("#148;", "\""),
+//		new StrPair("quot;", "\""),
+//		new StrPair("lsquo;", "'"),
+//
+//		new StrPair("agrave;", "à"),
+//		new StrPair("ugrave;", "ù"),
+//		new StrPair("egrave;", "è"),
+//		new StrPair("#8212;", "-"),
+//		new StrPair("#9;", ""),
+//		new StrPair("#145;", "'"),
+//		new StrPair("hellip;", "..."),
+//		new StrPair("Uuml;", "Ü"),
+//		new StrPair("uuml;", "ü"),
+//		new StrPair("ouml;", "ö"),
+//		new StrPair("Aacute;", "Á"),
+//		new StrPair("aacute;", "á"),
+//		new StrPair("acute;", "´"),
+//		new StrPair("macr;", "¯"),
+//
+//		new StrPair("sect;", "§"),
+//		new StrPair("szlig;", "ß"),
+//		new StrPair("auml;", "ä"),
+//		new StrPair("ecirc;", "ê"),
+//		new StrPair("ocirc;", "ô"),
+//		new StrPair("icirc;", "î"),
+//
+//		new StrPair("iuml;", "ï"),
+//		new StrPair("oacute;", "ó"),
+//		new StrPair("rsquo;", "'"),
+//		new StrPair("#156;", "œ"),
+//		new StrPair("Eacute;", "É"),
+//		new StrPair("rdquo;", "\""),
+//		new StrPair("oelig;", "œ"),
+//		new StrPair("Auml;", "Ä"),
+//		new StrPair("acirc;", "â"),
+//
+//		new StrPair("euml;", "ë"),
+//		new StrPair("copy;", "©"),
+//		new StrPair("iacute;", "í"),
+//		new StrPair("ntilde;", "ñ"),
+//		new StrPair("pound;", "£"),
+//		new StrPair("uacute;", "ú"),
+//		new StrPair("Egrave;", "È"),
+//		new StrPair("Icirc;", "î"),
+//		new StrPair("Euml;", "Ë"),
+//		new StrPair("cedil;", "ç"),
+//		new StrPair("Ocirc;", "Ô"),
+//		new StrPair("Igrave;", "Ì"),
+//		new StrPair("Icirc;", "Î"),
+//		new StrPair("Ograve;", "Ò"),
+//		new StrPair("scaron;", ""),
+//		new StrPair("Ecirc;", "Ê"),
+//		new StrPair("thorn;", "þ"),
+//		new StrPair("uacute;", "ú"),
+//		new StrPair("aelig;", "æ"),
+//		new StrPair("Agrave;", "À"),
+//		new StrPair("Oslash;", "Ø"),
+//		new StrPair("oslash;", "ø"),
+//		new StrPair("iquest;", "¿"),
+//		new StrPair("middot;", "·"),
+//		new StrPair("yacute;", "ý"),
+//		new StrPair("deg;", "°"),
+//		new StrPair("yen;", "¥"),
+//		new StrPair("#x17D;", "Ž"),
+//		new StrPair("#x17E;", " 	ž "),
+//		new StrPair("#x159;", "ř "),
+//		new StrPair("#131;", "ƒ"),
+//		new StrPair("#150;", "-"),
+//		new StrPair("#135;", "‡"),
+//		new StrPair("#138;", "Š"),
+//		new StrPair("#157;", ""),
+//		new StrPair("#0;", ""),
+//		new StrPair("#169;", "©"),
+//		new StrPair("#009;", ""),
+//		new StrPair("atilde;", "ã"),
+//		new StrPair("Atilde;", "Ã"),
+//		new StrPair("Ntilde;", "Ñ"),
+//
+//		new StrPair("Scaron;", "Š"),
+//		new StrPair("Acirc;", "Â"),
+//		new StrPair("ograve;", "ò"),
+//		new StrPair("ucirc;", "û"),
+//		new StrPair("#16;", ""),
+//		new StrPair("#17;", ""),
+//		new StrPair("#7;", ""),
+//		new StrPair("#42;", "*"),
+//		new StrPair("#42", "*"),
+//		new StrPair("#163;", "£"),
+//		new StrPair("#8224;", "†"),
+//
+//		new StrPair("#166;", "¦"),
+//		new StrPair("#171;", "«"),
+//		new StrPair("#173;", ""),
+//		new StrPair("#180;", "´"),
+//		new StrPair("#183;", "·"),
+//		new StrPair("#187;", "»"),
+//		new StrPair("#191;", "¿"),
+//		new StrPair("otilde;", "õ"),
+//		new StrPair("Ccedil;", "Ç"),
+//		new StrPair("Iacute;", "Í"),
+//		new StrPair("Uacute;", "Ú"),
+//		new StrPair("yuml;", "ÿ"),
+//		new StrPair("reg;", "®"),
+//		new StrPair("eacute", "é"),
+//		new StrPair("Oacute;", "Ó"),
+//		new StrPair("Otilde;", "Õ"),
+//		new StrPair("igrave;", "ì"),
+//		new StrPair("Ouml;", "Ö"),
+//		new StrPair("eth;", "ð"),
+//		new StrPair("AElig;", "Æ"),
+//		new StrPair("Yacute;", "Ý"),
+//		new StrPair("Aring;", "Å"),
+//		new StrPair("THORN;", "Þ"),
+//		new StrPair("pounds;", "£"),
+//		new StrPair("#233;", "é"),
+//		new StrPair("#252;", "ü"),
+//		new StrPair("#153;", "™"),
+//		new StrPair("#176;", "°"),
+//		new StrPair("#177;", "±"),
+//		new StrPair("#161;", "¡"),
+//		new StrPair("#162;", "¢"),
+//		new StrPair("#167;", "§"),
+//		new StrPair("#168;", "¨"),
+//		new StrPair("#169;", "©"),
+//		new StrPair("#225;", "á"),
+//		new StrPair("#224;", "à"),
+//		new StrPair("#230;", "æ"),
+//		new StrPair("#242;", "ò"),
+//		new StrPair("#246;", "ö"),
+//		new StrPair("#232;", "è"),
+//		new StrPair("#182;", "¶"),
+//		new StrPair("#175;", "¯"),
+//		new StrPair("raquo;", "»"),
+//		new StrPair("aring;", "å"),
+//		new StrPair("rarr;", "→"),
+//		new StrPair("iexcl;", "¡"),
+//		new StrPair("emsp;", ""),
+//		new StrPair("#x02013;", "-"),
+//		new StrPair("#x02014;", "-"),
+//		new StrPair("#x000A0;", " "),
+//		new StrPair("#x000F6;", "ö"),
+//		new StrPair("#x000FA;", "ú"),
+//		new StrPair("#x000C9;", "É"),
+//
+//		new StrPair("frac14;", "¼"),
+//		new StrPair("frac12;", "½"),
+//		new StrPair("para;", "¶"),
+//		new StrPair("frac34;", "¾"),
+//		new StrPair("times;", "×"),
+//		new StrPair("Ucirc;", "Û")
+//	};
+//	String newStr = arr[0];
+//	for (int i = 1; i < arr.length; i++) {
+//		for (int j = 0; j < matchList.length; j++) {
+//			if (arr[i].startsWith(matchList[j].first))
+//				newStr += "&" + matchList[j].second + arr[i].substring(matchList[j].first.length());
+//			else
+//				newStr += "&" + arr[i];
+//		}
+//	}
+//
+//	return newStr;
   }
 
 //  private String parseXML(String str) {
@@ -625,12 +1185,14 @@ public class NinesStatementHandler implements StatementHandler {
 		// add fulltext and ocr indicators
 		ArrayList<String> objectArray = object.get("text");
 		if( objectArray != null ) {	// If we have a text field
-			addField(object, "has_full_text", "T");
+			if (object.get("has_full_text") == null)
+				addField(object, "has_full_text", "T");
 			objectArray = object.get("is_ocr");
 			if( objectArray == null )	// If we weren't told differently, then it is not an ocr object
 				addField(object, "is_ocr", "F");
 		} else {
-			addField(object, "has_full_text", "F");
+			if (object.get("has_full_text") == null)
+				addField(object, "has_full_text", "F");
 		}
 	}
     return documents;
@@ -677,18 +1239,22 @@ public class NinesStatementHandler implements StatementHandler {
 		// remove everything between <script>..</script>
 		fullText = removeTag(fullText, "script");
 
-		// remove all "&..;" encoding
-		fullText = fullText.replaceAll("\\&[a-z]{1,5}\\;", " ");
-
 		// remove everything between <...>
 		fullText = removeBracketed(fullText, "<", ">");
 
-		// Clean up the file a little bit
+		// Get rid of non-unix line endings
+		fullText = fullText.replaceAll("\r", "");
+
+		fullText = unescapeXML(fullText);
+		// remove all "&..;" encoding
+		//fullText = fullText.replaceAll("\\&[a-z]{1,5}\\;", " ");
+
+		// Clean up the file a little bit -- there shouldn't be two spaces in a row or blank lines
 		fullText = fullText.replaceAll("\t", " ");
 		fullText = fullText.replaceAll(" +", " ");
 		fullText = replaceMatch(fullText, " \n", "\n");
 		fullText = replaceMatch(fullText, "\n ", "\n");
-		fullText = replaceMatch(fullText, "\n\n", "\n");
+		fullText = replaceMatch(fullText, "\n+", "\n");
 
 
 		//      if (fullText != null && fullText.indexOf("<") != -1) {

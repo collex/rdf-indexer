@@ -41,6 +41,7 @@ import org.apache.log4j.PatternLayout;
 public class RDFIndexer {
 
   private int numFiles = 0;
+  private int fileCount = 0;
   private int numObjects = 0;
   //private int numToDelete = 0;
   private ArrayList< String > archives = new ArrayList<String>();
@@ -286,7 +287,7 @@ public class RDFIndexer {
     recursivelyQueueFiles(rdfDir);
     numFiles = dataFileQueue.size();
     
-    log.info("=> Indexing " + rdfDir);
+    log.info("=> Indexing " + rdfDir + " total files: " + numFiles);
     
     initSpeedReporting();
 
@@ -369,8 +370,19 @@ public class RDFIndexer {
 		else {
 			Set<String> archive_list = objects_by_archive.keySet();
 		    for (String arch : archive_list) {
-	          log.info("posting:" + arch + " (num=" + objects_by_archive.get(arch).size() + ")");
-		      postObjectsToSolr( client, objects_by_archive.get(arch), arch );
+				HashMap<String, HashMap<String, ArrayList<String>>> documents = objects_by_archive.get(arch);
+				int textLen = 0;
+				int docsWithText = 0;
+				Set<String> uris = documents.keySet();
+				for (String uri : uris) {
+				  HashMap<String, ArrayList<String>> fields = documents.get(uri);
+				  if (fields.get("text") != null) {
+					  textLen += fields.get("text").get(0).length();
+					  docsWithText++;
+				  }
+				}
+	          log.info("  posting:" + ++fileCount + " of " + numFiles + " " + arch + " (num docs=" + documents.size() + ",text len=" + textLen + ",docs with text=" + docsWithText + ")");
+		      postObjectsToSolr( client, documents, arch );
 			}
 	    }
 
