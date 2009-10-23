@@ -7,9 +7,9 @@ public class LinkCollector {
 	
 	private FileWriter linkDataFile; 
 
-	public LinkCollector() {	
+	public LinkCollector(String prefix) {
 		try {
-			linkDataFile = new FileWriter("link_data.txt");
+			linkDataFile = new FileWriter(prefix + "_link_data.txt");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

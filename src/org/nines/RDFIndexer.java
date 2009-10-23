@@ -64,7 +64,11 @@ public class RDFIndexer {
   
   public RDFIndexer( File rdfSource, RDFIndexerConfig config )  {
 	  	
-    initSystem();   
+	// We are assuming that the rdf is somewhere in a folder under "/rdf/". Everything past that is used as the report title.
+    String reportFilename = rdfSource.getPath().substring(rdfSource.getPath().lastIndexOf("/rdf/") + 5);
+	reportFilename = reportFilename.replaceAll("/", "_");
+	String logFileRelativePath = "../../../log/";
+    initSystem(logFileRelativePath + reportFilename);
     
     log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text"); 
 
@@ -72,8 +76,7 @@ public class RDFIndexer {
     //this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
     
     //File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the report file.
-    String reportFilename = rdfSource.getPath().substring(rdfSource.getPath().lastIndexOf('/') + 1);
-    File reportFile = new File(reportFilename + "_report.txt");	// keep report file in the same folder as the log file.
+    File reportFile = new File(logFileRelativePath + reportFilename + "_report.txt");	// keep report file in the same folder as the log file.
     try {
         errorReport = new ErrorReport(reportFile);
     } 
@@ -82,7 +85,7 @@ public class RDFIndexer {
         return;
     }
     
-    linkCollector = new LinkCollector();
+    linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
 
     HttpClient client = new HttpClient();
 	
@@ -147,7 +150,7 @@ public class RDFIndexer {
       }
   }
 
-  private void initSystem() {
+  private void initSystem(String logName) {
     // Use the SAX2-compliant Xerces parser:
     System.setProperty(
         "org.xml.sax.driver",
@@ -156,12 +159,13 @@ public class RDFIndexer {
    
     try {
       // purge old log on startup
-      File logFile = new File("indexer.log");
+		String logPath = logName + "_indexer.log";
+      File logFile = new File(logPath);
       if (logFile.exists()) {
          logFile.delete();
       }
       
-      FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), "indexer.log");
+      FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), logPath);
       BasicConfigurator.configure( fa );
       log = Logger.getLogger(RDFIndexer.class.getName());
 
