@@ -376,297 +376,7 @@ public class NinesStatementHandler implements StatementHandler {
 			  		text = unescapeXML(text);
 
 					text = cleanText(text);
-//					if (text.indexOf("Alexander Street Press : Trial Login") > 0)	// TODO: just cleaning up. Remove this.
-//						text = "";
-//					if (text.indexOf("Page Not Found") > 0)	{ // TODO: Just analyzing cather
-//						errorReport.addError(new IndexerError(filename, documentURI, "Text contains Page Not Found"));
-//						text = "";
-//					}
 
-					String archive = doc.get("archive").get(0);
-					if (archive.length() > 5 && archive.substring(0, 5).equals("JSTOR")) {
-						text = text.replaceAll("\\.page \\{ padding\\: 1em\\; \\}", "");
-						text = text.replaceAll("&amp;", "&");
-					}
-
-					if (archive.equals("rc")) {
-						String jsText = "var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");\ndocument.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));\ntry {\nvar pageTracker = _gat._getTracker(\"UA-8863611-1\");\npageTracker._trackPageview();\n} catch(err) {}";
-						text = replaceMatch(text, jsText, "");
-						jsText = "function openFootnote(file) {";
-						text = replaceMatch(text, jsText, "");
-						jsText = "var PARAMS = \"resizable=yes,status=no,scrollbars=yes,toolbar=0,directories=0,menubar=0,location=0,copyhistory=0,width=600,height=200,left=100,top=100\";";
-						text = replaceMatch(text, jsText, "");
-						jsText = "var Footnotes = window.open(file,'Footnotes',PARAMS);";
-						text = replaceMatch(text, jsText, "");
-						jsText = "if (JSVer12 || JSVer11) Footnotes.focus() } }";
-						text = replaceMatch(text, jsText, "");
-						jsText = "if (isVer10) alert(\"This web page uses pop-up windows for footnotes. With your browser, it is best to close the footnote window each time after you are through reading a note. Thank you.\");";
-						text = replaceMatch(text, jsText, "");
-						jsText = "var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");\ndocument.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));\ntry {\nvar pageTracker = _gat._getTracker(\"UA-8863611-1\");\npageTracker._trackPageview();\n} catch(err) {}";
-						text = replaceMatch(text, jsText, "");
-						jsText = "0&&parent.frames.length) {";
-						text = replaceMatch(text, jsText, "");
-						jsText = "d=parent.frames[n.substring(p+1)].document; n=n.substring(0,p);}";
-						text = replaceMatch(text, jsText, "");
-						jsText = "if(!(x=d[n])&&d.all) x=d.all[n]; for (i=0;!x&&i";
-						text = replaceMatch(text, jsText, "");
-						jsText = "function MM_swapImgRestore() { //v3.0";
-						text = replaceMatch(text, jsText, "");
-						jsText = "var i,x,a=document.MM_sr; for(i=0;a&&i";
-						text = replaceMatch(text, jsText, "");
-						jsText = "function opensesame(t) {";
-						text = replaceMatch(text, jsText, "");
-						jsText = "t=window.open(t, \"opensesame\",\"scrollbars,resizable,width=620,height=550\");";
-						text = replaceMatch(text, jsText, "");
-						jsText = "t.focus();";
-						text = replaceMatch(text, jsText, "");
-					}
-
-					if (archive.substring(0, 4).equals("muse")) {
-						text = removeBracketed(text, "<!--", "-->");
-						text = removeBracketed(text, "<link", "/>");
-						text = removeBracketed(text, "<BODY", ">");
-						text = removeBracketed(text, "<IMG", ">");
-						text = removeBracketed(text, "<img", ">");
-						text = removeBracketed(text, "<A ", ">");
-						text = removeBracketed(text, "<a ", ">");
-						text = removeBracketed(text, "<P", ">");
-						text = text.replaceAll("&amp;", "&");
-						text = text.replaceAll("&apos;", "'");
-						text = removeBracketed(text, "<!DOCTYPE", "dtd\">");
-
-//						String[] matchList = new String[]{
-//							"date.setTime(date.getTime() - skew);",
-//							"}",
-//							"//var expire_time = new Date();",
-//							"//fixDate(expire_time);",
-//							"//expire_time.setTime(expire_time.getTime() + 365 * 24 * 60 * 60 * 1000);",
-//							"var searchpath = \"/;\";",
-//							"var searchcheck = getCookie(\"resultstracker\");",
-//							"//var searchdomain = \"muse.jhu.edu\";",
-//							"function getSearchResults() {",
-//							"window.history.go(\"otcgi\")",
-//							"var loc = location.href",
-//							"var last = loc.substring(loc.length-1, loc.length)",
-//							"//If the article has been clicked on from a search results link, do the following.",
-//							"if(last == '?'){",
-//							"if (!searchcheck) {",
-//							"document.writeln(\"\");",
-//							"setCookie(\"resultstracker\", '', '', searchpath);",
-//							"else {",
-//							"document.writeln(searchcheck);",
-//							"//If the article has been clicked on from a non-search results link, then do the following, which is:",
-//							"//check for an existing search results cookie, and if found, display the back to search results button.",
-//							"if (searchcheck) {",
-//							"document.writeln(searchcheck);",
-//							"*/",
-//							"document.writeln('')",
-//							"// -->",
-//							"= 0) {",
-//							"document.write(\"\");",
-//							"} else {"
-//						};
-//
-//						text = removeDirtyLines(text, matchList);
-					}
-
-					if (archive.equals("swrp")) {
-						text = removeBracketed(text, "var Url = {", "addEvent(window, 'load', dynamicLayout);");
-						text = removeBracketed(text, "function ShowStaticURL(urlAddress)", "window.print();\n}");
-						text = removeBracketed(text, "function ShowHideDiv(divid)", "txt.innerHTML = \"show metadata\";\n}\n}");
-						text = removeBracketed(text, "var gaJsHost =", "catch(err) {}");
-						text = text.replaceAll("&amp;", "&");
-						text = text.replaceAll("</i>", "");
-						text = removeBracketed(text, "<!DOCTYPE", ">");
-
-//						String[] matchList = new String[]{
-//							"var Url = {",
-//							"// public method for url encoding",
-//							"encode : function (string) {",
-//							"return escape(this._utf8_encode(string));",
-//							"},",
-//							"// public method for url decoding",
-//							"decode : function (string) {",
-//							"return this._utf8_decode(unescape(string));",
-//							"// private method for UTF-8 encoding",
-//							"_utf8_encode : function (string) {",
-//							"string = string.replace(/\\r\\n/g,\"\\n\");",
-//							"var utftext = \"\";",
-//							"for (var n = 0; n",
-//							"127) && (c",
-//							"> 6) | 192);",
-//							"utftext += String.fromCharCode((c & 63) | 128);",
-//							"}",
-//							"else {",
-//							"utftext += String.fromCharCode((c >> 12) | 224);",
-//							"utftext += String.fromCharCode(((c >> 6) & 63) | 128);",
-//							"utftext += String.fromCharCode((c & 63) | 128);",
-//							"return utftext;",
-//							"_utf8_decode : function (utftext) {",
-//							"var string = \"\";",
-//							"var i = 0;",
-//							"var c = c1 = c2 = 0;",
-//							"while ( i",
-//							"191) && (c < 224)) {",
-//							"c2 = utftext.charCodeAt(i+1);",
-//							"string += String.fromCharCode(((c & 31) << 6) | (c2 & 63));",
-//							"i += 2;",
-//							"else {",
-//							"c2 = utftext.charCodeAt(i+1);",
-//							"c3 = utftext.charCodeAt(i+2);",
-//							"string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));",
-//							"i += 3;",
-//							"return string;",
-//							"function getBrowserWidth()",
-//							"{",
-//							"if (window.innerWidth){",
-//							"return window.innerWidth;}",
-//							"else if (document.documentElement && document.documentElement.clientWidth != 0){",
-//							"return document.documentElement.clientWidth; }",
-//							"else if (document.body){return document.body.clientWidth;}",
-//							"return 0;",
-//							"function addEvent( obj, type, fn )",
-//							"if (obj.addEventListener){",
-//							"obj.addEventListener( type, fn, false );",
-//							"else if (obj.attachEvent){",
-//							"obj[\"e\"+type+fn] = fn;",
-//							"obj[type+fn] = function(){ obj[\"e\"+type+fn]( window.event ); }",
-//							"obj.attachEvent( \"on\"+type, obj[type+fn] );",
-//							"function dynamicLayout()",
-//							"var browserWidth = getBrowserWidth();",
-//							"// load small css rules",
-//							"if (browserWidth < 801){",
-//							"changeLayout(\"small\");",
-//							"// set correct image banner",
-//							"document.getElementById(\"imgLogo\").src = \"swrp.graphics/swrptoolbar795.jpg\";",
-//							"function changeLayout(description)",
-//							"var i, a;",
-//							"for(i=0; (a = document.getElementsByTagName(\"link\")[i]); i++){",
-//							"if(a.getAttribute(\"title\") == description){a.disabled = false;}",
-//							"else if(a.getAttribute(\"title\") != \"default\"){a.disabled = true;}",
-//							"// Run dynamicLayout function when page loads and when it resizes.",
-//							"addEvent(window, 'load', dynamicLayout);",
-//							"function ShowStaticURL(urlAddress)",
-//							"window.open (\"swrp.static.url.aspx?url=\" + urlAddress, \"StaticURL\",\"status=0,toolbar=0,location=0,menubar=0,directories=0,resizable=0,scrollbars=0,height=160,width=550,top=50,left=50\");",
-//							"function PrintPage(){",
-//							"window.print();",
-//							"function ShowHideDiv(divid)",
-//							"var elediv = document.getElementById(divid);",
-//							"if(elediv.style.display == \"none\")",
-//							"elediv.style.display = \"block\";",
-//							"else",
-//							"elediv.style.display = \"none\";",
-//							"function ShowObjectDetails(dorpID)",
-//							"var newUrl = \"swrp.object.details.aspx?dorpID=\" + dorpID;",
-//							"var fulltext = getQueryVariable(\"fulltext\");",
-//							"if (fulltext != null){",
-//							"newUrl += \"&fulltext=\" + fulltext;",
-//							"window.location = newUrl;",
-//							"function getQueryVariable(variable) {",
-//							"var query = window.location.search.substring(1);",
-//							"var vars = query.split(\"&\");",
-//							"for (var i=0;i<vars.length;i++) {",
-//							"var pair = vars[i].split(\"=\");",
-//							"if (pair[0] == variable) {",
-//							"if (pair[1].toString().trim() == \"\"){",
-//							"return null;",
-//							"}else{",
-//							"return pair[1];",
-//							"String.prototype.trim = function() {",
-//							"a = this.replace(/^\\s+/, '');",
-//							"return a.replace(/\\s+$/, '');",
-//							"};",
-//							"function toggleDiv()",
-//							"var ele = document.getElementById(\"divMetadata\");",
-//							"var img = document.getElementById(\"imgToggle\");",
-//							"var txt = document.getElementById(\"spanToggleText\");",
-//							"if(ele.style.display == \"none\")",
-//							"ele.style.display = \"block\";",
-//							"img.alt = \"hide metadata\";",
-//							"img.title = \"hide metadata\";",
-//							"img.src = \"swrp.graphics/minus.gif\";",
-//							"txt.innerHTML = \"hide metadata\";",
-//							"} else {",
-//							"ele.style.display = \"none\";",
-//							"img.alt = \"show metadata\";",
-//							"img.title = \"show metadata\";",
-//							"img.src = \"swrp.graphics/plus.gif\";",
-//							"txt.innerHTML = \"show metadata\";",
-//							"var gaJsHost = ((\"https:\" == document.location.protocol) ? \"https://ssl.\" : \"http://www.\");",
-//							"document.write(unescape(\"%3Cscript src='\" + gaJsHost + \"google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E\"));",
-//							"try {",
-//							"var pageTracker = _gat._getTracker(\"UA-5214612-4\");",
-//							"pageTracker._trackPageview();",
-//							"} catch(err) {}",
-//							"// private method for UTF-8 decoding",
-//							"191) && (c"
-//						};
-//
-//						text = removeDirtyLines(text, matchList);
-					}
-
-					if (archive.equals("PQCh-EAF") || archive.equals("PQCh-NCF")) {
-//						String[] matchList = new String[]{
-//							"var contextRoot = \"/;jsessionid=D03E357175EB09C720913D2A7A553AE2\".split(';')[0];",
-//							"var contextRoot = \"/;jsessionid=E7782EFACA80B1BDC54484D5A1D5AB3D\".split(';')[0];",
-//							"function newToc(id,queryId,area,reqDiv)",
-//							"{",
-//							"fullyExpandParam = \"\";",
-//							"divLevel = reqDiv;",
-//							"if(reqDiv==null || reqDiv==\"\")",
-//							"divLevel=\"9\";",
-//							"fullyExpandParam=\"&extra_fullyExpand=Y\";",
-//							"}",
-//							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=no,scrollbars=yes,resizable=yes,width=700,height=600\";",
-//							"tocWindow = window.open(contextRoot+\"toc.do?id=\"+id+\"&action=new&area=\"+area+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&mapping=toc\"+fullyExpandParam+\"#scroll\",'ilcstoc',windowPrefs);",
-//							"tocWindow.focus();",
-//							"function newTocHref(href)",
-//							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=yes,scrollbars=yes,resizable=yes,width=480,height=480\";",
-//							"tocWindow = window.open(href,'lion3toc',windowPrefs);",
-//							"tocWindow.opener=top;",
-//							"var title = top.document.title;",
-//							"var title1 = title.replace('Full Text', 'Table of Contents');",
-//							"tocWindow.document.title=title1;",
-//							"tocWindow.focus();",
-//							"function restrictedText(id,queryId,area,divLevel,restriction)",
-//							"windowPrefs = \"toolbar=no,directories=no,status=yes,menubar=no,scrollbars=yes,resizable=yes,width=800,height=600\";",
-//							"if (restriction==\"1\")",
-//							"tocWindow = window.open(contextRoot+\"searchFulltext.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
-//							"if (restriction==\"2\")",
-//							"tocWindow = window.open(contextRoot+\"searchFulltextRestricted2.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
-//							"if (restriction==\"3\")",
-//							"tocWindow = window.open(contextRoot+\"searchFulltextRestricted3.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&print=No&forward=textsCR\",'restricted',windowPrefs);",
-//							"tocWindow.focus();",
-//							"function restrictedTextOnly(id,queryId,area,divLevel,size,restriction,textonly)",
-//							"window.location = contextRoot+\"searchFulltext.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
-//							"window.location = contextRoot+\"searchFulltextRestricted2.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
-//							"window.location = contextRoot+\"searchFulltextRestricted3.do?id=\"+id+\"&divLevel=\"+divLevel+\"&queryId=\"+queryId+\"&area=\"+area+\"&size=\"+size+\"&textonly=\"+textonly+\"&forward=textsCR\";",
-//							"function selectAll(status)",
-//							"selectAllMarkedList(status);",
-//							"// Core marked list JavaScript.",
-//							"// Switch for debugging alert boxes.",
-//							"var DEBUG = false;",
-//							"// Global variables for selecting all & signaling when a users' marked list is full.",
-//							"var selAllMLActive = false;",
-//							"var selAllMLSignal = \"\";",
-//							"/*",
-//							"** Select all marked list checkboxes on the page, adding the items to the users' marked list.",
-//							"** Params: selected - whether the checkboxes should be checked (added) or unchecked (removed)",
-//							"*/",
-//							"function selectAllMarkedList(selected)",
-//							"if (!selAllMLActive)",
-//							"selAllMLActive = true;",
-//							"selAllMLSignal = \"\";",
-//							"// Loop through the marked list checkboxes, until there are either no more checkboxes,",
-//							"// or the list limit has been reached & we're adding.",
-//							"checkboxes = document.getElementsByName(\"mlcb\");",
-//							"if( (checkboxes!=null && checkboxes.length>0) && !(selAllMLSignal == \"limit\" && selected) )",
-//							"for(i=0; i"
-//						};
-//
-//						text = removeDirtyLines(text, matchList);
-						text = removeBracketed(text, "var contextRoot = \"/;jsessionid=", "form.elements['TheText'].value=openURL();\n}");
-					}
 					// print out all lines with ampersands to see what we're up against.
 					printLinesContaining(text, "&");
 					printLinesContaining(text, "{");
@@ -819,17 +529,6 @@ public class NinesStatementHandler implements StatementHandler {
 	  String start = "<arr name=\"text\"><str>";
 	  String stop = "</str></arr>";
 	 fullText = trimBracketed(fullText, start, stop);
-//	  if (uri.equals("http://www.rossettiarchive.org/docs/2-1881.sigdadd.delms.rad"))
-//	  {
-//		  int iQuote = fullText.indexOf("‚Äú");
-//		  int iDblQuote = fullText.indexOf("‚Äú‚Äú");
-//		  int iQuote2 = fullText.indexOf("“");
-//		  int iDblQuote2 = fullText.indexOf("““");
-//		  errorReport.addError(new IndexerError("","","Quotes: " + iQuote + "," + iDblQuote + "," + iQuote2 + "," + iDblQuote2));
-//		  String str = unescapeXML(fullText);
-//		  if (str.length() != fullText.length())
-//			  errorReport.addError(new IndexerError("","","Not same length"));
-//	  }
 
     } catch (NoHttpResponseException e) {
       errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
@@ -859,20 +558,20 @@ public class NinesStatementHandler implements StatementHandler {
 	str = StringEscapeUtils.unescapeHtml(str);
 
 	//for some reason, unescapeHtml doesn't get everything.
-	str = str.replaceAll("&#8226;", "•");
-	str = str.replaceAll("&quot;", "\"");
-
-	// Also, some of the text we get is missing the final semi colon
-	str = str.replaceAll("&nbsp;", " ");
-	str = str.replaceAll("&nbsp", " ");
-	str = str.replaceAll("&mdash;", "-");
-	str = str.replaceAll("&mdash", "-");
-	str = str.replaceAll("&#151;", "-");
-	str = str.replaceAll("&#151", "-");
-	str = str.replaceAll("&hyphen;", "-");
-	str = str.replaceAll("&hyphen", "-");
-	str = str.replaceAll("&colon;", ":");
-	str = str.replaceAll("&colon", ":");
+//	str = str.replaceAll("&#8226;", "•");
+//	str = str.replaceAll("&quot;", "\"");
+//
+//	// Also, some of the text we get is missing the final semi colon
+//	str = str.replaceAll("&nbsp;", " ");
+//	str = str.replaceAll("&nbsp", " ");
+//	str = str.replaceAll("&mdash;", "-");
+//	str = str.replaceAll("&mdash", "-");
+//	str = str.replaceAll("&#151;", "-");
+//	str = str.replaceAll("&#151", "-");
+//	str = str.replaceAll("&hyphen;", "-");
+//	str = str.replaceAll("&hyphen", "-");
+//	str = str.replaceAll("&colon;", ":");
+//	str = str.replaceAll("&colon", ":");
 
 	return str;
 
