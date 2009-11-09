@@ -375,7 +375,7 @@ public class NinesStatementHandler implements StatementHandler {
 
 			  		text = unescapeXML(text);
 
-					text = cleanText(text);
+					text = cleanText(text, false);
 
 					// print out all lines with ampersands to see what we're up against.
 					printLinesContaining(text, "&");
@@ -949,28 +949,34 @@ public class NinesStatementHandler implements StatementHandler {
       String fullText = contentStream.toString("UTF-8");
       String cleanedFullText = fullText;
 
-	  cleanedFullText = cleanText(fullText);
+	  cleanedFullText = cleanText(fullText, true);
+		cleanedFullText = cleanedFullText.replaceAll("&lt;", "<");
+		cleanedFullText = replaceMatch(cleanedFullText, "&lt;", "<");
+		cleanedFullText = replaceMatch(cleanedFullText, "&gt;", ">");
+		cleanedFullText = replaceMatch(cleanedFullText, "&amp;", "&");
       return cleanedFullText;
     } finally {
       get.releaseConnection();
     }
   }
 
-	public String cleanText(String fullText) {
+	public String cleanText(String fullText, Boolean removeHtml) {
 		// If the text contains markup, remove it.
 		// We may be passed plain text, or we may be passed html, so any strategy we use needs to work for both.
 		// We can assume that if it is plain text, it won't have stuff that looks like tags in it.
 		if (fullText == null)
 			return fullText;
 
-		// remove everything between <head>...</head>
-		fullText = removeTag(fullText, "head");
+		if (removeHtml) {
+			// remove everything between <head>...</head>
+			fullText = removeTag(fullText, "head");
 
-		// remove everything between <script>..</script>
-		fullText = removeTag(fullText, "script");
+			// remove everything between <script>..</script>
+			fullText = removeTag(fullText, "script");
 
-		// remove everything between <...>
-		//fullText = removeBracketed(fullText, "<", ">");
+			// remove everything between <...>
+			fullText = removeBracketed(fullText, "<", ">");
+		}
 
 		// Get rid of non-unix line endings
 		fullText = fullText.replaceAll("\r", "");
