@@ -55,7 +55,7 @@ public class ValidationUtility {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
     // look for all role_* keys in object, validate that they are in this list:
-    //    ART, AUT, EDT, PBL, and TRL
+    //    ART, AUT, EDT, PBL, and TRL, also CRE, EGR, ETR
 
     Set<String> keys = object.keySet();
     for (String key : keys) {
@@ -64,6 +64,9 @@ public class ValidationUtility {
              "role_AUT".equals(key) ||
              "role_EDT".equals(key) ||
              "role_PBL".equals(key) ||
+             "role_CRE".equals(key) ||
+             "role_EGR".equals(key) ||
+             "role_ETR".equals(key) ||
              "role_TRL".equals(key))) {
         messages.add(new ErrorMessage(false, "invalid role: " + key));
       }
@@ -78,7 +81,7 @@ public class ValidationUtility {
   public static ArrayList<ErrorMessage> validateRequired(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
     String[] requiredFields = new String[]{"archive", "title", "genre", "year"};
-    String[] rdfTerm = new String[]{"nines:archive", "dc:title", "nines:genre", "dc:date"};
+    String[] rdfTerm = new String[]{"collex:archive", "dc:title", "collex:genre", "dc:date"};
 
     for (int i = 0; i < requiredFields.length; i++) {
       if (!object.containsKey(requiredFields[i])) {
@@ -161,7 +164,7 @@ public class ValidationUtility {
     String fieldVal = fields.get(0);
     if (!validateFreeculture(fieldVal)) {
       messages.add(new ErrorMessage(false,
-          fieldVal + " is not a valid value for nines:freeculture"));
+          fieldVal + " is not a valid value for collex:freeculture"));
     }
 
     return messages;
