@@ -113,7 +113,7 @@ public class NinesStatementHandler implements StatementHandler {
     if (predicate.startsWith("http://www.collex.org/schema#")) {
       String attribute = predicate.substring("http://www.collex.org/schema#".length());
       if (! (attribute.equals("archive") || attribute.equals("freeculture") ||
-          attribute.equals("source") || attribute.equals("federation") || attribute.equals("ocr") ||
+          attribute.equals("source_xml") || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation") || attribute.equals("ocr") ||
           attribute.equals("genre") || attribute.equals("thumbnail") || attribute.equals("text") || attribute.equals("fulltext") ||
           attribute.equals("image"))) {
 
@@ -128,6 +128,9 @@ public class NinesStatementHandler implements StatementHandler {
     if( handleFederation(predicate, object) ) return;
     if( handleOcr(predicate, object) ) return;
     if( handleFullText(predicate, object) ) return;
+    if( handleCollexSourceXml(predicate, object) ) return;
+    if( handleCollexSourceHtml(predicate, object) ) return;
+    if( handleCollexSourceSgml(predicate, object) ) return;
     if( handleArchive(predicate, object) ) return;
     if( handleFreeCulture(predicate, object) ) return;
     if( handleTitle(predicate, object) ) return;
@@ -178,7 +181,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
 
   public boolean handleFormat( String predicate, String object ) {
-	  if ("http://www.collex.org/schema#format".equals(predicate)) {
+	  if ("http://purl.org/dc/elements/1.1/format".equals(predicate)) {
 	      addField(doc, "format", object);
 	      return true;
 	  }
@@ -186,7 +189,7 @@ public class NinesStatementHandler implements StatementHandler {
   }
 
   public boolean handleLanguage( String predicate, String object ) {
-	  if ("http://www.collex.org/schema#language".equals(predicate)) {
+	  if ("http://purl.org/dc/elements/1.1/language".equals(predicate)) {
 	      addField(doc, "language", object);
 	      return true;
 	  }
@@ -199,6 +202,30 @@ public class NinesStatementHandler implements StatementHandler {
 	      return true;
 	  }
 	  return false;
+  }
+
+  public boolean handleCollexSourceXml( String predicate, String object ) {
+    if ("http://www.collex.org/schema#source_xml".equals(predicate)) {
+      addField(doc, "source_xml", object);
+      return true;
+    }
+    return false;
+  }
+
+  public boolean handleCollexSourceHtml( String predicate, String object ) {
+    if ("http://www.collex.org/schema#source_html".equals(predicate)) {
+      addField(doc, "source_html", object);
+      return true;
+    }
+    return false;
+  }
+
+  public boolean handleCollexSourceSgml( String predicate, String object ) {
+    if ("http://www.collex.org/schema#source_sgml".equals(predicate)) {
+      addField(doc, "source_sgml", object);
+      return true;
+    }
+    return false;
   }
 
   public boolean handleArchive( String predicate, String object ) {
