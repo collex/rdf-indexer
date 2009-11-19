@@ -405,9 +405,9 @@ public class NinesStatementHandler implements StatementHandler {
 					text = cleanText(text, false);
 
 					// print out all lines with ampersands to see what we're up against.
-					printLinesContaining(text, "&");
-					printLinesContaining(text, "{");
-					printLinesContaining(text, "}");
+					//printLinesContaining(text, "&");
+					//printLinesContaining(text, "{");
+					//printLinesContaining(text, "}");
 
 			  }
 		  }
