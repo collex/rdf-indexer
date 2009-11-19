@@ -939,6 +939,16 @@ public class NinesStatementHandler implements StatementHandler {
 		else if (engraver.length() > 0)
 			addField(object, "author_sort", engraver);
 
+		// add year_sort
+		String year_sort_field = getFirstField(object, "date_label");
+		if (year_sort_field.length() > 0)
+			addField(object, "year_sort", year_sort_field);
+		else {
+			year_sort_field = getFirstField(object, "year");
+			if (year_sort_field.length() > 0)
+				addField(object, "year_sort", year_sort_field);
+		}
+
 		// add fulltext and ocr indicators
 		ArrayList<String> objectArray = object.get("text");
 		if( objectArray != null ) {	// If we have a text field
