@@ -1022,6 +1022,7 @@ public class NinesStatementHandler implements StatementHandler {
 		//fullText = fullText.replaceAll("\\&[a-z]{1,5}\\;", " ");
 
 		// Clean up the file a little bit -- there shouldn't be two spaces in a row or blank lines
+		fullText = fullText.replaceAll("&nbsp;", " ");
 		fullText = fullText.replaceAll("\t", " ");
 		fullText = fullText.replaceAll(" +", " ");
 		fullText = fullText.replaceAll(" \n", "\n");
