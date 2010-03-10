@@ -145,7 +145,7 @@ public class ValidationUtility {
         "Translation", "Travel",
         "Visual Art", "Citation",
         "Book History", "Family Life", "Folklore",
-        "Humor", "Law", "Reference Works"
+        "Humor", "Law", "Reference Works", "Sermon"
     };
 
     for (String aGenreList : genreList) {
