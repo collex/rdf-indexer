@@ -152,7 +152,7 @@ public class NinesStatementHandler implements StatementHandler {
   
   public boolean handleFederation( String predicate, String object ) {
 	  if ("http://www.collex.org/schema#federation".equals(predicate)) {
-		  if (object.equals("NINES") || object.equals("18th Connect"))
+		  if (object.equals("NINES") || object.equals("18thConnect"))
 		      addField(doc, "federation", object);
 		  else
 			   errorReport.addError(new IndexerError(filename, documentURI, "Unknown federation: " + object));
@@ -1023,6 +1023,7 @@ public class NinesStatementHandler implements StatementHandler {
 
 		// Clean up the file a little bit -- there shouldn't be two spaces in a row or blank lines
 		fullText = fullText.replaceAll("&nbsp;", " ");
+		fullText = fullText.replaceAll("&#160;", " ");
 		fullText = fullText.replaceAll("\t", " ");
 		fullText = fullText.replaceAll(" +", " ");
 		fullText = fullText.replaceAll(" \n", "\n");
