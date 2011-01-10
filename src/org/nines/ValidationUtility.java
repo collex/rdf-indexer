@@ -107,6 +107,10 @@ public class ValidationUtility {
       }
     }
 
+    ArrayList<String> fields = object.get("archive");
+	if (fields.size() > 1)
+        messages.add(new ErrorMessage(false, "must contain exactly one archive field"));
+
     Set<String> keys = object.keySet();
     boolean hasRole = false;
     for (String key : keys) {
