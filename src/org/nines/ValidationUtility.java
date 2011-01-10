@@ -47,6 +47,7 @@ public class ValidationUtility {
     messages.addAll(validateRequired(object));
     messages.addAll(validateGenre(object));
     messages.addAll(validateRole(object));
+    messages.addAll(validateUri(object));
 
     return messages;
   }
@@ -75,13 +76,29 @@ public class ValidationUtility {
     return messages;
   }
 
+  public static ArrayList<ErrorMessage> validateUri(HashMap<String, ArrayList<String>> object) {
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
+
+	// The URI can't contain foo
+    ArrayList<String> fields = object.get("uri");
+	if (fields.size() > 1)
+        messages.add(new ErrorMessage(false, "must contain exactly one URI field"));
+	if (!fields.isEmpty()) {
+	    String fieldVal = fields.get(0);
+		if (fieldVal.startsWith("http://foo/"))
+	        messages.add(new ErrorMessage(false, "URI field is not created properly"));
+	}
+
+    return messages;
+  }
+
   /**
    * Confirms that required fields are present and non-null
    */
   public static ArrayList<ErrorMessage> validateRequired(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
-    String[] requiredFields = new String[]{"archive", "title", "genre", "year"};
-    String[] rdfTerm = new String[]{"collex:archive", "dc:title", "collex:genre", "dc:date"};
+    String[] requiredFields = new String[]{"archive", "title", "genre", "year", "freeculture", "has_full_text", "is_ocr", "federation", "url" };
+    String[] rdfTerm = new String[]{"collex:archive", "dc:title", "collex:genre", "dc:date", "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
 
     for (int i = 0; i < requiredFields.length; i++) {
       if (!object.containsKey(requiredFields[i])) {

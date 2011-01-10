@@ -239,8 +239,10 @@ public class NinesStatementHandler implements StatementHandler {
   public boolean handleFreeCulture( String predicate, String object ) {
     if ("http://www.collex.org/schema#freeculture".equals(predicate)) {
       if ("false".equalsIgnoreCase(object)) {
-        // only add a freeculture field if its false.  No field set implies "T"rue
         addField(doc, "freeculture", "F");  // "F"alse
+      }
+		else if("true".equalsIgnoreCase(object)) {
+        addField(doc, "freeculture", "T");  // "T"rue
       }
       return true;
     }
@@ -954,13 +956,15 @@ public class NinesStatementHandler implements StatementHandler {
 		if( objectArray != null ) {	// If we have a text field
 			if (object.get("has_full_text") == null)
 				addField(object, "has_full_text", "T");
-			objectArray = object.get("is_ocr");
-			if( objectArray == null )	// If we weren't told differently, then it is not an ocr object
-				addField(object, "is_ocr", "F");
 		} else {
 			if (object.get("has_full_text") == null)
 				addField(object, "has_full_text", "F");
 		}
+		objectArray = object.get("is_ocr");
+		if( objectArray == null )	// If we weren't told differently, then it is not an ocr object
+			addField(object, "is_ocr", "F");
+		if (object.get("freeculture") == null)
+			addField(object, "freeculture", "T");
 	}
     return documents;
   }
