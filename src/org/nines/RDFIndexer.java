@@ -76,7 +76,7 @@ public class RDFIndexer {
     //this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
     
     //File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the report file.
-    File reportFile = new File(logFileRelativePath + reportFilename + "_report.txt");	// keep report file in the same folder as the log file.
+    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log");	// keep report file in the same folder as the log file.
     try {
         errorReport = new ErrorReport(reportFile);
     } 
@@ -159,7 +159,7 @@ public class RDFIndexer {
    
     try {
       // purge old log on startup
-		String logPath = logName + "_indexer.log";
+		String logPath = logName + "_progress.log";
       File logFile = new File(logPath);
       if (logFile.exists()) {
          logFile.delete();
@@ -326,7 +326,7 @@ public class RDFIndexer {
   private String archiveToCore(String archive) {
 	  String core = archive.replaceAll(":", "_");
 	  core = core.replaceAll(" ", "_");
-	  core = core.replaceAll("-", "_");
+	  //core = core.replaceAll("-", "_");
 	  core = core.replaceAll(",", "_");
 	  return "archive_" + core;
   }

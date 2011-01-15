@@ -239,10 +239,10 @@ public class NinesStatementHandler implements StatementHandler {
   public boolean handleFreeCulture( String predicate, String object ) {
     if ("http://www.collex.org/schema#freeculture".equals(predicate)) {
       if ("false".equalsIgnoreCase(object)) {
-        addField(doc, "freeculture", "F");  // "F"alse
+        setField(doc, "freeculture", "F");  // "F"alse
       }
 		else if("true".equalsIgnoreCase(object)) {
-        addField(doc, "freeculture", "T");  // "T"rue
+        setField(doc, "freeculture", "T");  // "T"rue
       }
       return true;
     }
@@ -392,7 +392,7 @@ public class NinesStatementHandler implements StatementHandler {
       try {
         String text = object;
         if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
-          addFieldEntry(doc, "text_url", text);
+          addFieldEntry(doc, "text_url", text, false);
 		  if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
 			errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
 			text = "";
@@ -401,10 +401,6 @@ public class NinesStatementHandler implements StatementHandler {
 			 if( config.retrieveFullText ) text = fetchContent(object);
 			  if (config.reindexFullText) {
 				  text = getFullText(doc.get("uri").get(0), httpClient );
-
-			  		text = unescapeXML(text);
-
-					text = cleanText(text, false);
 
 					// print out all lines with ampersands to see what we're up against.
 					//printLinesContaining(text, "&");
@@ -415,7 +411,7 @@ public class NinesStatementHandler implements StatementHandler {
 		  }
         }
 		if (text.length() > 0)
-	        addFieldEntry(doc, "text", text);
+	        addFieldEntry(doc, "text", text, false);
 //        addFieldEntry(doc, "content", text);
       } catch (IOException e) {
         String uriVal = documentURI;
@@ -570,7 +566,15 @@ public class NinesStatementHandler implements StatementHandler {
       get.releaseConnection();
     }
 
-    return unescapeXML(fullText);
+	fullText = fullText.replaceAll("&lt;", "<");
+	fullText = replaceMatch(fullText, "&lt;", "<");
+	fullText = replaceMatch(fullText, "&gt;", ">");
+	fullText = replaceMatch(fullText, "&amp;", "&");
+	//fullText = unescapeXML(fullText);
+	// Use this if we want to further scrub the text that comes out of solr
+//	fullText = cleanText(fullText, false);
+//    fullText = unescapeXML(fullText);
+	return fullText;
 }
 
 //  private class StrPair {
@@ -887,12 +891,25 @@ public class NinesStatementHandler implements StatementHandler {
     	linkCollector.addLink(documentURI, filename, value);
     }
 
-    addFieldEntry(map,name,value);
+    addFieldEntry(map,name,value, false);
   }
-  
-  public static void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value) {  
+
+  // this is like add, but if the field exists it replaces the value instead of creating a second one.
+  public void setField(HashMap<String, ArrayList<String>> map, String name, String value) {
+    // skip null fields
+    if (value == null || name == null) return;
+
+    // if the field is a url, check to see if it is reachable
+    if ( config.collectLinks && value.trim().startsWith("http://") && value.trim().indexOf(" ") == -1 && !"uri".equals(name)) {
+    	linkCollector.addLink(documentURI, filename, value);
+    }
+
+    addFieldEntry(map,name,value, true);
+  }
+
+  public static void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
     // make sure we add to array for already existing fields
-    if (map.containsKey(name)) {
+    if (map.containsKey(name) && replace == false) {
       ArrayList<String> pastValues = map.get(name);
       pastValues.add(value);
       map.put(name, pastValues);
@@ -963,7 +980,8 @@ public class NinesStatementHandler implements StatementHandler {
 		objectArray = object.get("is_ocr");
 		if( objectArray == null )	// If we weren't told differently, then it is not an ocr object
 			addField(object, "is_ocr", "F");
-		if (object.get("freeculture") == null)
+		objectArray = object.get("freeculture");
+		if( objectArray == null )	// If we weren't told differently, then it is freeculture
 			addField(object, "freeculture", "T");
 	}
     return documents;
