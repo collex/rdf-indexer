@@ -481,6 +481,14 @@ public class NinesStatementHandler implements StatementHandler {
 		}
   }
 
+	private String replaceDoubledUtfChar(String fullText, int c1, int c2, int c3) {
+		byte [] match = new byte [] { (byte)c1, (byte)c2, (byte)c3, (byte)c1, (byte)c2, (byte)c3 };
+		byte [] repl = new byte [] { (byte)c1, (byte)c2, (byte)c3 };
+
+		fullText = replaceMatch(fullText, new String(match), new String(repl));
+		return fullText;
+	}
+
   private String getFullText(String uri, HttpClient httpclient ) {
 	  String fullText = "";
     String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
@@ -566,11 +574,18 @@ public class NinesStatementHandler implements StatementHandler {
       get.releaseConnection();
     }
 
-	fullText = fullText.replaceAll("&lt;", "<");
 	fullText = replaceMatch(fullText, "&lt;", "<");
 	fullText = replaceMatch(fullText, "&gt;", ">");
 	fullText = replaceMatch(fullText, "&amp;", "&");
-	//fullText = unescapeXML(fullText);
+	fullText = replaceMatch(fullText, "““", "“");
+
+	fullText = replaceDoubledUtfChar(fullText, 226, 128, 148);
+	fullText = replaceDoubledUtfChar(fullText, 226, 128, 160);
+	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
+	fullText = replaceDoubledUtfChar(fullText, 226, 128, 149);
+	fullText = replaceDoubledUtfChar(fullText, 226, 128, 156);
+	//fullText = unescapeXML(fullText);	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
+
 	// Use this if we want to further scrub the text that comes out of solr
 //	fullText = cleanText(fullText, false);
 //    fullText = unescapeXML(fullText);
