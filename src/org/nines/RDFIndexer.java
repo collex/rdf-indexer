@@ -62,11 +62,11 @@ public class RDFIndexer {
   private static final int PROGRESS_MILESTONE_INTERVAL = 100;
   private static final int DOCUMENTS_PER_POST = 100;
   
-  public RDFIndexer( File rdfSource, RDFIndexerConfig config )  {
+  public RDFIndexer( File rdfSource, String archiveName, RDFIndexerConfig config )  {
 	  	
-	// We are assuming that the rdf is somewhere in a folder under "/rdf/". Everything past that is used as the report title.
-    String reportFilename = rdfSource.getPath().substring(rdfSource.getPath().lastIndexOf("/rdf/") + 5);
-	reportFilename = reportFilename.replaceAll("/", "_");
+	// Use the archive name as the log file name
+    String reportFilename = archiveName;
+	reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
 	String logFileRelativePath = "../../../log/";
     initSystem(logFileRelativePath + reportFilename);
     
@@ -158,12 +158,12 @@ public class RDFIndexer {
     
    
     try {
-      // purge old log on startup
+      // don't purge old log on startup -- that is handled before calling this app.
 		String logPath = logName + "_progress.log";
       File logFile = new File(logPath);
-      if (logFile.exists()) {
-         logFile.delete();
-      }
+//      if (logFile.exists()) {
+//         logFile.delete();
+//      }
       
       FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), logPath);
       BasicConfigurator.configure( fa );
@@ -183,7 +183,7 @@ public class RDFIndexer {
   
   public static void main(String[] args) {
     if (args.length < 1) {
-      System.err.println("java -jar rdf-indexer.jar <rdf dir|file> [--fulltext] [--reindex] [--ignore=ignore_filename] [--include=include_filename] [--maxDocs=99]");
+      System.err.println("java -jar rdf-indexer.jar <rdf dir|file> <archive name> [--fulltext] [--reindex] [--ignore=ignore_filename] [--include=include_filename] [--maxDocs=99]");
       System.exit(-1);
     }
 
@@ -194,9 +194,10 @@ public class RDFIndexer {
     String useIncludeFile = "--include";	// This ignores the folders specified in the file.
     
     File rdfSource = new File(args[0]);
+	String archiveName = new String(args[1]);
     RDFIndexerConfig config = new RDFIndexerConfig();
 
-	for (int i = 1; i < args.length; i++) {
+	for (int i = 2; i < args.length; i++) {
 		if (args[i].equals(fullTextFlag))
 			config.retrieveFullText = true;
 		else if (args[i].equals(reindexFlag))
@@ -245,7 +246,7 @@ public class RDFIndexer {
 		}
 	}
 
-    new RDFIndexer(rdfSource, config);
+    new RDFIndexer(rdfSource, archiveName, config);
   }
 
 	private void recursivelyQueueFiles(File dir) {

@@ -485,7 +485,7 @@ public class NinesStatementHandler implements StatementHandler {
 		byte [] match = new byte [] { (byte)c1, (byte)c2, (byte)c3, (byte)c1, (byte)c2, (byte)c3 };
 		byte [] repl = new byte [] { (byte)c1, (byte)c2, (byte)c3 };
 
-		fullText = replaceMatch(fullText, new String(match), new String(repl));
+		fullText = replaceMatchOnce(fullText, new String(match), new String(repl));
 		return fullText;
 	}
 
@@ -577,13 +577,16 @@ public class NinesStatementHandler implements StatementHandler {
 	fullText = replaceMatch(fullText, "&lt;", "<");
 	fullText = replaceMatch(fullText, "&gt;", ">");
 	fullText = replaceMatch(fullText, "&amp;", "&");
-	fullText = replaceMatch(fullText, "““", "“");
+	fullText = replaceMatchOnce(fullText, "““", "“");
+	fullText = replaceMatchOnce(fullText, "――", "―");
+//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
+//	fullText = replaceDoubledUtfChar(fullText, 227, 128, 137);
 
-	fullText = replaceDoubledUtfChar(fullText, 226, 128, 148);
-	fullText = replaceDoubledUtfChar(fullText, 226, 128, 160);
-	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
-	fullText = replaceDoubledUtfChar(fullText, 226, 128, 149);
-	fullText = replaceDoubledUtfChar(fullText, 226, 128, 156);
+//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 148);
+//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 160);
+//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 149);
+//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 156);
+
 	//fullText = unescapeXML(fullText);	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
 
 	// Use this if we want to further scrub the text that comes out of solr
@@ -1092,6 +1095,15 @@ public class NinesStatementHandler implements StatementHandler {
   public void setFilename(String filename) {
     this.filename = filename;
   }
+
+  // Only replace the match once. For instance, if we are matching 00 and changing it to 0 and the string is 0000, it will output 00, but replaceMatch will output 0
+	private String replaceMatchOnce(String fullText, String match, String newText) {
+		int start = fullText.indexOf(match);
+		if (start != -1) {
+			fullText = fullText.substring(0, start) + newText + replaceMatchOnce(fullText.substring(start + match.length()), match, newText);
+		}
+		return fullText;
+	}
 
 	private String replaceMatch(String fullText, String match, String newText) {
 		int start = fullText.indexOf(match);

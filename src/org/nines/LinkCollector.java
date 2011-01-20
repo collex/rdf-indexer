@@ -9,7 +9,7 @@ public class LinkCollector {
 
 	public LinkCollector(String prefix) {
 		try {
-			linkDataFile = new FileWriter(prefix + "_link_data.txt");
+			linkDataFile = new FileWriter(prefix + "_link_data.txt", true);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

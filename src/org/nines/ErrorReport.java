@@ -32,7 +32,7 @@ public class ErrorReport {
   
   public ErrorReport( File reportFile ) throws IOException {
     //create the empty report.txt
-    report = new FileWriter(reportFile);
+    report = new FileWriter(reportFile, true);
     report.write("");
     fileCount = new HashSet<String>();
     objectCount = new HashSet<String>();
