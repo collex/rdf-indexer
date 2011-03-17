@@ -410,9 +410,15 @@ public class NinesStatementHandler implements StatementHandler {
 			  }
 		  }
         }
-		if (text.length() > 0)
+		if (text.length() > 0) {
+			text = text.replaceAll("\t", " ");
+			text = text.replaceAll(" +", " ");
+			text = text.replaceAll(" \n", "\n");
+			text = text.replaceAll("\n ", "\n");
+			text = text.replaceAll("\n+", "\n");
 	        addFieldEntry(doc, "text", text, false);
 //        addFieldEntry(doc, "content", text);
+		  }
       } catch (IOException e) {
         String uriVal = documentURI;
         errorReport.addError(

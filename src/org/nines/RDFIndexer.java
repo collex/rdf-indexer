@@ -44,7 +44,7 @@ public class RDFIndexer {
   private int fileCount = 0;
   private int numObjects = 0;
   //private int numToDelete = 0;
-  private ArrayList< String > archives = new ArrayList<String>();
+  //private ArrayList< String > archives = new ArrayList<String>();
   private String guid = "";
   private RDFIndexerConfig config;
   private ConcurrentLinkedQueue<File> dataFileQueue;
@@ -54,6 +54,7 @@ public class RDFIndexer {
   private long lastTime;
   //private String solrURL;
   private Logger log;
+  private String targetArchive = "";
 
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
   private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
@@ -63,7 +64,8 @@ public class RDFIndexer {
   private static final int DOCUMENTS_PER_POST = 100;
   
   public RDFIndexer( File rdfSource, String archiveName, RDFIndexerConfig config )  {
-	  	
+
+	  targetArchive = archiveName;
 	// Use the archive name as the log file name
     String reportFilename = archiveName;
 	reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
@@ -88,16 +90,22 @@ public class RDFIndexer {
     linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
 
     HttpClient client = new HttpClient();
-	
-//    if (rdfSource.isDirectory()) {
+
+	try {
+		beSureCoreExists(client, archiveToCore(archiveName));
+	} catch (IOException e) {
+		errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
+	}
+
+		//if (rdfSource.isDirectory()) {
     	createGUID(rdfSource);
     	Date start = new Date();
     	log.info("Started indexing at " + start);
 
     	indexDirectory(rdfSource);
         if( config.commitToSolr ) {
-			for (String archive : archives)
-				commitDocumentsToSolr(client, archive);
+			//for (String archive : archives)
+				commitDocumentsToSolr(client, archiveToCore(archiveName));
 		}
         else log.info("Skipping Commit to SOLR...");
 	    
@@ -331,6 +339,31 @@ public class RDFIndexer {
 	  core = core.replaceAll(",", "_");
 	  return "archive_" + core;
   }
+
+  // This can fail because of threading issues when accessing archives, so catch that and retry.
+//	private void testArchive(File file, HttpClient client, String archive) {
+//		while (true) {
+//			try {
+//				Boolean found = false;
+//				for (String a : archives) {
+//					if (a.equals(archive))
+//						found = true;
+//				}
+//				if (!found) {
+//					archives.add(archive);
+//					try {
+//						beSureCoreExists(client, archive);
+//						return;
+//					} catch (IOException e) {
+//						errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
+//					}
+//				}
+//			} catch (Exception e) {
+//				errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
+//			}
+//		}
+//	}
+
   private void indexFile(File file, HttpClient client ) {
     try {
     	HashMap<String, HashMap<String, ArrayList<String>>> objects = RdfDocumentParser.parse( file, errorReport, linkCollector, config );
@@ -346,14 +379,9 @@ public class RDFIndexer {
 				if (!objects_by_archive.containsKey(archive))
 					objects_by_archive.put(archive, new HashMap<String, HashMap<String, ArrayList<String>>>());
 				objects_by_archive.get(archive).put(uri, object);
-				Boolean found = false;
-				for (String a : archives)
-					if (a.equals(archive))
-						found = true;
-				if (!found) {
-					archives.add(archive);
-					beSureCoreExists(client, archive);
-				}
+				//testArchive(file, client, archive);
+				if (!objectArray.get(0).equals(targetArchive))
+	                errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. " + objectArray.get(0) + " should be " + targetArchive));
               } else {
                 errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
               }
