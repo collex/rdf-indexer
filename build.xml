@@ -1,7 +1,13 @@
-<project name="MyProject" default="dist" basedir=".">
+<project name="MyProject" default="old" basedir=".">
   <description>
     build RDF indexer
   </description>
+
+  <import file="nbproject/build-impl.xml"/>
+  
+  <target name="old" depends="default">
+     <echo>Execute old netbeans buildfile</echo>
+  </target>
 
 	<!-- set global properties for this build -->
 	<property name="src" location="src"/>
