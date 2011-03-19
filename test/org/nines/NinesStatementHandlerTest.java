@@ -15,20 +15,18 @@
  **/
 package org.nines;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import junit.framework.TestCase;
-
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import junit.framework.TestCase;
 
 public class NinesStatementHandlerTest extends TestCase {
   private NinesStatementHandler sh;
@@ -46,7 +44,7 @@ public class NinesStatementHandlerTest extends TestCase {
 	String text;
 		try {
 			text = readWholeFile(data);
-			String cleaned = sh.cleanText(text);
+			String cleaned = sh.cleanText(text, true);
 			writeFile(data.getPath()+".txt", cleaned);
 			Logger.getLogger(NinesStatementHandlerTest.class.getName()).log(Level.SEVERE, null, cleaned);
 			assertTrue(false);
