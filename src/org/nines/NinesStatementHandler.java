@@ -15,8 +15,21 @@
  **/
 package org.nines;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.StringTokenizer;
+
+import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -25,19 +38,6 @@ import org.openrdf.rio.StatementHandlerException;
 import org.openrdf.sesame.sailimpl.memory.BNodeNode;
 import org.openrdf.sesame.sailimpl.memory.LiteralNode;
 import org.openrdf.sesame.sailimpl.memory.URINode;
-import org.apache.commons.lang.StringEscapeUtils;
-
-import java.io.BufferedInputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.*;
-
-import net.sf.saxon.functions.Substring;
-import org.apache.commons.httpclient.ConnectTimeoutException;
-import org.apache.commons.httpclient.NameValuePair;
-import org.apache.commons.httpclient.NoHttpResponseException;
-import org.apache.log4j.Logger;
 
 public class NinesStatementHandler implements StatementHandler {
   public final static Logger log = Logger.getLogger(NinesStatementHandler.class.getName());
