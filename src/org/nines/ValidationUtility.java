@@ -15,19 +15,14 @@
  **/
 package org.nines;
 
-import nu.xom.*;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.HeadMethod;
-import org.jdom.Element;
-import org.jdom.IllegalDataException;
-import org.jdom.Verifier;
-
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.ListIterator;
 import java.util.Set;
+
+import org.jdom.Element;
+import org.jdom.IllegalDataException;
+import org.jdom.Verifier;
 
 public class ValidationUtility {
 
