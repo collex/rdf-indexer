@@ -15,6 +15,10 @@
  **/
 package org.nines;
 
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.ListIterator;
@@ -26,6 +30,48 @@ import org.jdom.Verifier;
 
 public class ValidationUtility {
 
+  public static boolean validateTextField( final String txt ) {
+  
+    int startPos = 0;
+    while (true) {
+      int pos = txt.indexOf("&#", startPos);
+      if ( pos == -1) {
+        break;
+      } else {
+        int p2 = txt.indexOf(";", pos);
+        if ( p2 == -1 ) {
+          return false;
+        }
+        
+        String data = txt.substring(pos+2,p2);
+        int intVal = Integer.parseInt(data);
+        byte[] bytes = intToByteArray(intVal);
+        try {
+          CharBuffer  cb = Charset.availableCharsets().get("UTF-8").newDecoder()
+            .decode(ByteBuffer.wrap(bytes));
+          String outVal = cb.toString();
+          System.out.println("VAL ["+outVal+"]");
+        } catch (CharacterCodingException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+          return false;
+        }
+        startPos = p2+1;
+      }
+    }
+    return true;
+  }
+  
+  private static final byte[] intToByteArray(int value) {
+    byte[] b = new byte[4];
+    for (int i = 0; i < 4; i++) {
+      int offset = (b.length - 1 - i) * 8;
+      b[i] = (byte) ((value >>> offset) & 0xFF);
+    }
+    return b;
+  }
+  
+  
   public static boolean validateObjects(HashMap<String, HashMap<String, ArrayList<String>>> objects, String filename) {
     Set<String> keys = objects.keySet();
     for (String uri : keys) {

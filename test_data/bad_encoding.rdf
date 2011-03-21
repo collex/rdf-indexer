@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:collex="http://www.collex.org/schema#"
+    xmlns:ab="http://www.personal.psu.edu/faculty/c/a/caw43/bierce/schema#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:role="http://www.loc.gov/loc.terms/relators/">
+    <ab:object rdf:about="http://www.personal.psu.edu/faculty/c/a/caw43/bierce/adderson">
+        
+        <!-- Standard DublinCore metadata -->
+        <dc:title>Parker Adderson, Philosopher</dc:title>
+        <role:AUT>Ambrose Bierce</role:AUT>
+        <collex:genre>Primary</collex:genre>
+        <dc:date>1891</dc:date>
+        
+        <collex:text>
+            plea Is on the cards. These refugees have almost ruined me. A welcome unto Sembrich, who
+            asserts she will not sing, But visits us as welcome guest, a much more pleasant thing.
+            When ladies&#82112;I refrain from stating just the proper age&#82112; Have waved
+            a handkerchief farewell, forever left the stage, This should not mean an au revoir, as
+            often is the case, And rediviva songstresses with corsets stem to lace. Marcella, think
+        </collex:text> 
+        
+        
+        <role:PBL>San Francisco Examiner</role:PBL>
+        
+        <!-- NINES specific metadata -->
+        <collex:federation>NINES</collex:federation>
+		<collex:archive>bierce</collex:archive>
+        <collex:genre>Fiction</collex:genre>
+        
+        <!-- Link that NINES should send users for this object -->
+        <rdfs:seeAlso rdf:resource="http://www.ambrosebierce.org/adderson.html"/>
+    </ab:object>
+</rdf:RDF>

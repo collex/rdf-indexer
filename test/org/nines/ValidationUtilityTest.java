@@ -26,6 +26,10 @@ public class ValidationUtilityTest extends TestCase {
     super.setUp();
   }
 
+  public void testEncoding() {
+    assertFalse(ValidationUtility.validateTextField("test &#82112; end") );
+  }
+  
   public void testGenre() {
     assertTrue(ValidationUtility.validateGenreInList("Poetry"));
     assertFalse(ValidationUtility.validateGenreInList("asdf"));
