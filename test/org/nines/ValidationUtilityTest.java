@@ -25,26 +25,6 @@ public class ValidationUtilityTest extends TestCase {
   protected void setUp() throws Exception {
     super.setUp();
   }
-
-//  public void testEncoding() {
-//    try{
-//    String s= "test &#64; end";
-//    byte[] b = s.getBytes("US-ASCII");
-//    String s2 = new String(b,"UTF-8");
-//    System.out.println(s2);
-//    } catch (Exception e) {
-//      e.printStackTrace();
-//    }
-//    
-//    
-////    assertEquals(0, ValidationUtility.validateTextField("test &#xcf90; end").size() );
-//    assertEquals(1, ValidationUtility.validateTextField("test &#82112; &#233;  end").size() );
-////    assertEquals(2, ValidationUtility.validateTextField("test &#82112; &#xFF; end").size() );
-////    assertEquals(0, ValidationUtility.validateTextField("test &#64; end").size() );
-//    assertEquals(0, ValidationUtility.validateTextField("&#233; and &#xcf90;").size() );
-//    assertEquals(1, ValidationUtility.validateTextField("test &#821").size() );
-//    System.out.println("done");
-//  }
   
   public void testGenre() {
     

@@ -22,4 +22,9 @@ class ErrorMessage {
   public String getErrorMessage() {
     return errorMsg;
   }
+  
+  @Override
+  public String toString() {
+    return getErrorMessage();
+  }
 }

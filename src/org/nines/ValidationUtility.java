@@ -15,16 +15,8 @@
  **/
 package org.nines;
 
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CoderResult;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -61,131 +53,6 @@ public class ValidationUtility {
     "collex:archive", "dc:title", "collex:genre", "dc:date", "collex:freeculture",
     "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso" };
 
-  /**
-   * Parse the passed data for UTF-8 escape sequences. Validate that the content of each
-   * results in a vailid UTF-8 character. All errors are pushed into and array
-   * of error messages and resturned.
-   * 
-   * @param txt Source text string
-   * @return An ArrayList of ErrorMessage objects
-   */
-  public static final ArrayList<ErrorMessage> validateTextField(final String txt) {
-
-    int startPos = 0;
-    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
-    
-    while (true) {
-
-      // find start of escape sequence
-      int pos = txt.indexOf("&#", startPos);
-      if (pos == -1) {
-        // when no more can be found, terminate
-        break;
-      } else {
-        
-        // make sure the end marker exists as well
-        int p2 = txt.indexOf(";", pos);
-        if (p2 == -1) {
-          
-          System.err.println("Unterminated UTF-8 escape sequence found at pos [" + pos + "]");
-          messages.add(new ErrorMessage(false, "Unterminated UTF-8 escape sequence found at pos [" + pos + "]") );
-          break;
-        }
-
-        // pull the numeric sequence data and convert it to a byte array
-        String data = txt.substring(pos + 2, p2).trim();
-        byte[] bytes = intToByteArray(data);
-        try {
-
-            Charset utf8_cs = Charset.availableCharsets().get("UTF-8");
-           String s = new String(bytes, utf8_cs.name());
-           System.out.println(s);
-           byte[] b2 = s.getBytes(utf8_cs.name());
-           System.out.println(b2);
-           
-          // attempt to encode this byte array to UTF-8
-//          
-//          CharsetDecoder decoder = utf8_cs.newDecoder();
-//          ByteBuffer bb = ByteBuffer.wrap(bytes);
-//          
-//          CharBuffer cb = decoder.decode(bb);
-//          String foo = cb.toString();
-//          if ( foo.length() > 1){
-//            throw new Exception("multi char");
-//          }
-
-        } catch (Exception e) {
-
-          String sequence = txt.substring(pos, p2 + 1).trim();
-          System.err.println("Invalid UTF-8 escape string [" + sequence + "] at pos ["+pos+"]");
-          messages.add(new ErrorMessage(false, "Invalid UTF-8 escape string [" + sequence + "] at pos ["+pos+"]") );
-        }
-        startPos = p2 + 1;
-      }
-    }
-    
-    return messages;
-  }
-  
-  /**
-   * Converts an array of Unicode scalar values (code points) into
-   * UTF-8. This algorithm works under the assumption that all
-   * surrogate pairs have already been converted into scalar code
-   * point values within the argument.
-   * 
-   * @param ch an array of Unicode scalar values (code points)
-   * @returns a byte[] containing the UTF-8 encoded characters
-   */
-  public static byte[] encode(int[] ch) {
-    // determine how many bytes are needed for the complete conversion
-    int bytesNeeded = 0;
-    for (int i = 0; i < ch.length; i++) {
-      if (ch[i] < 0x80) {
-        ++bytesNeeded;
-      } else if (ch[i] < 0x0800) {
-        bytesNeeded += 2;
-      } else if (ch[i] < 0x10000) {
-        bytesNeeded += 3;
-      } else {
-        bytesNeeded += 4;
-      }
-    }
-    // allocate a byte[] of the necessary size
-    byte[] utf8 = new byte[bytesNeeded];
-    // do the conversion from character code points to utf-8
-    for (int i = 0, bytes = 0; i < ch.length; i++) {
-      if (ch[i] < 0x80) {
-        utf8[bytes++] = (byte) ch[i];
-      } else if (ch[i] < 0x0800) {
-        utf8[bytes++] = (byte) (ch[i] >> 6 | 0xC0);
-        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
-      } else if (ch[i] < 0x10000) {
-        utf8[bytes++] = (byte) (ch[i] >> 12 | 0xE0);
-        utf8[bytes++] = (byte) (ch[i] >> 6 & 0x3F | 0x80);
-        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
-      } else {
-        utf8[bytes++] = (byte) (ch[i] >> 18 | 0xF0);
-        utf8[bytes++] = (byte) (ch[i] >> 12 & 0x3F | 0x80);
-        utf8[bytes++] = (byte) (ch[i] >> 6 & 0x3F | 0x80);
-        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
-      }
-    }
-    return utf8;
-  }
-  
-  private static final byte[] intToByteArray(final String numVal) {
-    int val = 0;
-    if (numVal.toLowerCase().charAt(0) == 'x') {
-      val = Integer.parseInt(numVal.substring(1),16);
-    } else {
-      val = Integer.parseInt(numVal);
-    }
-    
-    int[] vals = { val };
-    byte[] b1 = encode(vals);
-    return b1;
-  }
-
   public static ArrayList<ErrorMessage> validateObject(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
@@ -193,30 +60,40 @@ public class ValidationUtility {
     messages.addAll( ValidationUtility.validateGenre(object));
     messages.addAll( ValidationUtility.validateRole(object));
     messages.addAll( ValidationUtility.validateUri(object));
-    
-//    boolean dump = false;
-//    if (object.containsKey("text")) {
-//      ArrayList< String > vals = object.get("text");
-//      
-//      ArrayList<String> t = object.get("title");
-//      if (t.get(0).equals("The Man Overboard")) {
-//        System.out.println("TITLE: "+t.get(0));
-//        dump = true;
-//      }
-//      
-//      
-//      for ( String txt: vals) {
-//        if ( dump ) {
-//          System.out.println("PARTIAL TEXT: "+txt.substring(0,100));
-//          int pos = txt.indexOf("&#");
-//          if ( pos > -1) {
-//            System.out.println("GOT ESCAPE SEQUENCE AT "+pos);
-//          }
-//        }
-//        messages.addAll( ValidationUtility.validateTextField(txt));
-//      }
-//    }
+    messages.addAll( ValidationUtility.validateText(object) );
 
+    return messages;
+  }
+
+  /**
+   * Validate that there are no stray '&#' in the text. Emit a log warning
+   * with details about each one found
+   * 
+   * @param object
+   * @return
+   */
+  private static final ArrayList<ErrorMessage> validateText( final HashMap<String, ArrayList<String>> object) {
+
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
+    if (object.containsKey("text")) {
+      ArrayList<String> vals = object.get("text");
+
+      for (String txt : vals) {
+        int startPos = 0;
+        while ( true ) {
+          int pos = txt.indexOf("&#", startPos);
+          if (pos > -1) {
+            String snip = txt.substring(Math.max(0, pos-15), Math.min(txt.length(), pos+15));
+            messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence. Position: [" +
+            		pos + "], Snippet: [" +
+            		snip + "]"));
+            startPos = pos+2;
+          } else {
+            break;
+          }
+        }
+      }
+    }
     return messages;
   }
 
