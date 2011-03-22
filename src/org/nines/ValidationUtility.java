@@ -19,9 +19,13 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CoderResult;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.jdom.Element;
@@ -29,66 +33,189 @@ import org.jdom.IllegalDataException;
 import org.jdom.Verifier;
 
 public class ValidationUtility {
-
-  public static boolean validateTextField( final String txt ) {
   
+  // List of all valid genres 
+  public static final String[] GENRE_LIST = new String[]{"Architecture",
+      "Artifacts", "Bibliography",
+      "Collection", "Criticism", "Drama",
+      "Education", "Ephemera", "Fiction",
+      "History", "Leisure", "Letters",
+      "Life Writing", "Manuscript", "Music",
+      "Nonfiction", "Paratext", "Periodical",
+      "Philosophy", "Photograph", "Poetry", "Politics",
+      "Religion", "Review", "Science",
+      "Translation", "Travel",
+      "Visual Art", "Citation",
+      "Book History", "Family Life", "Folklore",
+      "Humor", "Law", "Reference Works", "Sermon"
+  };
+  
+  // Fields that are required to be present in RDF
+  public static final String[] REQUIRED_FIELDS = new String[] { 
+    "archive", "title", "genre", "year", "freeculture", 
+    "has_full_text", "is_ocr", "federation", "url" };
+  
+  // Parallel to required fields - the actual tag name to be used
+  // Any change above must be reflected hereå
+  private static final String[] RDF_TERM = new String[] { 
+    "collex:archive", "dc:title", "collex:genre", "dc:date", "collex:freeculture",
+    "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso" };
+
+  /**
+   * Parse the passed data for UTF-8 escape sequences. Validate that the content of each
+   * results in a vailid UTF-8 character. All errors are pushed into and array
+   * of error messages and resturned.
+   * 
+   * @param txt Source text string
+   * @return An ArrayList of ErrorMessage objects
+   */
+  public static final ArrayList<ErrorMessage> validateTextField(final String txt) {
+
     int startPos = 0;
+    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
+    
     while (true) {
+
+      // find start of escape sequence
       int pos = txt.indexOf("&#", startPos);
-      if ( pos == -1) {
+      if (pos == -1) {
+        // when no more can be found, terminate
         break;
       } else {
-        int p2 = txt.indexOf(";", pos);
-        if ( p2 == -1 ) {
-          return false;
-        }
         
-        String data = txt.substring(pos+2,p2);
-        int intVal = Integer.parseInt(data);
-        byte[] bytes = intToByteArray(intVal);
-        try {
-          CharBuffer  cb = Charset.availableCharsets().get("UTF-8").newDecoder()
-            .decode(ByteBuffer.wrap(bytes));
-          String outVal = cb.toString();
-          System.out.println("VAL ["+outVal+"]");
-        } catch (CharacterCodingException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
-          return false;
+        // make sure the end marker exists as well
+        int p2 = txt.indexOf(";", pos);
+        if (p2 == -1) {
+          
+          System.err.println("Unterminated UTF-8 escape sequence found at pos [" + pos + "]");
+          messages.add(new ErrorMessage(false, "Unterminated UTF-8 escape sequence found at pos [" + pos + "]") );
+          break;
         }
-        startPos = p2+1;
+
+        // pull the numeric sequence data and convert it to a byte array
+        String data = txt.substring(pos + 2, p2).trim();
+        byte[] bytes = intToByteArray(data);
+        try {
+
+            Charset utf8_cs = Charset.availableCharsets().get("UTF-8");
+           String s = new String(bytes, utf8_cs.name());
+           System.out.println(s);
+           byte[] b2 = s.getBytes(utf8_cs.name());
+           System.out.println(b2);
+           
+          // attempt to encode this byte array to UTF-8
+//          
+//          CharsetDecoder decoder = utf8_cs.newDecoder();
+//          ByteBuffer bb = ByteBuffer.wrap(bytes);
+//          
+//          CharBuffer cb = decoder.decode(bb);
+//          String foo = cb.toString();
+//          if ( foo.length() > 1){
+//            throw new Exception("multi char");
+//          }
+
+        } catch (Exception e) {
+
+          String sequence = txt.substring(pos, p2 + 1).trim();
+          System.err.println("Invalid UTF-8 escape string [" + sequence + "] at pos ["+pos+"]");
+          messages.add(new ErrorMessage(false, "Invalid UTF-8 escape string [" + sequence + "] at pos ["+pos+"]") );
+        }
+        startPos = p2 + 1;
       }
     }
-    return true;
+    
+    return messages;
   }
   
-  private static final byte[] intToByteArray(int value) {
-    byte[] b = new byte[4];
-    for (int i = 0; i < 4; i++) {
-      int offset = (b.length - 1 - i) * 8;
-      b[i] = (byte) ((value >>> offset) & 0xFF);
+  /**
+   * Converts an array of Unicode scalar values (code points) into
+   * UTF-8. This algorithm works under the assumption that all
+   * surrogate pairs have already been converted into scalar code
+   * point values within the argument.
+   * 
+   * @param ch an array of Unicode scalar values (code points)
+   * @returns a byte[] containing the UTF-8 encoded characters
+   */
+  public static byte[] encode(int[] ch) {
+    // determine how many bytes are needed for the complete conversion
+    int bytesNeeded = 0;
+    for (int i = 0; i < ch.length; i++) {
+      if (ch[i] < 0x80) {
+        ++bytesNeeded;
+      } else if (ch[i] < 0x0800) {
+        bytesNeeded += 2;
+      } else if (ch[i] < 0x10000) {
+        bytesNeeded += 3;
+      } else {
+        bytesNeeded += 4;
+      }
     }
-    return b;
+    // allocate a byte[] of the necessary size
+    byte[] utf8 = new byte[bytesNeeded];
+    // do the conversion from character code points to utf-8
+    for (int i = 0, bytes = 0; i < ch.length; i++) {
+      if (ch[i] < 0x80) {
+        utf8[bytes++] = (byte) ch[i];
+      } else if (ch[i] < 0x0800) {
+        utf8[bytes++] = (byte) (ch[i] >> 6 | 0xC0);
+        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
+      } else if (ch[i] < 0x10000) {
+        utf8[bytes++] = (byte) (ch[i] >> 12 | 0xE0);
+        utf8[bytes++] = (byte) (ch[i] >> 6 & 0x3F | 0x80);
+        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
+      } else {
+        utf8[bytes++] = (byte) (ch[i] >> 18 | 0xF0);
+        utf8[bytes++] = (byte) (ch[i] >> 12 & 0x3F | 0x80);
+        utf8[bytes++] = (byte) (ch[i] >> 6 & 0x3F | 0x80);
+        utf8[bytes++] = (byte) (ch[i] & 0x3F | 0x80);
+      }
+    }
+    return utf8;
   }
   
-  
-  public static boolean validateObjects(HashMap<String, HashMap<String, ArrayList<String>>> objects, String filename) {
-    Set<String> keys = objects.keySet();
-    for (String uri : keys) {
-      HashMap<String, ArrayList<String>> object = objects.get(uri);
-      validateObject(object);
+  private static final byte[] intToByteArray(final String numVal) {
+    int val = 0;
+    if (numVal.toLowerCase().charAt(0) == 'x') {
+      val = Integer.parseInt(numVal.substring(1),16);
+    } else {
+      val = Integer.parseInt(numVal);
     }
-
-    return true;
+    
+    int[] vals = { val };
+    byte[] b1 = encode(vals);
+    return b1;
   }
 
   public static ArrayList<ErrorMessage> validateObject(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
-    messages.addAll(validateRequired(object));
-    messages.addAll(validateGenre(object));
-    messages.addAll(validateRole(object));
-    messages.addAll(validateUri(object));
+    messages.addAll( ValidationUtility.validateRequired(object) );
+    messages.addAll( ValidationUtility.validateGenre(object));
+    messages.addAll( ValidationUtility.validateRole(object));
+    messages.addAll( ValidationUtility.validateUri(object));
+    
+//    boolean dump = false;
+//    if (object.containsKey("text")) {
+//      ArrayList< String > vals = object.get("text");
+//      
+//      ArrayList<String> t = object.get("title");
+//      if (t.get(0).equals("The Man Overboard")) {
+//        System.out.println("TITLE: "+t.get(0));
+//        dump = true;
+//      }
+//      
+//      
+//      for ( String txt: vals) {
+//        if ( dump ) {
+//          System.out.println("PARTIAL TEXT: "+txt.substring(0,100));
+//          int pos = txt.indexOf("&#");
+//          if ( pos > -1) {
+//            System.out.println("GOT ESCAPE SEQUENCE AT "+pos);
+//          }
+//        }
+//        messages.addAll( ValidationUtility.validateTextField(txt));
+//      }
+//    }
 
     return messages;
   }
@@ -138,19 +265,16 @@ public class ValidationUtility {
    */
   public static ArrayList<ErrorMessage> validateRequired(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
-    String[] requiredFields = new String[]{"archive", "title", "genre", "year", "freeculture", "has_full_text", "is_ocr", "federation", "url" };
-    String[] rdfTerm = new String[]{"collex:archive", "dc:title", "collex:genre", "dc:date", "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
-
-    for (int i = 0; i < requiredFields.length; i++) {
-      if (!object.containsKey(requiredFields[i])) {
-        messages.add(new ErrorMessage(false, "object must contain the " +
-            rdfTerm[i] + " field"));
+    
+    for (int i = 0; i < REQUIRED_FIELDS.length; i++) {
+      if (!object.containsKey(REQUIRED_FIELDS[i])) {
+        messages.add(new ErrorMessage(false, "object must contain the " + RDF_TERM[i] + " field"));
       }
     }
 
     ArrayList<String> fields = object.get("archive");
-	if (fields.size() > 1)
-        messages.add(new ErrorMessage(false, "must contain exactly one archive field"));
+    if (fields.size() > 1)
+      messages.add(new ErrorMessage(false, "must contain exactly one archive field"));
 
     Set<String> keys = object.keySet();
     boolean hasRole = false;
@@ -174,15 +298,14 @@ public class ValidationUtility {
   public static ArrayList<ErrorMessage> validateGenre(HashMap<String, ArrayList<String>> object) {
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
 
-    Set<String> keys = object.keySet();
-    for (String field : keys) {
-      if ("genre".equals(field)) {
+    for (Map.Entry<String, ArrayList<String>> entry: object.entrySet()) {
+      
+      String key = entry.getKey();
+      ArrayList<String> valueList = entry.getValue();
+      
+      if ("genre".equals(key)) {
         // test 1: each genre is valid
-        ArrayList<String> valueList = object.get(field);
-        ListIterator<String> lit = valueList.listIterator();
-
-        while (lit.hasNext()) {
-          String genre = lit.next();
+        for ( String genre : valueList) {
           if (!validateGenreInList(genre)) {
             messages.add(new ErrorMessage(false,
                 genre + " genre not approved by NINES"));
@@ -195,22 +318,8 @@ public class ValidationUtility {
   }
 
   public static boolean validateGenreInList(String genre) {
-    String[] genreList = new String[]{"Architecture",
-        "Artifacts", "Bibliography",
-        "Collection", "Criticism", "Drama",
-        "Education", "Ephemera", "Fiction",
-        "History", "Leisure", "Letters",
-        "Life Writing", "Manuscript", "Music",
-        "Nonfiction", "Paratext", "Periodical",
-        "Philosophy", "Photograph", "Poetry", "Politics",
-        "Religion", "Review", "Science",
-        "Translation", "Travel",
-        "Visual Art", "Citation",
-        "Book History", "Family Life", "Folklore",
-        "Humor", "Law", "Reference Works", "Sermon"
-    };
-
-    for (String aGenreList : genreList) {
+ 
+    for (String aGenreList : GENRE_LIST) {
       if (aGenreList.equals(genre)) {
         return true;
       }

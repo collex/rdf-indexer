@@ -15,21 +15,22 @@
  **/
 package org.nines;
 
-import org.apache.commons.httpclient.HttpClient;
-import org.openrdf.sesame.sailimpl.memory.RdfSource;
-import org.openrdf.sesame.sail.SailInitializationException;
-import org.openrdf.rio.Parser;
-import org.openrdf.rio.ParseErrorListener;
-import org.openrdf.rio.StatementHandlerException;
-import org.openrdf.rio.ParseException;
-import org.openrdf.rio.rdfxml.RdfXmlParser;
-
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.FileInputStream;
-import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+
 import org.apache.log4j.Logger;
+import org.openrdf.rio.ParseErrorListener;
+import org.openrdf.rio.ParseException;
+import org.openrdf.rio.Parser;
+import org.openrdf.rio.StatementHandlerException;
+import org.openrdf.rio.rdfxml.RdfXmlParser;
+import org.openrdf.sesame.sail.SailInitializationException;
+import org.openrdf.sesame.sailimpl.memory.RdfSource;
 
 public class RdfDocumentParser {
   public final static Logger log = Logger.getLogger(RdfDocumentParser.class.getName());

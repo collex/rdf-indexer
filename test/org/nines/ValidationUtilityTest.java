@@ -26,17 +26,31 @@ public class ValidationUtilityTest extends TestCase {
     super.setUp();
   }
 
-  public void testEncoding() {
-    assertFalse(ValidationUtility.validateTextField("test &#82112; end") );
-  }
+//  public void testEncoding() {
+//    try{
+//    String s= "test &#64; end";
+//    byte[] b = s.getBytes("US-ASCII");
+//    String s2 = new String(b,"UTF-8");
+//    System.out.println(s2);
+//    } catch (Exception e) {
+//      e.printStackTrace();
+//    }
+//    
+//    
+////    assertEquals(0, ValidationUtility.validateTextField("test &#xcf90; end").size() );
+//    assertEquals(1, ValidationUtility.validateTextField("test &#82112; &#233;  end").size() );
+////    assertEquals(2, ValidationUtility.validateTextField("test &#82112; &#xFF; end").size() );
+////    assertEquals(0, ValidationUtility.validateTextField("test &#64; end").size() );
+//    assertEquals(0, ValidationUtility.validateTextField("&#233; and &#xcf90;").size() );
+//    assertEquals(1, ValidationUtility.validateTextField("test &#821").size() );
+//    System.out.println("done");
+//  }
   
   public void testGenre() {
-    assertTrue(ValidationUtility.validateGenreInList("Poetry"));
-    assertFalse(ValidationUtility.validateGenreInList("asdf"));
-  }
-
-  public void testGenreErrorList() {
-    assertTrue(ValidationUtility.validateGenreInList("Poetry"));
+    
+    for (String g : ValidationUtility.GENRE_LIST ) {
+      assertTrue(ValidationUtility.validateGenreInList(g));
+    }
     assertFalse(ValidationUtility.validateGenreInList("asdf"));
   }
 
@@ -66,10 +80,15 @@ public class ValidationUtilityTest extends TestCase {
 
     ArrayList<ErrorMessage> messages = ValidationUtility.validateRequired(testMap);
 
-    assertEquals(2, messages.size());
+    assertEquals(7, messages.size());
 
     testMap.put("title", genreVals);
     testMap.put("role_AUT", genreVals);
+    testMap.put("freeculture", genreVals);
+    testMap.put("has_full_text", genreVals);
+    testMap.put("is_ocr", genreVals);
+    testMap.put("federation", genreVals);
+    testMap.put("url", genreVals);
 
     messages = ValidationUtility.validateRequired(testMap);
 

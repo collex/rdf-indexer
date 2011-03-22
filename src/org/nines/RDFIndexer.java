@@ -15,36 +15,37 @@
  **/
 package org.nines;
 
-import org.apache.commons.httpclient.ConnectTimeoutException;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.NameValuePair;
-import org.apache.commons.httpclient.NoHttpResponseException;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.output.XMLOutputter;
-
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.httpclient.HttpMethodBase;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.output.XMLOutputter;
 
 public class RDFIndexer {
 
   private int numFiles = 0;
-  private int fileCount = 0;
   private int numObjects = 0;
-  //private int numToDelete = 0;
-  //private ArrayList< String > archives = new ArrayList<String>();
   private String guid = "";
   private RDFIndexerConfig config;
   private ConcurrentLinkedQueue<File> dataFileQueue;
@@ -52,7 +53,6 @@ public class RDFIndexer {
   private LinkCollector linkCollector;
   private int progressMilestone = 0;
   private long lastTime;
-  //private String solrURL;
   private Logger log;
   private String targetArchive = "";
 
@@ -63,69 +63,70 @@ public class RDFIndexer {
   private static final int PROGRESS_MILESTONE_INTERVAL = 100;
   private static final int DOCUMENTS_PER_POST = 100;
   
-  public RDFIndexer( File rdfSource, String archiveName, RDFIndexerConfig config )  {
+  public RDFIndexer(File rdfSource, String archiveName, RDFIndexerConfig config) {
 
-	  targetArchive = archiveName;
-	// Use the archive name as the log file name
+    targetArchive = archiveName;
+    // Use the archive name as the log file name
     String reportFilename = archiveName;
-	reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
-	String logFileRelativePath = "../../../log/";
+    reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
+    String logFileRelativePath = "../../../log/";
     initSystem(logFileRelativePath + reportFilename);
-    
-    log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text"); 
+
+    log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
 
     this.config = config;
-    //this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
-    
-    //File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the report file.
-    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log");	// keep report file in the same folder as the log file.
+    // this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
+
+    // File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the
+    // report file.
+    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log"); // keep report file in the same
+                                                                                     // folder as the log file.
     try {
-        errorReport = new ErrorReport(reportFile);
-    } 
-    catch (IOException e1) {
-        log.error("Unable to open error report log for writing, aborting indexer.");
-        return;
+      errorReport = new ErrorReport(reportFile);
+    } catch (IOException e1) {
+      log.error("Unable to open error report log for writing, aborting indexer.");
+      return;
     }
-    
+
     linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
 
     HttpClient client = new HttpClient();
 
-	try {
-		beSureCoreExists(client, archiveToCore(archiveName));
-	} catch (IOException e) {
-		errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
-	}
+    try {
+      beSureCoreExists(client, archiveToCore(archiveName));
+    } catch (IOException e) {
+      errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
+    }
 
-		//if (rdfSource.isDirectory()) {
-    	createGUID(rdfSource);
-    	Date start = new Date();
-    	log.info("Started indexing at " + start);
+    // if (rdfSource.isDirectory()) {
+    createGUID(rdfSource);
+    Date start = new Date();
+    log.info("Started indexing at " + start);
 
-    	indexDirectory(rdfSource);
-        if( config.commitToSolr ) {
-			//for (String archive : archives)
-				commitDocumentsToSolr(client, archiveToCore(archiveName));
-		}
-        else log.info("Skipping Commit to SOLR...");
-	    
-        // report done
-        Date end = new Date();	
-        long duration = (end.getTime() - start.getTime()) / 60000;	
-        log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
-//    }
-//    else {
-//    	errorReport.addError(new IndexerError("","","No objects found"));
-//    }
+    indexDirectory(rdfSource);
+    if (config.commitToSolr) {
+      // for (String archive : archives)
+      commitDocumentsToSolr(client, archiveToCore(archiveName));
+    } else
+      log.info("Skipping Commit to SOLR...");
 
-//    if (config.commitToSolr && archive != null) {
-//      // find out how many items will be deleted
-//      numToDelete = numToDelete(guid, archive, client );
-//      log.info("Deleting "+numToDelete+" duplicate existing documents from index.");
-//
-//      // remove content that isn't from this batch
-//      cleanUp(guid, archive, client);
-//    }
+    // report done
+    Date end = new Date();
+    long duration = (end.getTime() - start.getTime()) / 60000;
+    log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
+    // }
+    // else {
+    // errorReport.addError(new IndexerError("","","No objects found"));
+    // }
+
+    // if (config.commitToSolr && archive != null) {
+    // // find out how many items will be deleted
+    // numToDelete = numToDelete(guid, archive, client );
+    // log.info("Deleting "+numToDelete+" duplicate existing documents from index.");
+    //
+    // // remove content that isn't from this batch
+    // cleanUp(guid, archive, client);
+    // }
 
     errorReport.close();
     linkCollector.close();
@@ -167,12 +168,7 @@ public class RDFIndexer {
    
     try {
       // don't purge old log on startup -- that is handled before calling this app.
-		String logPath = logName + "_progress.log";
-      File logFile = new File(logPath);
-//      if (logFile.exists()) {
-//         logFile.delete();
-//      }
-      
+      String logPath = logName + "_progress.log";      
       FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), logPath);
       BasicConfigurator.configure( fa );
       log = Logger.getLogger(RDFIndexer.class.getName());
@@ -185,8 +181,6 @@ public class RDFIndexer {
       
     System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
     System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
-//    System.setProperty("org.apache.commons.logging.simplelog.log.httpclient.wire.header", "debug");
-//    System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "debug");
   }
   
   public static void main(String[] args) {
@@ -315,23 +309,30 @@ public class RDFIndexer {
     waitForIndexingThreads(threads);
   }
   
-  private void waitForIndexingThreads( ArrayList<IndexerThread> threads ) {
-	boolean done = false;
-    while( !done ) {
-    	
-    	// nap between checks
-    	try {
-			Thread.sleep(100);
-		} catch (InterruptedException e) {}
- 
-		// check status
-		done = true;
-		for( IndexerThread thread : threads ) {
-    		done = done && thread.isDone();
-    	}
+  private void waitForIndexingThreads(ArrayList<IndexerThread> threads) {
+    boolean done = false;
+    while (!done) {
+
+      // nap between checks
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {}
+
+      // check status
+      done = true;
+      for (IndexerThread thread : threads) {
+        done = done && thread.isDone();
+      }
     }
   }
 
+  /**
+   * Generate a core name given the archive. The core
+   * name is of the format: archive_[name]
+   * 
+   * @param archive
+   * @return
+   */
   private String archiveToCore(String archive) {
 	  String core = archive.replaceAll(":", "_");
 	  core = core.replaceAll(" ", "_");
@@ -340,91 +341,82 @@ public class RDFIndexer {
 	  return "archive_" + core;
   }
 
-  // This can fail because of threading issues when accessing archives, so catch that and retry.
-//	private void testArchive(File file, HttpClient client, String archive) {
-//		while (true) {
-//			try {
-//				Boolean found = false;
-//				for (String a : archives) {
-//					if (a.equals(archive))
-//						found = true;
-//				}
-//				if (!found) {
-//					archives.add(archive);
-//					try {
-//						beSureCoreExists(client, archive);
-//						return;
-//					} catch (IOException e) {
-//						errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
-//					}
-//				}
-//			} catch (Exception e) {
-//				errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
-//			}
-//		}
-//	}
-
-  private void indexFile(File file, HttpClient client ) {
+  private void indexFile(File file, HttpClient client) {
     try {
-    	HashMap<String, HashMap<String, ArrayList<String>>> objects = RdfDocumentParser.parse( file, errorReport, linkCollector, config );
-		String archive = "";
-		HashMap<String, HashMap<String, HashMap<String, ArrayList<String>>>> objects_by_archive = new HashMap<String, HashMap<String, HashMap<String, ArrayList<String>>>>();
+      // Parse a file into a hashmap. 
+      // Key is object URI, Value is a set of key-value pairs
+      // that describe the object
+      HashMap<String, HashMap<String, ArrayList<String>>> objects = RdfDocumentParser.parse(file, errorReport,
+          linkCollector, config);
 
-		Set<String> keys = objects.keySet();
-	    for (String uri : keys) {
-	      HashMap<String, ArrayList<String>> object = objects.get(uri);
-	      ArrayList<String> objectArray = object.get("archive");
-              if( objectArray != null ) {
-                archive = archiveToCore(objectArray.get(0));
-				if (!objects_by_archive.containsKey(archive))
-					objects_by_archive.put(archive, new HashMap<String, HashMap<String, ArrayList<String>>>());
-				objects_by_archive.get(archive).put(uri, object);
-				//testArchive(file, client, archive);
-				if (!objectArray.get(0).equals(targetArchive))
-	                errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. " + objectArray.get(0) + " should be " + targetArchive));
-              } else {
-                errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
-              }
-              
-	      ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
+      // Log an error for no objects abd bail if size is zero
+      if (objects.size() == 0) {
+        errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
+        errorReport.flush();
+        return;
+      }
+      
+      // XML doc containing rdf docs to be posted to solr
+      Document solrDoc = new Document();
+      Element root = new Element("add");
+      solrDoc.addContent(root);
+      int docCount = 0;
+      
+      String tgtArchive = "";
+      XMLOutputter outputter = new XMLOutputter();
+      for (Map.Entry<String, HashMap<String, ArrayList<String>>> entry: objects.entrySet()) {
+        
+        String uri = entry.getKey();
+        HashMap<String, ArrayList<String>> object = entry.getValue();
+        
+        // Validate archive and push objects intop new archive map
+        ArrayList<String> objectArray = object.get("archive");
+        if (objectArray != null) { 
+          String objArchive = objectArray.get(0);
+          tgtArchive = archiveToCore(objArchive);          
+          if (!objArchive.equals(this.targetArchive)) {
+            this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
+                + objArchive + " should be " + this.targetArchive));
+          }
+        } else {
+          this.errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
+        }
 
-	      ListIterator<ErrorMessage> lit = messages.listIterator();
+        // validate all other parts of object and generate error report
+        ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
+        for ( ErrorMessage message : messages ) {
+          IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
+          errorReport.addError(e);
+        }
+        
+        // turn this object into an XML solr doc and add it to the xml post
+        Element document = convertObjectToSolrDOM(uri, object);
+        root.addContent(document);
+        docCount++;
 
-	      while (lit.hasNext()) {
-	        ErrorMessage message = lit.next();
-	        IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
-	        errorReport.addError(e);
-	      }
-	    }
+        // once threashold met, post all docs
+        if ( docCount >= DOCUMENTS_PER_POST) {
+          log.info("  posting:" + docCount + " documents to SOLR");
+          postToSolr( outputter.outputString(solrDoc), client, tgtArchive);
+          solrDoc = new Document();
+          root = new Element("add");
+          solrDoc.addContent(root);
+          docCount = 0;
+        }
+      }
+      
+      // dump any remaining docs out to solr
+      if ( docCount >= 0) {
+        log.info("  posting:" + docCount + " documents to SOLR");
+        postToSolr( outputter.outputString(solrDoc), client, tgtArchive);
+      }
 
-	    int objectCount = objects.size();
-		if (objectCount == 0)
-	      errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
-		else {
-			Set<String> archive_list = objects_by_archive.keySet();
-		    for (String arch : archive_list) {
-				HashMap<String, HashMap<String, ArrayList<String>>> documents = objects_by_archive.get(arch);
-				int textLen = 0;
-				int docsWithText = 0;
-				Set<String> uris = documents.keySet();
-				for (String uri : uris) {
-				  HashMap<String, ArrayList<String>> fields = documents.get(uri);
-				  if (fields.get("text") != null) {
-					  textLen += fields.get("text").get(0).length();
-					  docsWithText++;
-				  }
-				}
-	          log.info("  posting:" + ++fileCount + " of " + numFiles + " " + arch + " (num docs=" + documents.size() + ",text len=" + textLen + ",docs with text=" + docsWithText + ")");
-		      postObjectsToSolr( client, documents, arch );
-			}
-	    }
-
-	    numObjects += objectCount;
-	    reportIndexingSpeed(numObjects);
+      numObjects += objects.size();
+      reportIndexingSpeed(numObjects);
 
     } catch (IOException e) {
-       errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
- 	}
+      errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
+    }
     errorReport.flush();
   }
   
@@ -536,205 +528,57 @@ public class RDFIndexer {
       post.releaseConnection();
     }
   }
-
-  /**
-   * Sends an http message to the adminapp to notify that indexing is finished for the
-   * batch identified by the guid
-   */
-//  private void sendMessage(String guid, String messageUrl, HttpClient httpclient) throws IOException {
-//    ErrorSummary summary = errorReport.getSummary();
-//
-//    GetMethod get = new GetMethod(messageUrl);
-//    NameValuePair guidParam = new NameValuePair("guid", guid);
-//    NameValuePair archiveParam = new NameValuePair("archive", this.archive);
-//    NameValuePair stat1 = new NameValuePair("stats[totalFileCount]", Integer.toString(numFiles));
-//    NameValuePair stat2 = new NameValuePair("stats[totalObjectCount]", Integer.toString(numObjects));
-//    NameValuePair stat3 = new NameValuePair("stats[fileErrorCount]", Integer.toString(summary.getFileCount()));
-//    NameValuePair stat4 = new NameValuePair("stats[objectErrorCount]", Integer.toString(summary.getObjectCount()));
-//    NameValuePair stat5 = new NameValuePair("stats[totalErrorCount]", Integer.toString(summary.getErrorCount()));
-//    NameValuePair stat6 = new NameValuePair("stats[objectsDeleted]", Integer.toString(numToDelete));
-//    NameValuePair params[] = new NameValuePair[]{guidParam, archiveParam, stat1, stat2, stat3, stat4, stat5, stat6};
-//    get.setQueryString(params);
-//
-//    int result;
-//    try {
-//      result = httpclient.executeMethod(get);
-//
-//      if (result != 200) {
-//        if (result >= 400 && result < 500) {
-//          throw new IOException(result+" code returned for URL: " + messageUrl);
-//        }
-//      }
-//    } catch (NoHttpResponseException e) {
-//      throw new IOException("The message server didn't respond to the http request to: " + messageUrl);
-//    } catch (ConnectTimeoutException e) {
-//      throw new IOException("The message server timed out on the http request to: " + messageUrl);
-//    } finally {
-//      get.releaseConnection();
-//    }
-//  }
-
-  /**
-   * Connects to solr and removes all content for a given archive that is not part of the current batch,
-   * as denoted by the guid.  This makes it possible to index all new content and to strip out the old as the
-   * last operation.
-   */
-//  private void cleanUp(String guid, String archive, HttpClient httpclient)  {
-//    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
-//    String solrXml = "<delete><query>" + luceneQuery + "</query></delete>";
-//
-//    try {
-//	    postToSolr(solrXml,httpclient);
-//	    postToSolr("<commit/>",httpclient);
-//    } catch( IOException e ) {
-//    	errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR during cleanup. "+e.getLocalizedMessage()));
-//    }
-//  }
-//
-//  private int numToDelete(String guid, String archive, HttpClient httpclient ) {
-//    String luceneQuery = "-batch:\"" + guid + "\" +archive:\"" + archive + "\"";
-//    int iNumToDelete = 0;
-//
-//    String solrUrl = config.solrBaseURL + config.solrNewIndex + "/select";
-//
-//    GetMethod get = new GetMethod(solrUrl);
-//    NameValuePair queryParam = new NameValuePair("q", luceneQuery);
-//    NameValuePair params[] = new NameValuePair[]{queryParam};
-//    get.setQueryString(params);
-//
-//    int result;
-//    try {
-//      int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-//      do {
-//        result = httpclient.executeMethod(get);
-//        solrRequestNumRetries--;
-//        if(result != 200) {
-//          try {
-//            Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-//          } catch(InterruptedException e) {
-//            log.info(">>>> Thread Interrupted");
-//          }
-//        }
-//      } while(result != 200 && solrRequestNumRetries > 0);
-//
-//      if (result != 200) {
-//        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
-//      }
-//
-//      String response = get.getResponseBodyAsString();
-//
-//      Pattern pattern = Pattern.compile("numFound=\\\"(.)\\\"", Pattern.DOTALL);
-//      Matcher matcher = pattern.matcher(response);
-//      while (matcher.find()) {
-//        String numFound = matcher.group(1);
-//        if (numFound != null)
-//          iNumToDelete = Integer.parseInt(numFound);
-//      }
-//    } catch (NoHttpResponseException e) {
-//      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
-//    } catch (ConnectTimeoutException e) {
-//      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
-//    } catch (IOException e) {
-//      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
-//	}
-//    finally {
-//      get.releaseConnection();
-//    }
-//
-//    return iNumToDelete;
-//  }
   
-  private Element convertObjectToSolrDOM( String documentName, HashMap<String, ArrayList<String>> fields) {
-    
-	Element doc = new Element("doc");
-    Set<String> fieldVals = fields.keySet();
-    for (String field : fieldVals) {
-    	// loop over each value per field
-        ArrayList<String> valList = fields.get(field);
+  private Element convertObjectToSolrDOM(String documentName, HashMap<String, ArrayList<String>> fields) {
 
-        ListIterator<String> lit = valList.listIterator();
+    Element doc = new Element("doc");
+    for (Map.Entry<String, ArrayList<String>> entry: fields.entrySet()) {
+      
+      String field = entry.getKey();
+      ArrayList<String> valList = entry.getValue();
 
-        while (lit.hasNext()) {
-          Element f = new Element("field");
-          f.setAttribute("name", field);
-          ValidationUtility.populateTextField(f, lit.next());
-          doc.addContent(f);         
-        }  
+      for (String value : valList) {
+        Element f = new Element("field");
+        f.setAttribute("name", field);
+        ValidationUtility.populateTextField(f, value);
+        doc.addContent(f);
+      }
     }
-    
+
     // tag the document with the batch id
     Element f = new Element("field");
     f.setAttribute("name", "batch");
     f.setText(guid);
     doc.addContent(f);
-    
+
     return doc;
   }
 
-  private class DocCollector {
-	  public Document solrDoc = new Document();
-	  public int documentCount = 0;
-  }
-
-  private void postObjectsToSolr( HttpClient client, HashMap<String, HashMap<String, ArrayList<String>>> documents, String archive ) throws IOException {
-	XMLOutputter outputter = new XMLOutputter();
-	Set<String> keys = documents.keySet();
-
-    int documentCount = 0;
-    Document solrDoc = new Document();
-    Element root = new Element("add");
-    solrDoc.addContent(root);
-    
-    for (String uri : keys) { 	
-      HashMap<String, ArrayList<String>> fields = documents.get(uri);   
-      Element document = convertObjectToSolrDOM( uri, fields );
-      root.addContent(document);	      
-      
-      if( documentCount++ >= DOCUMENTS_PER_POST ) {
-	      // post this set of documents
-    	  String xml = outputter.outputString(solrDoc);
-	      postToSolr(xml,client, archive);
-	      
-	      // reset for next post
-	      solrDoc = new Document();
-	      root = new Element("add");
-	      solrDoc.addContent(root);
-	      documentCount = 0;
-     }
-    }
-    
-    if( documentCount > 0 ) {
-	 String xml = outputter.outputString(solrDoc);
-	 postToSolr(xml,client, archive);
-    }
-  }
-
   private class IndexerThread extends Thread {
-	  
-   private boolean done;
-   private HttpClient httpClient;
 
-   public IndexerThread( int threadID ) {
-	   setName("IndexerThread"+threadID);
-	   httpClient = new HttpClient();
-	   httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-	   done = false;
-   }
-	  
-	@Override
-	public void run() {
-		File file = null;
-	    while( (file = dataFileQueue.poll()) != null ) {
-	    	indexFile(file,httpClient);
-	    }
-	    done = true;
-	}
+    private boolean done;
+    private HttpClient httpClient;
 
-	public boolean isDone() {
-		return done;
-	}
-  
+    public IndexerThread(int threadID) {
+      setName("IndexerThread" + threadID);
+      httpClient = new HttpClient();
+      httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
+      done = false;
+    }
+
+    @Override
+    public void run() {
+      File file = null;
+      while ((file = dataFileQueue.poll()) != null) {
+        indexFile(file, httpClient);
+      }
+      done = true;
+    }
+
+    public boolean isDone() {
+      return done;
+    }
+
   }
-
 
 }
