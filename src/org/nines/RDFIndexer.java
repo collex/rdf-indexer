@@ -386,9 +386,16 @@ public class RDFIndexer {
         }
 
         // validate all other parts of object and generate error report
-        ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
-        for ( ErrorMessage message : messages ) {
-          IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
+        try {
+          ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
+          for ( ErrorMessage message : messages ) {
+            IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
+            errorReport.addError(e);
+          }
+        } catch (Exception valEx) {
+          System.err.println("ERROR Validating file:" + file.getName() + " URI: " +  uri);
+          valEx.printStackTrace();
+          IndexerError e = new IndexerError(file.getName(), uri, valEx.getMessage());
           errorReport.addError(e);
         }
         
