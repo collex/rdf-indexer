@@ -20,7 +20,9 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
@@ -435,85 +438,99 @@ public class RDFIndexer {
   }
 
   private void beSureCoreExists(HttpClient httpclient, String core) throws IOException {
-	  GetMethod post = new GetMethod(config.solrBaseURL + "/admin/cores?action=STATUS");
+    GetMethod request = new GetMethod(config.solrBaseURL + "/admin/cores?action=STATUS");
 
     httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-    httpclient.getHttpConnectionManager().getParams().setIntParameter( HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000*1024);
-// Execute request
+    httpclient.getHttpConnectionManager().getParams()
+        .setIntParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
+    
+    // Execute request
     try {
       int result;
       int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
       do {
-        result = httpclient.executeMethod(post);
+        result = httpclient.executeMethod(request);
         solrRequestNumRetries--;
-        if(result != 200) {
+        if (result != 200) {
           try {
             Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-			log.info(">>>> postToSolr error: "+result+" (retrying...)");
-			log.info(">>>> getting core information");
-          } catch(InterruptedException e) {
+            log.info(">>>> postToSolr error: " + result + " (retrying...)");
+            log.info(">>>> getting core information");
+          } catch (InterruptedException e) {
             log.info(">>>> Thread Interrupted");
           }
         }
-      } while(result != 200 && solrRequestNumRetries > 0);
+      } while (result != 200 && solrRequestNumRetries > 0);
 
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n\n");
       }
-	  String response = post.getResponseBodyAsString();
-	  int exists = response.indexOf(">" + core + "<");
-	  if (exists <= 0) {
-		  // The core doesn't exist: create it.
-		  post = new GetMethod(config.solrBaseURL + "/admin/cores?action=CREATE&name="+core + "&instanceDir=.");
-        result = httpclient.executeMethod(post);
-            log.info(">>>> Created core: " + core);
-          try {
-	         Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-          } catch(InterruptedException e) {
-            log.info(">>>> Thread Interrupted");
-          }
-	  }
-      } finally {
+      String response = getResponseString( request );
+      int exists = response.indexOf(">" + core + "<");
+      if (exists <= 0) {
+        // The core doesn't exist: create it.
+        request = new GetMethod(config.solrBaseURL + "/admin/cores?action=CREATE&name=" + core + "&instanceDir=.");
+        result = httpclient.executeMethod(request);
+        log.info(">>>> Created core: " + core);
+        try {
+          Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
+        } catch (InterruptedException e) {
+          log.info(">>>> Thread Interrupted");
+        }
+      }
+    } finally {
       // Release current connection to the connection pool once you are done
-      post.releaseConnection();
+      request.releaseConnection();
     }
   }
 
-  public void postToSolr(String xml, HttpClient httpclient, String archive ) throws IOException {
-//	  beSureCoreExists(httpclient, archive);
+  private String getResponseString(HttpMethod httpMethod) throws IOException {
+    InputStream is = httpMethod.getResponseBodyAsStream();
+    StringWriter writer = new StringWriter();
+    char[] buffer = new char[1024];
+    BufferedReader reader = new BufferedReader( new InputStreamReader(is, "UTF-8"));
+    int n;
+    while ((n = reader.read(buffer)) != -1) {
+      writer.write(buffer, 0, n);
+    }
+    return writer.toString();
+  }
+
+  public void postToSolr(String xml, HttpClient httpclient, String archive) throws IOException {
 
     PostMethod post = new PostMethod(config.solrBaseURL + "/" + archive + "/update");
-    //PostMethod post = new PostMethod(config.solrBaseURL + config.solrNewIndex + "/update");
+    // PostMethod post = new PostMethod(config.solrBaseURL + config.solrNewIndex + "/update");
     post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
     post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
 
     httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-    httpclient.getHttpConnectionManager().getParams().setIntParameter( HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000*1024);
-// Execute request
+    httpclient.getHttpConnectionManager().getParams()
+        .setIntParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
+    // Execute request
     try {
       int result;
       int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
       do {
         result = httpclient.executeMethod(post);
-        if(result != 200) {
+        if (result != 200) {
           try {
             Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-			log.info(">>>> postToSolr error in archive " + archive + ": "+result+" (retrying...)");
-          } catch(InterruptedException e) {
+            log.info(">>>> postToSolr error in archive " + archive + ": " + result + " (retrying...)");
+          } catch (InterruptedException e) {
             log.info(">>>> Thread Interrupted");
           }
         } else {
-			if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES)
-				log.info(">>>> postToSolr: " + archive + ":  (succeeded!)");
-		}
+          if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES)
+            log.info(">>>> postToSolr: " + archive + ":  (succeeded!)");
+        }
         solrRequestNumRetries--;
-      } while(result != 200 && solrRequestNumRetries > 0);
+      } while (result != 200 && solrRequestNumRetries > 0);
 
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n\n" + xml);
       }
-      String response = post.getResponseBodyAsString();
-//      log.info(response);
+      String response = getResponseString(post);
+      // log.info(response);
       Pattern pattern = Pattern.compile("status=\\\"(\\d*)\\\">(.*)\\<\\/result\\>", Pattern.DOTALL);
       Matcher matcher = pattern.matcher(response);
       while (matcher.find()) {
