@@ -523,48 +523,8 @@ public class NinesStatementHandler implements StatementHandler {
         errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
       }
 
-      //String response = get.getResponseBodyAsString();
-//		BufferedReader reader = new BufferedReader(get.getResponseBodyAsStream());
-//		StringBuilder sb = new StringBuilder();
-//		String line = null;
-//		try {
-//			while ((line = reader.readLine()) != null) {
-//				sb.append(line + "\n");
-//			}
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
-//		fullText = sb.toString();
-
-//		BufferedInputStream bis = new BufferedInputStream(get.getResponseBodyAsStream());
-//	  byte[] b = new byte[4096];
-//	  int len;
-//	  while ((len = bis.read(b)) > 0) {
-//        String str = new String(b, 0, len, get.getResponseCharSet());
-//		  String start = "<arr name=\"text\"><str>";
-//		  String stop = "</str></arr>";
-//		  if (fullText.length() == 0) {
-//			  int iStart = str.indexOf(start);
-//			if (iStart >= 0) {
-//			  fullText = str.substring(iStart+start.length());
-//			  int iEnd = fullText.indexOf(stop);
-//			  if (iEnd >= 0) {
-//				  fullText = fullText.substring(0, iEnd);
-//				  break;
-//			  }
-//			}
-//		  } else {
-//			  int iEnd = str.indexOf(stop);
-//			  if (iEnd == -1)
-//				  fullText += str;
-//			  else {
-//				  fullText += str.substring(0, iEnd);
-//				  break;
-//			  }
-//		  }
-//      }
-	  //fullText = parseXML(response);
-	  fullText = get.getResponseBodyAsString();
+    fullText = RDFIndexer.getResponseString(get);
+    
 	  String start = "<arr name=\"text\"><str>";
 	  String stop = "</str></arr>";
 	 fullText = trimBracketed(fullText, start, stop);

@@ -472,7 +472,7 @@ public class RDFIndexer {
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n\n");
       }
-      String response = getResponseString( request );
+      String response = RDFIndexer.getResponseString( request );
       int exists = response.indexOf(">" + core + "<");
       if (exists <= 0) {
         // The core doesn't exist: create it.
@@ -491,7 +491,16 @@ public class RDFIndexer {
     }
   }
 
-  private String getResponseString(HttpMethod httpMethod) throws IOException {
+  /**
+   * Get the response body string from the HttpMethod. Internally uses 
+   * getResponseBodyAsStream.
+   * 
+   * @param httpMethod
+   * @return The response body string
+   * 
+   * @throws IOException
+   */
+  public static final String getResponseString(HttpMethod httpMethod) throws IOException {
     InputStream is = httpMethod.getResponseBodyAsStream();
     StringWriter writer = new StringWriter();
     char[] buffer = new char[1024];
@@ -536,7 +545,7 @@ public class RDFIndexer {
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n\n" + xml);
       }
-      String response = getResponseString(post);
+      String response = RDFIndexer.getResponseString(post);
       // log.info(response);
       Pattern pattern = Pattern.compile("status=\\\"(\\d*)\\\">(.*)\\<\\/result\\>", Pattern.DOTALL);
       Matcher matcher = pattern.matcher(response);
