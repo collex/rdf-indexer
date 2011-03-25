@@ -28,6 +28,8 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.XmlStreamReader;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
@@ -386,43 +388,58 @@ public class NinesStatementHandler implements StatementHandler {
     }
     return false;
   }
-  
-  public boolean handleText( String predicate, String object ) {
+
+  private boolean handleText(String predicate, String object) {
+    
+    // first, check if this object is TEXT. If it is the predicate
+    // will have the #text url below....
     if ("http://www.collex.org/schema#text".equals(predicate)) {
       try {
+        
+        // Objects with external content will have some form of
+        // http url as the content. Detect this and grab text.
         String text = object;
         if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
           addFieldEntry(doc, "text_url", text, false);
-		  if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
-			errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
-			text = "";
-		  }
-		  else {
-			 if( config.retrieveFullText ) text = fetchContent(object);
-			  if (config.reindexFullText) {
-				  text = getFullText(doc.get("uri").get(0), httpClient );
+          
+          // don't handle pdf links
+          if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
+            errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
+            text = "";
+          } else {
+            
+            // Two modes of operation, index and re-index. Only when indexing go
+            // to the site and scrape text content for addition to solr
+            if (config.retrieveFullText) {
+              
+              // Scrape content from source site. Do not attempt
+              // any corrections.
+              text = fetchContent(object);
+            } else if (config.reindexFullText) {
+              
+              // in re-index mode, pull existing text from solr
+              // and attempt to patch up any bad data we find
+              text = getFullText(doc.get("uri").get(0), httpClient);
 
-					// print out all lines with ampersands to see what we're up against.
-					//printLinesContaining(text, "&");
-					//printLinesContaining(text, "{");
-					//printLinesContaining(text, "}");
-
-			  }
-		  }
+              // TODO fix anything with &
+            }
+          }
         }
-		if (text.length() > 0) {
-			text = text.replaceAll("\t", " ");
-			text = text.replaceAll(" +", " ");
-			text = text.replaceAll(" \n", "\n");
-			text = text.replaceAll("\n ", "\n");
-			text = text.replaceAll("\n+", "\n");
-	        addFieldEntry(doc, "text", text, false);
-//        addFieldEntry(doc, "content", text);
-		  }
+        
+        // At this point, we have the text. Do some high-level cleanups
+        // and add it to the data hashmap
+        if (text.length() > 0) {
+          text = text.replaceAll("\t", " ");
+          text = text.replaceAll(" +", " ");
+          text = text.replaceAll(" \n", "\n");
+          text = text.replaceAll("\n ", "\n");
+          text = text.replaceAll("\n+", "\n");
+          XmlStreamReader xr = new  XmlStreamReader( IOUtils.toInputStream(text, "UTF-8")) ;
+          addFieldEntry(doc, "text", StringEscapeUtils.escapeXml(IOUtils.toString(xr)), false);
+        }
       } catch (IOException e) {
         String uriVal = documentURI;
-        errorReport.addError(
-            new IndexerError(filename, uriVal, e.getMessage()));
+        errorReport.addError(new IndexerError(filename, uriVal, e.getMessage()));
       }
       return true;
     }
@@ -495,13 +512,13 @@ public class NinesStatementHandler implements StatementHandler {
 		return fullText;
 	}
 
-  private String getFullText(String uri, HttpClient httpclient ) {
-	  String fullText = "";
+  private String getFullText(String uri, HttpClient httpclient) {
+    String fullText = "";
     String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
 
     GetMethod get = new GetMethod(solrUrl);
-    NameValuePair queryParam = new NameValuePair("q", "uri:\""+uri + "\"");
-    NameValuePair params[] = new NameValuePair[]{queryParam};
+    NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
+    NameValuePair params[] = new NameValuePair[] { queryParam };
     get.setQueryString(params);
 
     int result;
@@ -510,293 +527,43 @@ public class NinesStatementHandler implements StatementHandler {
       do {
         result = httpclient.executeMethod(get);
         solrRequestNumRetries--;
-        if(result != 200) {
+        if (result != 200) {
           try {
             Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-          } catch(InterruptedException e) {
+          } catch (InterruptedException e) {
             log.info(">>>> Thread Interrupted");
           }
         }
-      } while(result != 200 && solrRequestNumRetries > 0);
+      } while (result != 200 && solrRequestNumRetries > 0);
 
       if (result != 200) {
-        errorReport.addError(new IndexerError("","","cannot reach URL: " + solrUrl));
+        errorReport.addError(new IndexerError("", "", "cannot reach URL: " + solrUrl));
       }
 
-    fullText = RDFIndexer.getResponseString(get);
-    
-	  String start = "<arr name=\"text\"><str>";
-	  String stop = "</str></arr>";
-	 fullText = trimBracketed(fullText, start, stop);
+      fullText = RDFIndexer.getResponseString(get);
+
+      String start = "<arr name=\"text\"><str>";
+      String stop = "</str></arr>";
+      fullText = trimBracketed(fullText, start, stop);
 
     } catch (NoHttpResponseException e) {
-      errorReport.addError(new IndexerError("","","The SOLR server didn't respond to the http request to: " + solrUrl));
+      errorReport
+          .addError(new IndexerError("", "", "The SOLR server didn't respond to the http request to: " + solrUrl));
     } catch (ConnectTimeoutException e) {
-      errorReport.addError(new IndexerError("","","The SOLR server timed out on the http request to: " + solrUrl));
+      errorReport.addError(new IndexerError("", "", "The SOLR server timed out on the http request to: " + solrUrl));
     } catch (IOException e) {
-      errorReport.addError(new IndexerError("","","An IO Error occurred attempting to access: " + solrUrl));
-	}
-    finally {
+      errorReport.addError(new IndexerError("", "", "An IO Error occurred attempting to access: " + solrUrl));
+    } finally {
       get.releaseConnection();
     }
 
-	fullText = replaceMatch(fullText, "&lt;", "<");
-	fullText = replaceMatch(fullText, "&gt;", ">");
-	fullText = replaceMatch(fullText, "&amp;", "&");
-	fullText = replaceMatchOnce(fullText, "““", "“");
-	fullText = replaceMatchOnce(fullText, "――", "―");
-//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
-//	fullText = replaceDoubledUtfChar(fullText, 227, 128, 137);
-
-//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 148);
-//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 160);
-//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 149);
-//	fullText = replaceDoubledUtfChar(fullText, 226, 128, 156);
-
-	//fullText = unescapeXML(fullText);	fullText = replaceDoubledUtfChar(fullText, 226, 128, 153);
-
-	// Use this if we want to further scrub the text that comes out of solr
-//	fullText = cleanText(fullText, false);
-//    fullText = unescapeXML(fullText);
-	return fullText;
-}
-
-//  private class StrPair {
-//	  public String first;
-//	  public String second;
-//	  public StrPair(String f, String s) {
-//		  first = f;
-//		  second = s;
-//	  }
-//  }
-
-  private String unescapeXML(String str) {
-	str = str.replaceAll("&nbsp;", " ");	// This is escaped to a unicode char. For our purposes, we want this to be a space.
-	str = StringEscapeUtils.unescapeHtml(str);
-
-	//for some reason, unescapeHtml doesn't get everything.
-//	str = str.replaceAll("&#8226;", "•");
-//	str = str.replaceAll("&quot;", "\"");
-//
-//	// Also, some of the text we get is missing the final semi colon
-//	str = str.replaceAll("&nbsp;", " ");
-//	str = str.replaceAll("&nbsp", " ");
-//	str = str.replaceAll("&mdash;", "-");
-//	str = str.replaceAll("&mdash", "-");
-//	str = str.replaceAll("&#151;", "-");
-//	str = str.replaceAll("&#151", "-");
-//	str = str.replaceAll("&hyphen;", "-");
-//	str = str.replaceAll("&hyphen", "-");
-//	str = str.replaceAll("&colon;", ":");
-//	str = str.replaceAll("&colon", ":");
-
-	return str;
-
-//	String [] arr = str.split("&");
-//	StrPair[] matchList = new StrPair[]{
-//		new StrPair("lt;", "<"),
-//		new StrPair("gt;", ">"),
-//		new StrPair("nbsp;", " "),
-//		new StrPair("nbsp", " "),
-//		new StrPair("#034;", "\""),
-//		new StrPair("ldquo;", "\""),
-//		new StrPair("#039;", "'"),
-//		new StrPair("#39;", "'"),
-//		new StrPair("#8217;", "'"),
-//		new StrPair("#8216;", "'"),
-//		new StrPair("#146;", "'"),
-//		new StrPair("#339;", "œ"),
-//		new StrPair("#8226;", "•"),
-//		new StrPair("#8230;", "..."),
-//		new StrPair("mdash;", "-"),
-//		new StrPair("mdash", "-"),
-//		new StrPair("ndash;", "-"),
-//
-//		new StrPair("#8211;", "-"),
-//		new StrPair("hyphen;", "-"),
-//		new StrPair("hyphen", "-"),
-//		new StrPair("#151;", "-"),
-//		new StrPair("#151", "-"),
-//		new StrPair("colon;", ":"),
-//		new StrPair("colon", ":"),
-//		new StrPair("eacute;", "é"),
-//		new StrPair("ccedil;", "ç"),
-//		new StrPair("#147;", "\""),
-//		new StrPair("#148;", "\""),
-//		new StrPair("quot;", "\""),
-//		new StrPair("lsquo;", "'"),
-//
-//		new StrPair("agrave;", "à"),
-//		new StrPair("ugrave;", "ù"),
-//		new StrPair("egrave;", "è"),
-//		new StrPair("#8212;", "-"),
-//		new StrPair("#9;", ""),
-//		new StrPair("#145;", "'"),
-//		new StrPair("hellip;", "..."),
-//		new StrPair("Uuml;", "Ü"),
-//		new StrPair("uuml;", "ü"),
-//		new StrPair("ouml;", "ö"),
-//		new StrPair("Aacute;", "Á"),
-//		new StrPair("aacute;", "á"),
-//		new StrPair("acute;", "´"),
-//		new StrPair("macr;", "¯"),
-//
-//		new StrPair("sect;", "§"),
-//		new StrPair("szlig;", "ß"),
-//		new StrPair("auml;", "ä"),
-//		new StrPair("ecirc;", "ê"),
-//		new StrPair("ocirc;", "ô"),
-//		new StrPair("icirc;", "î"),
-//
-//		new StrPair("iuml;", "ï"),
-//		new StrPair("oacute;", "ó"),
-//		new StrPair("rsquo;", "'"),
-//		new StrPair("#156;", "œ"),
-//		new StrPair("Eacute;", "É"),
-//		new StrPair("rdquo;", "\""),
-//		new StrPair("oelig;", "œ"),
-//		new StrPair("Auml;", "Ä"),
-//		new StrPair("acirc;", "â"),
-//
-//		new StrPair("euml;", "ë"),
-//		new StrPair("copy;", "©"),
-//		new StrPair("iacute;", "í"),
-//		new StrPair("ntilde;", "ñ"),
-//		new StrPair("pound;", "£"),
-//		new StrPair("uacute;", "ú"),
-//		new StrPair("Egrave;", "È"),
-//		new StrPair("Icirc;", "î"),
-//		new StrPair("Euml;", "Ë"),
-//		new StrPair("cedil;", "ç"),
-//		new StrPair("Ocirc;", "Ô"),
-//		new StrPair("Igrave;", "Ì"),
-//		new StrPair("Icirc;", "Î"),
-//		new StrPair("Ograve;", "Ò"),
-//		new StrPair("scaron;", ""),
-//		new StrPair("Ecirc;", "Ê"),
-//		new StrPair("thorn;", "þ"),
-//		new StrPair("uacute;", "ú"),
-//		new StrPair("aelig;", "æ"),
-//		new StrPair("Agrave;", "À"),
-//		new StrPair("Oslash;", "Ø"),
-//		new StrPair("oslash;", "ø"),
-//		new StrPair("iquest;", "¿"),
-//		new StrPair("middot;", "·"),
-//		new StrPair("yacute;", "ý"),
-//		new StrPair("deg;", "°"),
-//		new StrPair("yen;", "¥"),
-//		new StrPair("#x17D;", "Ž"),
-//		new StrPair("#x17E;", " 	ž "),
-//		new StrPair("#x159;", "ř "),
-//		new StrPair("#131;", "ƒ"),
-//		new StrPair("#150;", "-"),
-//		new StrPair("#135;", "‡"),
-//		new StrPair("#138;", "Š"),
-//		new StrPair("#157;", ""),
-//		new StrPair("#0;", ""),
-//		new StrPair("#169;", "©"),
-//		new StrPair("#009;", ""),
-//		new StrPair("atilde;", "ã"),
-//		new StrPair("Atilde;", "Ã"),
-//		new StrPair("Ntilde;", "Ñ"),
-//
-//		new StrPair("Scaron;", "Š"),
-//		new StrPair("Acirc;", "Â"),
-//		new StrPair("ograve;", "ò"),
-//		new StrPair("ucirc;", "û"),
-//		new StrPair("#16;", ""),
-//		new StrPair("#17;", ""),
-//		new StrPair("#7;", ""),
-//		new StrPair("#42;", "*"),
-//		new StrPair("#42", "*"),
-//		new StrPair("#163;", "£"),
-//		new StrPair("#8224;", "†"),
-//
-//		new StrPair("#166;", "¦"),
-//		new StrPair("#171;", "«"),
-//		new StrPair("#173;", ""),
-//		new StrPair("#180;", "´"),
-//		new StrPair("#183;", "·"),
-//		new StrPair("#187;", "»"),
-//		new StrPair("#191;", "¿"),
-//		new StrPair("otilde;", "õ"),
-//		new StrPair("Ccedil;", "Ç"),
-//		new StrPair("Iacute;", "Í"),
-//		new StrPair("Uacute;", "Ú"),
-//		new StrPair("yuml;", "ÿ"),
-//		new StrPair("reg;", "®"),
-//		new StrPair("eacute", "é"),
-//		new StrPair("Oacute;", "Ó"),
-//		new StrPair("Otilde;", "Õ"),
-//		new StrPair("igrave;", "ì"),
-//		new StrPair("Ouml;", "Ö"),
-//		new StrPair("eth;", "ð"),
-//		new StrPair("AElig;", "Æ"),
-//		new StrPair("Yacute;", "Ý"),
-//		new StrPair("Aring;", "Å"),
-//		new StrPair("THORN;", "Þ"),
-//		new StrPair("pounds;", "£"),
-//		new StrPair("#233;", "é"),
-//		new StrPair("#252;", "ü"),
-//		new StrPair("#153;", "™"),
-//		new StrPair("#176;", "°"),
-//		new StrPair("#177;", "±"),
-//		new StrPair("#161;", "¡"),
-//		new StrPair("#162;", "¢"),
-//		new StrPair("#167;", "§"),
-//		new StrPair("#168;", "¨"),
-//		new StrPair("#169;", "©"),
-//		new StrPair("#225;", "á"),
-//		new StrPair("#224;", "à"),
-//		new StrPair("#230;", "æ"),
-//		new StrPair("#242;", "ò"),
-//		new StrPair("#246;", "ö"),
-//		new StrPair("#232;", "è"),
-//		new StrPair("#182;", "¶"),
-//		new StrPair("#175;", "¯"),
-//		new StrPair("raquo;", "»"),
-//		new StrPair("aring;", "å"),
-//		new StrPair("rarr;", "→"),
-//		new StrPair("iexcl;", "¡"),
-//		new StrPair("emsp;", ""),
-//		new StrPair("#x02013;", "-"),
-//		new StrPair("#x02014;", "-"),
-//		new StrPair("#x000A0;", " "),
-//		new StrPair("#x000F6;", "ö"),
-//		new StrPair("#x000FA;", "ú"),
-//		new StrPair("#x000C9;", "É"),
-//
-//		new StrPair("frac14;", "¼"),
-//		new StrPair("frac12;", "½"),
-//		new StrPair("para;", "¶"),
-//		new StrPair("frac34;", "¾"),
-//		new StrPair("times;", "×"),
-//		new StrPair("Ucirc;", "Û")
-//	};
-//	String newStr = arr[0];
-//	for (int i = 1; i < arr.length; i++) {
-//		for (int j = 0; j < matchList.length; j++) {
-//			if (arr[i].startsWith(matchList[j].first))
-//				newStr += "&" + matchList[j].second + arr[i].substring(matchList[j].first.length());
-//			else
-//				newStr += "&" + arr[i];
-//		}
-//	}
-//
-//	return newStr;
+    fullText = replaceMatch(fullText, "&lt;", "<");
+    fullText = replaceMatch(fullText, "&gt;", ">");
+    fullText = replaceMatch(fullText, "&amp;", "&");
+    fullText = replaceMatchOnce(fullText, "““", "“");
+    fullText = replaceMatchOnce(fullText, "――", "―");
+    return fullText;
   }
-
-//  private String parseXML(String str) {
-//	  String start = "<arr name=\"text\"><str>";
-//	  String stop = "</str></arr>";
-//	 String fullText = trimBracketed(str, start, stop);
-//	 fullText = replaceMatch(fullText, "&lt;", "<");
-//	 fullText = replaceMatch(fullText, "&gt;", ">");
-//	 fullText = replaceMatch(fullText, "&amp;", "&");
-//	return fullText;
-//    }
-
-
 
   public boolean handleRole( String predicate, String object ) {
     if (predicate.startsWith("http://www.loc.gov/loc.terms/relators/")) {
