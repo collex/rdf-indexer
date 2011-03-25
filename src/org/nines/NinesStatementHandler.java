@@ -28,9 +28,6 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.input.XmlStreamReader;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
@@ -434,8 +431,7 @@ public class NinesStatementHandler implements StatementHandler {
           text = text.replaceAll(" \n", "\n");
           text = text.replaceAll("\n ", "\n");
           text = text.replaceAll("\n+", "\n");
-          XmlStreamReader xr = new  XmlStreamReader( IOUtils.toInputStream(text, "UTF-8")) ;
-          addFieldEntry(doc, "text", StringEscapeUtils.escapeXml(IOUtils.toString(xr)), false);
+          addFieldEntry(doc, "text", text, false);
         }
       } catch (IOException e) {
         String uriVal = documentURI;
