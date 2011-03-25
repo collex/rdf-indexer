@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -35,7 +37,8 @@ import org.openrdf.sesame.sailimpl.memory.RdfSource;
 public class RdfDocumentParser {
   public final static Logger log = Logger.getLogger(RdfDocumentParser.class.getName());
 
-  public static HashMap<String, HashMap<String, ArrayList<String>>> parse(final File file, ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config ) throws IOException {
+  public static HashMap<String, HashMap<String, ArrayList<String>>> parse(final File file, ErrorReport errorReport,
+      LinkCollector linkCollector, RDFIndexerConfig config) throws IOException {
     RdfSource rdfSource = new RdfSource();
     try {
       rdfSource.initialize();
@@ -65,16 +68,21 @@ public class RdfDocumentParser {
 
     // parse file
     try {
-      parser.parse(new InputStreamReader(new FileInputStream(file), "UTF8"), "http://foo/bar");
-    } catch (ParseException e) {   
-      errorReport.addError(new IndexerError(file.getName(), "", "Parse Error on Line "+e.getLineNumber()+": "+e.getMessage() ));
+      Charset cs = Charset.availableCharsets().get("UTF-8");
+      CharsetDecoder decoder = cs.newDecoder();
+      InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
+      parser.parse(is, "http://foo/" + file.getName());
+
+    } catch (ParseException e) {
+      errorReport.addError(new IndexerError(file.getName(), "", "Parse Error on Line " + e.getLineNumber() + ": "
+          + e.getMessage()));
     } catch (StatementHandlerException e) {
-      errorReport.addError(new IndexerError(file.getName(), "", "StatementHandler Exception: "+e.getMessage()));
-    } catch( Exception e ) {
-  	  errorReport.addError(new IndexerError(file.getName(), "", "RDF Parser Error: "+e.getMessage()));
-	}
-    
-    // retrieve parsed data 
+      errorReport.addError(new IndexerError(file.getName(), "", "StatementHandler Exception: " + e.getMessage()));
+    } catch (Exception e) {
+      errorReport.addError(new IndexerError(file.getName(), "", "RDF Parser Error: " + e.getMessage()));
+    }
+
+    // retrieve parsed data
     HashMap<String, HashMap<String, ArrayList<String>>> docHash = statementHandler.getDocuments();
 
     // process tags
@@ -84,7 +92,7 @@ public class RdfDocumentParser {
       // normalize tags, replace spaces with dashes, lowercase
       ArrayList<String> tags = document.remove("tag");
       if (tags != null) {
-        for (int i=0; i < tags.size(); i++) {
+        for (int i = 0; i < tags.size(); i++) {
           String tag = tags.get(i);
           tag = tag.toLowerCase();
           tag = tag.replaceAll(" ", "-");

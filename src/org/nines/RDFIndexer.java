@@ -22,7 +22,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -37,12 +36,14 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.commons.io.IOUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.jdom.Document;
 import org.jdom.Element;
+import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
 
 public class RDFIndexer {
@@ -366,7 +367,7 @@ public class RDFIndexer {
       int docCount = 0;
       
       String tgtArchive = "";
-      XMLOutputter outputter = new XMLOutputter();
+      XMLOutputter outputter = new XMLOutputter(Format.getCompactFormat());
       for (Map.Entry<String, HashMap<String, ArrayList<String>>> entry: objects.entrySet()) {
         
         String uri = entry.getKey();
@@ -403,8 +404,16 @@ public class RDFIndexer {
         Element document = convertObjectToSolrDOM(uri, object);
         root.addContent(document);
         docCount++;
+        
+        // last stop validation checks. Take the dom and dump it to an xml
+        // string. look for bad chars
+        ArrayList<ErrorMessage> messages = ValidationUtility.validateSolrDOM( document );
+        for ( ErrorMessage message : messages ) {
+          IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
+          errorReport.addError(e);
+        }
 
-        // once threashold met, post all docs
+        // once threshold met, post all docs
         if ( docCount >= DOCUMENTS_PER_POST) {
           log.info("  posting:" + docCount + " documents to SOLR");
           postToSolr( outputter.outputString(solrDoc), client, tgtArchive);
@@ -502,14 +511,7 @@ public class RDFIndexer {
    */
   public static final String getResponseString(HttpMethod httpMethod) throws IOException {
     InputStream is = httpMethod.getResponseBodyAsStream();
-    StringWriter writer = new StringWriter();
-    char[] buffer = new char[1024];
-    BufferedReader reader = new BufferedReader( new InputStreamReader(is, "UTF-8"));
-    int n;
-    while ((n = reader.read(buffer)) != -1) {
-      writer.write(buffer, 0, n);
-    }
-    return writer.toString();
+    return IOUtils.toString(is, "UTF-8");
   }
 
   public void postToSolr(String xml, HttpClient httpclient, String archive) throws IOException {

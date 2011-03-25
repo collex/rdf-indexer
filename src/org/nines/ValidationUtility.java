@@ -23,6 +23,7 @@ import java.util.Set;
 import org.jdom.Element;
 import org.jdom.IllegalDataException;
 import org.jdom.Verifier;
+import org.jdom.output.XMLOutputter;
 
 public class ValidationUtility {
   
@@ -60,40 +61,38 @@ public class ValidationUtility {
     messages.addAll( ValidationUtility.validateGenre(object));
     messages.addAll( ValidationUtility.validateRole(object));
     messages.addAll( ValidationUtility.validateUri(object));
-    messages.addAll( ValidationUtility.validateText(object) );
 
     return messages;
   }
-
+  
   /**
-   * Validate that there are no stray '&#' in the text. Emit a log warning
-   * with details about each one found
+   * Eaxmine final SOLR DOM. Look for any '&#' sequences in text that is not
+   * supposed to have them. Log all ocurances in error messages.
    * 
-   * @param object
+   * @param solrDom
    * @return
    */
-  private static final ArrayList<ErrorMessage> validateText( final HashMap<String, ArrayList<String>> object) {
-
+  public static final ArrayList<ErrorMessage> validateSolrDOM(Element solrDom){
+    
+    final XMLOutputter xmlOut = new XMLOutputter();
+    
     ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
-    if (object.containsKey("text")) {
-      ArrayList<String> vals = object.get("text");
-
-      for (String txt : vals) {
-        int startPos = 0;
-        while ( true ) {
-          int pos = txt.indexOf("&#", startPos);
-          if (pos > -1) {
-            String snip = txt.substring(Math.max(0, pos-15), Math.min(txt.length(), pos+15));
-            messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence. Position: [" +
-            		pos + "], Snippet: [" +
-            		snip + "]"));
-            startPos = pos+2;
-          } else {
-            break;
-          }
-        }
+    String finalXmlStr = xmlOut.outputString(solrDom);
+    
+    int startPos = 0;
+    while ( true ) {
+      int pos = finalXmlStr.indexOf("&#", startPos);
+      if (pos > -1) {
+        String snip = finalXmlStr.substring(Math.max(0, pos-25), Math.min(finalXmlStr.length(), pos+25));
+        messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence. Position: [" +
+            pos + "], Snippet: [" +
+            snip + "]"));
+        startPos = pos+2;
+      } else {
+        break;
       }
     }
+    
     return messages;
   }
 
