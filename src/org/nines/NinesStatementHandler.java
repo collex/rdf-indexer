@@ -417,8 +417,7 @@ public class NinesStatementHandler implements StatementHandler {
               // in re-index mode, pull existing text from solr
               // and attempt to patch up any bad data we find
               text = getFullText(doc.get("uri").get(0), httpClient);
-
-              // TODO fix anything with &
+              text = stripEscapeSequences(text);
             }
           }
         }
@@ -440,6 +439,51 @@ public class NinesStatementHandler implements StatementHandler {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Find any occurances of &# with a ; within 6 chars. Replace all
+   * with [?] and log an error in the logs
+   * 
+   * @param text
+   * @return
+   */
+  protected String stripEscapeSequences( String text) {
+    
+    int startPos = 0;
+    while ( true ) {
+      int pos = text.indexOf("&#", startPos);
+      if ( pos == -1 ) {
+        // none found. All done
+        break;
+      } else {
+        // look for a trainling ; to end the sequence
+        int pos2 = text.indexOf(";", pos);
+        if (pos2 > -1) {
+          // if a semicolon is found within 6 of &# 
+          // it is likely to be an unrecognized escape
+          // Strip it
+          if ( pos2 <= pos + 6) {
+            String bad = text.substring(pos, pos2+1);
+            text = text.replace(bad, "[?]");
+            errorReport.addError(new IndexerError( this.filename, this.documentURI, 
+                "Replaced potentially invalid escape sequece [" + bad + "]") );
+            
+            // skip the new [?]
+            startPos = pos + 3;
+          } else {
+          
+            // no close ; found. Just skip over the &#
+            startPos = pos+2;
+          }
+         
+        } else {
+          // NO ; found  - skip over the &#
+          startPos = pos+2;
+        }
+      }
+    }
+    return text;
   }
 
   private String removeDirtyLines(String text, String [] matchList) {
@@ -514,7 +558,8 @@ public class NinesStatementHandler implements StatementHandler {
 
     GetMethod get = new GetMethod(solrUrl);
     NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
-    NameValuePair params[] = new NameValuePair[] { queryParam };
+    NameValuePair fieldsParam = new NameValuePair("fl", "text");
+    NameValuePair params[] = new NameValuePair[] { queryParam, fieldsParam };
     get.setQueryString(params);
 
     int result;

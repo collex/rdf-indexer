@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import junit.framework.TestCase;
 
@@ -38,6 +36,20 @@ public class NinesStatementHandlerTest extends TestCase {
     sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
   }
 
+  public void testReplaceSequence() {
+    String text = this.sh.stripEscapeSequences("xx &#88l; xx");
+    assertEquals(text, "xx [?] xx");
+    
+    text = this.sh.stripEscapeSequences("xx &#88l; xx &#88l; xx &#882;");
+    assertEquals(text, "xx [?] xx [?] xx [?]");
+    
+    text = this.sh.stripEscapeSequences("xx &#88l");
+    assertEquals(text, "xx &#88l");
+    
+    text = this.sh.stripEscapeSequences("xx xx");
+    assertEquals(text, "xx xx");
+    
+  }
   public void testProblematicFullTextSource() {
 	File data = new File(System.getProperty("test.data.dir"),"test_data/problematic_full_text_source.html");
 
@@ -46,8 +58,6 @@ public class NinesStatementHandlerTest extends TestCase {
 			text = readWholeFile(data);
 			String cleaned = sh.cleanText(text, true);
 			writeFile(data.getPath()+".txt", cleaned);
-			Logger.getLogger(NinesStatementHandlerTest.class.getName()).log(Level.SEVERE, null, cleaned);
-			assertTrue(false);
 		} catch (FileNotFoundException ex) {
 			assertTrue(false);
 		}
