@@ -14,6 +14,7 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
@@ -33,6 +34,7 @@ import org.nines.RDFIndexerConfig.CompareMode;
 public class RDFCompare {
   
   private RDFIndexerConfig config;
+  private boolean includesText = false;
   private Logger log;
   private HttpClient httpClient;
   private LinkedHashMap<String,List<String>> errors = new LinkedHashMap<String,List<String>>();
@@ -46,7 +48,10 @@ public class RDFCompare {
     "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", 
     "author", "batch", "editor", "text_url", "year", "type", "date_updated", "title_sort", 
     "author_sort", "year_sort", "source_html", "source_sgml", "person", "format", 
-    "language", "geospacial")); 
+    "language", "geospacial"));
+
+  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
+      "PQCh-EAF", "amdeveryday", "oldBailey" ));
   
   private static final ArrayList<String> REQUIRED_FIELDS = new ArrayList<String>( Arrays.asList(
       "title_sort", "title", "genre", "archive", "url", 
@@ -132,7 +137,9 @@ public class RDFCompare {
 
   private String getFieldList() {
     
+    this.includesText = true;
     if ( this.config.compareMode.equals(CompareMode.FAST)) {
+      this.includesText = false;
       StringBuilder sb = new StringBuilder();
       for (String s : NON_TEXT_FIELDS) {
         if (sb.length()>0) {
@@ -142,7 +149,7 @@ public class RDFCompare {
       }
       return sb.toString();
     } else if ( this.config.compareMode.equals(CompareMode.TEXT)) {
-      return "uri+text";
+      return "uri+is_ocr+has_full_text+text";
     }
     return "*";
   }
@@ -192,9 +199,15 @@ public class RDFCompare {
     // loop over all keys in doc
     for (Entry<String, Object> entry: doc.entrySet()) {
       
+      // get key and do special handing for text fields
+      String key = entry.getKey();
+      if ( key.equals("text")) {
+        compareText(uri, indexDoc, doc);
+        continue;
+      }
+      
       // grab new val
       String newVal = entry.getValue().toString();
-      String key = entry.getKey();
       
       // is this a new key?
       if ( indexDoc.containsKey(key) == false) {
@@ -215,7 +228,7 @@ public class RDFCompare {
       if ( key.equals("batch") || key.equals("score") ) {        
         continue;
       }
-            
+     
       // difference?
       if ( newVal.equals(oldVal) == false) {
         
@@ -269,10 +282,142 @@ public class RDFCompare {
     }
   }
   
+  /**
+   * Compare just the TEXT field of the index and archive docs
+   * @param uri
+   * @param indexDoc
+   * @param doc
+   */
+  private void compareText(String uri, SolrDocument indexDoc, SolrDocument doc) {
+    
+    Object newTxtObj = doc.get("text");
+    Object oldTxtObj = indexDoc.get("text");
+    indexDoc.remove("text");
+    
+    String newTxt = getTextFromObject(uri, "new", newTxtObj);
+    String oldTxt = getTextFromObject(uri, "old", oldTxtObj);
+    
+    // log additional errors if no new text and doc is flagged
+    // such that it must have text (ocr or full text)
+    if (newTxt == null) {
+      String val = doc.get("has_full_text").toString();
+      if ( val.equalsIgnoreCase("false")) {
+        addError(uri, "field has_full_text is "+val+" but full text does not exist.");
+      }
+      
+      val = doc.get("is_ocr").toString();
+      if ( val.equalsIgnoreCase("false")) {
+        addError(uri, "field is_ocr is "+val+" but full text does not exist.");
+      }
+    }
+    
+    if (newTxt == null && oldTxt != null) {
+      addError(uri, "text field has disappeared from the new index. (old text size = "+oldTxt.length());
+    } else if (newTxt != null && oldTxt == null) {
+      addError(uri, "text field has appeared in the new index.");
+    } else if (newTxt.equals(oldTxt) == false) {
+    
+      newTxt = getProcessedReindexedText(newTxt);
+      oldTxt = getProcessedOrigText(oldTxt);
+      if (oldTxt.equals(newTxt) == false ) {
+        logMismatchedText(uri, oldTxt, newTxt);
+      }
+    }    
+  }
+  
+  private void logMismatchedText(final String uri, final String oldTxt, final String newTxt) {
+    String[] oldLines = oldTxt.split("\n");
+    String[] newLines = newTxt.split("\n");
+    int firstMismatch = -1;
+    for (int i=0; i<Math.min(oldLines.length, newLines.length); i++) {
+      String oldLine = oldLines[i];
+      String newLine = newLines[i];
+      if ( oldLine.equals(newLine) == false ) {
+        firstMismatch = i;
+        break;
+      }
+    }
+    
+    // no mosmatch, but new is bigger than old, mismatch startsat end of old
+    if (firstMismatch == -1 && newLines.length > oldLines.length) {
+      firstMismatch = oldLines.length;
+    }
+    
+    // still no mismatch, just bail
+    if (firstMismatch == -1) {
+      return;
+    }
+  
+    String newLine = newLines[firstMismatch];
+    String oldLine = oldLines[firstMismatch];
+    int pos = StringUtils.indexOfDifference(newLine, oldLine);
+    String newSub = newLine.substring(pos, Math.min(pos+50, newLine.length()));
+    String oldSub = oldLine.substring(pos, Math.min(pos+50, oldLine.length()));
+    addError(uri, "==== "+uri+" mismatch at line "+firstMismatch+":col "+pos+":\n(new "+newTxt.length()+")");
+    addError(uri, newSub);
+    addError(uri, "-- vs --\n(old "+oldLine.length()+")");
+    addError(uri, oldSub);
+    
+    // generate hex string of new text
+    byte[] bytes = newSub.getBytes();
+    StringBuffer hexStr = new StringBuffer();
+    for (int i=0; i<bytes.length; i++ ) {
+      hexStr.append(Integer.toHexString(0xFF & bytes[i]) ).append(" ");
+    }
+    addError(uri, "NEW: "+hexStr.toString().trim());
+    
+    // generate hex of old bytes
+    bytes = oldSub.getBytes();
+    hexStr = new StringBuffer();
+    for (int i=0; i<bytes.length; i++ ) {
+      hexStr.append(Integer.toHexString(0xFF & bytes[i]) ).append(" ");
+    }
+    addError(uri, "OLD: "+hexStr.toString().trim());   
+  }
+
+
+  private String getTextFromObject(String uri, String prefix, Object txtObj) {
+    if ( txtObj == null) {
+      return null;
+    }
+    
+    if ( txtObj instanceof List ) {
+      @SuppressWarnings("unchecked")
+      List<String> dat = (List<String>)txtObj;
+      addError(uri, prefix+" text is an array of size "+dat.size());
+      StringBuffer sb = new StringBuffer();
+      for (String s: dat) {
+        if (sb.length() > 0) {
+          sb.append(" | ");
+        }
+        sb.append( s);
+      }
+      return sb.toString();
+    } else {
+      return txtObj.toString().trim();
+    }  
+  }
+ 
+
   private String getProcessedOrigFied(String origVal) {
     String val = StringEscapeUtils.escapeXml(origVal);
     val = val.replaceAll("\n", " ");
     return removeExtraWhiteSpace(val);
+  }
+  
+  private String getProcessedOrigText(String origTxt) {
+    String val = StringEscapeUtils.escapeXml(origTxt);
+    val = val.replaceAll("\n", " ");
+    val = val.replaceAll("““", "“");
+    val = val.replaceAll("””", "””");
+    val = val.replaceAll("††", "†");
+    val = val.replaceAll("〉〉", "〉");
+    val = val.replaceAll("\\—+", "—");
+    return removeExtraWhiteSpace(val);
+  }
+  
+  private String getProcessedReindexedText(String srcTxt ) {
+    return removeExtraWhiteSpace(srcTxt);
   }
   
   private String removeExtraWhiteSpace(final String srcTxt) {
@@ -373,6 +518,13 @@ public class RDFCompare {
   private List<SolrDocument> getAllPagesFromArchive(final String core, final String archive, final String fields) {
     int page = 0;
     int size = 500;
+    
+    // When fieldlist includes test, and the archive is one that contains
+    // large text fields, limit page size to 1
+    if ( this.includesText && LARGE_TEXT_ARCHIVES.contains(archive)) {
+      size = 1;
+    }
+    
     List<SolrDocument> results = new ArrayList<SolrDocument>();
     while (true) {
      
