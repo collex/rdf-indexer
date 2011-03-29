@@ -1,7 +1,6 @@
 package org.nines;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -9,6 +8,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -18,16 +18,10 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.SimpleOrderedMap;
-import org.jaxen.JaxenException;
-import org.jaxen.jdom.JDOMXPath;
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.JDOMException;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.XMLOutputter;
-import org.jdom.xpath.XPath;
 import org.nines.RDFIndexerConfig.CompareMode;
 
 /**
@@ -104,33 +98,24 @@ public class RDFCompare {
     String fl = getFieldList();
     
     // get docs from current index
-    List<Element> indexDocs = getAllPagesFromArchive(
+    List<SolrDocument> indexDocs = getAllPagesFromArchive(
         "resources", config.archiveName, fl);
     logInfo("retrieved " + indexDocs.size() +" old rdf objects;");
     
     // get docs from reindex archive
-    List<Element> archiveDocs = getAllPagesFromArchive(archiveToCoreName(
+    List<SolrDocument> archiveDocs = getAllPagesFromArchive(archiveToCoreName(
         config.archiveName), config.archiveName, fl);
     logInfo("retrieved "+archiveDocs.size()+" new rdf objects;");
     
     // do the comparison
-    try {
-      compareLists(indexDocs, archiveDocs);
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
+    compareLists(indexDocs, archiveDocs);
     
-    try {
     for (Map.Entry<String, List<String>> entry: this.errors.entrySet()) {
       String uri = entry.getKey();
-      this.log.info("---"+uri+"---");
+      logInfo("---"+uri+"---");
       for (String msg : entry.getValue() ) {
-        this.log.info("    "+msg);
+        logInfo("    "+msg);
       }
-    }
-    } catch (Exception e) {
-      e.printStackTrace();
     }
     
     // done log some stats
@@ -139,13 +124,11 @@ public class RDFCompare {
     Date end = new Date();
     double durationSec = (end.getTime()-start.getTime())/1000.0;
     if (durationSec >= 60 ) {
-      this.log.info( String.format("Finished in %3.2f minutes.", (durationSec/60.0)));
+      logInfo( String.format("Finished in %3.2f minutes.", (durationSec/60.0)));
     } else {
-      this.log.info( String.format("Finished in %3.2f seconds.", durationSec));
+      logInfo( String.format("Finished in %3.2f seconds.", durationSec));
     }
-
   }
-
 
   private String getFieldList() {
     
@@ -170,29 +153,26 @@ public class RDFCompare {
    * @param archiveDocs List of docs in the reindexed archive
    * @throws Exception
    */
-  private void compareLists(List<Element> indexDocs, List<Element> archiveDocs) throws Exception {
+  private void compareLists(List<SolrDocument> indexDocs, List<SolrDocument> archiveDocs) {
     
     // hash the indexed docs by uri to hopefull speed stuff up
-    HashMap<String, Element> indexed = new HashMap<String, Element>();
-    JDOMXPath xp = new JDOMXPath("str[@name='uri']");
-    for ( Element ele : indexDocs) {
-      Element uriEle = (Element) xp.selectSingleNode(ele);
-      String uri = uriEle.getText();
-      indexed.put(uri, ele);
+    HashMap<String, SolrDocument> indexed = new HashMap<String, SolrDocument>();
+    for ( SolrDocument doc : indexDocs) {
+      String uri = doc.get("uri").toString();
+      indexed.put(uri, doc);
     }
     indexDocs.clear();
     
     // Run thru al items in new archive. Validate correct data
     // and compare against object in original index if possible
-    for ( Element doc : archiveDocs) {
+    for ( SolrDocument doc : archiveDocs) {
       
       // validaate all required data is present in new rev
-      Element uriEle = (Element) xp.selectSingleNode(doc);
-      String uri = uriEle.getText();
-      validateRequiredFields(uri, doc);
+      String uri = doc.get("uri").toString();
+      validateRequiredFields(doc);
       
       // look up the object in existing index
-      Element indexDoc = indexed.get(uri);
+      SolrDocument indexDoc = indexed.get(uri);
       if ( indexDoc != null) {
         compareFields( uri, indexDoc, doc);
       }
@@ -205,42 +185,37 @@ public class RDFCompare {
    * 
    * @param uri
    * @param indexDoc
-   * @param newDoc
-   * @throws JaxenException
+   * @param doc
    */
-  @SuppressWarnings("unchecked")
-  private void compareFields(String uri, Element indexDoc, Element newDoc) throws JaxenException {
+  private void compareFields(String uri, SolrDocument indexDoc, SolrDocument doc) {
     
-    List<Element> eles = newDoc.getChildren();
-    for ( Element ele : eles ) {
+    // loop over all keys in doc
+    for (Entry<String, Object> entry: doc.entrySet()) {
       
       // grab new val
-      String newVal = getValue( ele );
-      String key = ele.getAttributeValue("name");
-      //System.out.println("NEW NAME: "+key+" VAL: "+newVal);
+      String newVal = entry.getValue().toString();
+      String key = entry.getKey();
       
-      // use xpath to find the same field in the indexDoc
-      JDOMXPath xp = new JDOMXPath("*[@name='" + key + "']");
-      Element oldEle = (Element) xp.selectSingleNode(indexDoc);
-      String oldVal = getValue( oldEle );
-      //System.out.println("OLD NAME: "+key+" VAL: "+oldVal);
-       
-      // New key/value?
-      if (oldVal == null) {
+      // is this a new key?
+      if ( indexDoc.containsKey(key) == false) {
         if (isIgnoredNewField(key) == false) {
           addError( uri, key+" "+newVal.replaceAll("\n", " / ")+" introduced in reindexing.");
-        }
+        } 
         continue;
       }
       
-      // dump the old ele so we can later detect leftover fields
-      indexDoc.getChildren().remove(oldEle);
+      // get parallel val in indexDoc
+      String oldVal = indexDoc.get(key).toString();
+      
+      // dump the key from indexDoc so we can detect
+      // unindexed values later
+      indexDoc.remove(key);
       
       // don't compare batch or score
       if ( key.equals("batch") || key.equals("score") ) {        
         continue;
       }
-             
+            
       // difference?
       if ( newVal.equals(oldVal) == false) {
         
@@ -284,10 +259,9 @@ public class RDFCompare {
     
     // now see if there are any leftover fields in indexDoc
     // log them is not reindexed
-    eles = indexDoc.getChildren();
-    for ( Element ele : eles ) {
-      String val = getValue( ele );
-      String key = ele.getAttributeValue("name");
+    for (Entry<String, Object> entry: indexDoc.entrySet()) {
+      String val = entry.getValue().toString();
+      String key = entry.getKey();
       if ( val.length() > 100) {
         val = val.substring(0,100);
       }
@@ -327,7 +301,6 @@ public class RDFCompare {
     return false;
   }
 
-
   private void addError(String uri, String err) {
     if ( this.errors.containsKey(uri) == false) {
       this.errors.put(uri, new ArrayList<String>() );
@@ -336,87 +309,43 @@ public class RDFCompare {
     errorCount++;
   }
 
-
-  /**
-   * Extract the value of the element. If the element is
-   * and array, the value is all child values joined by |
-   * 
-   * @param ele
-   * @return String content of the element, or null if element is invaid
-   */
-  private String getValue(Element ele) {
-    if ( ele == null) {
-      return null;
-    }
-    if ( ele.getName().equalsIgnoreCase("arr")) {
-      @SuppressWarnings("unchecked")
-      List<Element> children = ele.getChildren();
-      String childTxt = "";
-      for ( Element child : children ) {
-        if ( childTxt.length() > 0) {
-          childTxt += " | ";
-        }
-        childTxt += child.getText().trim();
-      }
-      return childTxt;
-    }
-    
-    return ele.getText().trim();
-  }
-
   /**
    * Ensure that all required fields are present and contain data
    * @param uri URI of the document
    * @param doc Document XML data
    * @throws Exception
    */
-  private void validateRequiredFields(String uri, Element doc)  {
+  private void validateRequiredFields(SolrDocument doc)  {
 
-    for ( String field : REQUIRED_FIELDS) {
+    for ( String fieldName : REQUIRED_FIELDS) {
 
       // find the first element in the correct doc that
       // has a name attribute matching the  required field
-      Element fieldEle = null;
-      try {
-        
-        JDOMXPath xp = new JDOMXPath("*[@name='" + field + "']");
-        fieldEle = (Element) xp.selectSingleNode(doc);
-      } catch ( JaxenException e) {
-        
-        addError(uri, "XPath to required field: "+field
-            +" threw exception: "+e.getMessage());
-        continue;
-      }
+      String uri = doc.get("uri").toString();
+      Object docField = doc.get(fieldName);
       
       // make sure field is present
-      if ( fieldEle == null ) {
+      if ( docField == null ) {
         
-        addError(uri, "required field: "+field+" missing in new index");
+        addError(uri, "required field: "+fieldName+" missing in new index");
         
       } else {
         
         // if its an array, make sure it has children
         // and that the concatenated children content has length
-        if ( fieldEle.getName().equalsIgnoreCase("arr")) {
-          
+        if ( docField instanceof List ) {
           @SuppressWarnings("unchecked")
-          List<Element> children = fieldEle.getChildren();
-          if (children.size() == 0) {
-            addError(uri, "required ARR field: "+field+" is NIL in new index");
-          } else {
-            String childTxt = "";
-            for ( Element child : children ) {
-              childTxt += child.getText();
-            }
-            if ( childTxt.trim().length() == 0) {
-              addError(uri, "required ARR field: "+field+" is all spaces in new index");
-            }
+          List<String> list = (List<String>)docField;
+          String val = "";
+          for ( String data: list) {
+            val += data;
           }
-        } else if ( fieldEle.getName().equalsIgnoreCase("str")) {
-          
-          // make sure string elements have data
-          if ( fieldEle.getText().trim().length() == 0) {
-            addError(uri, "required STR field: "+field+" is all spaces in new index");
+          if (val.length() == 0) {
+            addError(uri, "required ARR field: "+fieldName+" is all spaces in new index");
+          }
+        } else {
+          if ( docField.toString().trim().length() == 0) {
+            addError(uri, "required STR field: "+fieldName+" is all spaces in new index");
           }
         }
       }
@@ -429,7 +358,7 @@ public class RDFCompare {
    */
   private void logInfo( final String msg) {
     log.info(msg);
-    //System.out.println(msg);
+    System.out.println(msg);
   }
   
   /**
@@ -441,15 +370,15 @@ public class RDFCompare {
     return "archive_"+archive.replace(":", "_").replace(" ", "_").replace(",", "_");
   }
 
-  private List<Element> getAllPagesFromArchive(final String core, final String archive, final String fields) {
+  private List<SolrDocument> getAllPagesFromArchive(final String core, final String archive, final String fields) {
     int page = 0;
     int size = 500;
-    List<Element> results = new ArrayList<Element>();
+    List<SolrDocument> results = new ArrayList<SolrDocument>();
     while (true) {
      
       try {
         
-        List<Element> pageHits = getPageFromSolr(core, archive, page, size, fields);
+        List<SolrDocument> pageHits = getPageFromSolr(core, archive, page, size, fields);
         results.addAll(pageHits);
         if (pageHits.size()  < size ){
           
@@ -468,8 +397,7 @@ public class RDFCompare {
     return results;
   }
   
-  @SuppressWarnings("unchecked")
-  private List<Element> getPageFromSolr(final String core, final String archive, 
+  private List<SolrDocument> getPageFromSolr(final String core, final String archive, 
       final int page, final int pageSize, final String fields) throws IOException {
 
     // build the request query string
@@ -503,23 +431,13 @@ public class RDFCompare {
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n" );
       }
-      
-      try {
-        
-        JavaBinCodec jbc = new JavaBinCodec();
-        SimpleOrderedMap map = (SimpleOrderedMap) jbc.unmarshal( get.getResponseBodyAsStream() );
-        
-        //avaBin
-        String response = RDFIndexer.getResponseString(get);
-        SAXBuilder sb = new SAXBuilder();
-        Document doc = sb.build(new StringReader(response) );
-        JDOMXPath xPath = new JDOMXPath("//doc");
-        return xPath.selectNodes(doc);
-        
-      } catch ( Exception e) {
-        throw new IOException( "Invalid response", e );
-      }
-      
+
+      JavaBinCodec jbc = new JavaBinCodec();
+      @SuppressWarnings("rawtypes")
+      SimpleOrderedMap map = (SimpleOrderedMap)jbc.unmarshal( get.getResponseBodyAsStream() );
+      SolrDocumentList docList = (SolrDocumentList)map.get("response");
+      return docList;
+
     } finally {
       // Release current connection to the connection pool once you are done
       get.releaseConnection();
