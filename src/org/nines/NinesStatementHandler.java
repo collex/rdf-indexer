@@ -29,6 +29,7 @@ import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.log4j.Logger;
+import org.nines.RDFIndexerConfig.TextMode;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
 import org.openrdf.model.Value;
@@ -407,12 +408,12 @@ public class NinesStatementHandler implements StatementHandler {
             
             // Two modes of operation, index and re-index. Only when indexing go
             // to the site and scrape text content for addition to solr
-            if (config.retrieveFullText) {
+            if (config.textMode == TextMode.RETRIEVE_FULL) {
               
               // Scrape content from source site. Do not attempt
               // any corrections.
               text = fetchContent(object);
-            } else if (config.reindexFullText) {
+            } else if (config.textMode == TextMode.REINDEX_FULL) {
               
               // in re-index mode, pull existing text from solr
               // and attempt to patch up any bad data we find

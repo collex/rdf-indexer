@@ -15,13 +15,9 @@
  **/
 package org.nines;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -30,6 +26,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionGroup;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -45,6 +49,8 @@ import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
+import org.nines.RDFIndexerConfig.CompareMode;
+import org.nines.RDFIndexerConfig.TextMode;
 
 public class RDFIndexer {
 
@@ -58,7 +64,6 @@ public class RDFIndexer {
   private int progressMilestone = 0;
   private long lastTime;
   private Logger log;
-  private String targetArchive = "";
 
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
   private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
@@ -67,73 +72,85 @@ public class RDFIndexer {
   private static final int PROGRESS_MILESTONE_INTERVAL = 100;
   private static final int DOCUMENTS_PER_POST = 100;
   
-  public RDFIndexer(File rdfSource, String archiveName, RDFIndexerConfig config) {
+  /**
+   * 
+   * @param rdfSource
+   * @param archiveName
+   * @param config
+   */
+  public RDFIndexer( RDFIndexerConfig config) {
 
-    targetArchive = archiveName;
+    this.config = config;
+    
     // Use the archive name as the log file name
-    String reportFilename = archiveName;
+    String reportFilename = config.archiveName;
     reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
     String logFileRelativePath = "../../../log/";
     initSystem(logFileRelativePath + reportFilename);
 
-    log.info(config.retrieveFullText ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
-
-    this.config = config;
-    // this.solrURL = config.solrBaseURL + config.solrNewIndex + "/update";
-
-    // File reportFile = new File(rdfSource.getPath() + File.separatorChar + "report.txt"); // original place for the
-    // report file.
-    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log"); // keep report file in the same
-                                                                                     // folder as the log file.
+    // log text mode
+    this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
+    
+    // log comparison mode
+    if  (config.compareMode != CompareMode.NONE ) {
+      this.log.info("Comparison Mode: " + config.compareMode);
+    }
+    
+    // keep report file in the same  folder as the log file.
+    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log"); 
     try {
-      errorReport = new ErrorReport(reportFile);
+      this.errorReport = new ErrorReport(reportFile);
     } catch (IOException e1) {
-      log.error("Unable to open error report log for writing, aborting indexer.");
+      this.log.error("Unable to open error report log for writing, aborting indexer.");
       return;
     }
 
-    linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
+    this.linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
 
     HttpClient client = new HttpClient();
 
     try {
-      beSureCoreExists(client, archiveToCore(archiveName));
+      beSureCoreExists(client, archiveToCore(config.archiveName));
     } catch (IOException e) {
-      errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
+      this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
     }
 
-    // if (rdfSource.isDirectory()) {
-    createGUID(rdfSource);
-    Date start = new Date();
-    log.info("Started indexing at " + start);
+    // do the indexing if requested
+    if ( config.textMode != TextMode.SKIP ) {
+      createGUID(config.rdfSource);
+      Date start = new Date();
+      log.info("Started indexing at " + start);
 
-    indexDirectory(rdfSource);
-    if (config.commitToSolr) {
-      // for (String archive : archives)
-      commitDocumentsToSolr(client, archiveToCore(archiveName));
-    } else
-      log.info("Skipping Commit to SOLR...");
+      indexDirectory(config.rdfSource);
+      if (config.commitToSolr) {
+        // for (String archive : archives)
+        commitDocumentsToSolr(client, archiveToCore(config.archiveName));
+      } else {
+        log.info("Skipping Commit to SOLR...");
+      }
 
-    // report done
-    Date end = new Date();
-    long duration = (end.getTime() - start.getTime()) / 60000;
-    log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
-    // }
-    // else {
-    // errorReport.addError(new IndexerError("","","No objects found"));
-    // }
+      // report indexing time
+      Date end = new Date();
+      long duration = (end.getTime() - start.getTime()) / 60000;
+      this.log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
+      this.errorReport.close();
+      this.linkCollector.close();
+    }
+    
+    // do any testing if requested
+    if  (config.compareMode != CompareMode.NONE ) {
 
-    // if (config.commitToSolr && archive != null) {
-    // // find out how many items will be deleted
-    // numToDelete = numToDelete(guid, archive, client );
-    // log.info("Deleting "+numToDelete+" duplicate existing documents from index.");
-    //
-    // // remove content that isn't from this batch
-    // cleanUp(guid, archive, client);
-    // }
-
-    errorReport.close();
-    linkCollector.close();
+      log.info("Staring " + config.compareMode + " comparison");
+      try {
+        RDFCompare rdfCompare = new RDFCompare( config );
+        rdfCompare.compareArhive();
+      } catch (Exception e) {
+        System.err.println("Comparison exception: " + e.getMessage());
+        e.printStackTrace();
+        log.error("Comparison exception: " + e.getMessage());
+        
+      }
+    }
   }
   
   private void commitDocumentsToSolr( HttpClient client, String archive ) {
@@ -187,74 +204,6 @@ public class RDFIndexer {
     System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
   }
   
-  public static void main(String[] args) {
-    if (args.length < 1) {
-      System.err.println("java -jar rdf-indexer.jar <rdf dir|file> <archive name> [--fulltext] [--reindex] [--ignore=ignore_filename] [--include=include_filename] [--maxDocs=99]");
-      System.exit(-1);
-    }
-
-    String fullTextFlag = "--fulltext";	// This goes to the website to get the full text.
-    String reindexFlag = "--reindex";	// This gets the full text from the current index instead of going to the website.
-    String maxDocsFlag = "--maxDocs";	// This just looks at the first few docs in each folder.
-    String useIgnoreFile = "--ignore";	// This ignores the folders specified in the file.
-    String useIncludeFile = "--include";	// This ignores the folders specified in the file.
-    
-    File rdfSource = new File(args[0]);
-	String archiveName = new String(args[1]);
-    RDFIndexerConfig config = new RDFIndexerConfig();
-
-	for (int i = 2; i < args.length; i++) {
-		if (args[i].equals(fullTextFlag))
-			config.retrieveFullText = true;
-		else if (args[i].equals(reindexFlag))
-			config.reindexFullText = true;
-		else if (args[i].startsWith(maxDocsFlag))
-			config.maxDocsPerFolder = Integer.parseInt(args[i].substring(maxDocsFlag.length()+1));
-		else if (args[i].startsWith(useIgnoreFile)) {
-			String ignoreFile = rdfSource + "/" + args[i].substring(useIgnoreFile.length()+1);
-			try{
-				// Open the file that is the first
-				// command line parameter
-				FileInputStream fstream = new FileInputStream(ignoreFile);
-				// Get the object of DataInputStream
-				DataInputStream in = new DataInputStream(fstream);
-				BufferedReader br = new BufferedReader(new InputStreamReader(in));
-				String strLine;
-				//Read File Line By Line
-				while ((strLine = br.readLine()) != null)   {
-				  config.ignoreFolders.add(rdfSource + "/" + strLine);
-				}
-				//Close the input stream
-				in.close();
-				}catch (Exception e){//Catch exception if any
-				  System.err.println("Error: " + e.getMessage());
-				}
-		}
-		else if (args[i].startsWith(useIncludeFile)) {
-			String includeFile = rdfSource + "/" + args[i].substring(useIncludeFile.length()+1);
-			try{
-				// Open the file that is the first
-				// command line parameter
-				FileInputStream fstream = new FileInputStream(includeFile);
-				// Get the object of DataInputStream
-				DataInputStream in = new DataInputStream(fstream);
-				BufferedReader br = new BufferedReader(new InputStreamReader(in));
-				String strLine;
-				//Read File Line By Line
-				while ((strLine = br.readLine()) != null)   {
-				  config.includeFolders.add(rdfSource + "/" + strLine);
-				}
-				//Close the input stream
-				in.close();
-				}catch (Exception e){//Catch exception if any
-				  System.err.println("Error: " + e.getMessage());
-				}
-		}
-	}
-
-    new RDFIndexer(rdfSource, archiveName, config);
-  }
-
 	private void recursivelyQueueFiles(File dir) {
 		if (dir.isDirectory()) {
 			log.info("loading directory: " + dir.getPath());
@@ -378,9 +327,9 @@ public class RDFIndexer {
         if (objectArray != null) { 
           String objArchive = objectArray.get(0);
           tgtArchive = archiveToCore(objArchive);          
-          if (!objArchive.equals(this.targetArchive)) {
+          if (!objArchive.equals(this.config.archiveName)) {
             this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
-                + objArchive + " should be " + this.targetArchive));
+                + objArchive + " should be " + this.config.archiveName));
           }
         } else {
           this.errorReport.addError(new IndexerError(file.getName(), uri, "Unable to determine archive for this object."));
@@ -616,4 +565,98 @@ public class RDFIndexer {
 
   }
 
+
+  /**
+   * MAIN Main application entry point
+   * @param args
+   */
+  public static void main(String[] args) {
+    
+    // Option constants
+    final String fullTextFlag = "fulltext";   // This goes to the website to get the full text.
+    final String reindexFlag = "reindex";     // This gets the full text from the current index instead of going to the website.
+    final String maxDocsFlag = "maxDocs";     // This just looks at the first few docs in each folder.
+    final String useIgnoreFile = "ignore";    // This ignores the folders specified in the file.
+    final String useIncludeFile = "include";  // This ignores the folders specified in the file.
+    final String compareAll = "compareFull";  // Ful compare of archive vs resources
+    final String compareTxt = "compareTxt";   // compare ontly TEXT fields 
+    final String compare = "compare";         // fast compare; everything BUT text
+    final String source = "source";         // fast compare; everything BUT text
+    final String archive = "archive";         // fast compare; everything BUT text
+    
+    // define the list of command line options
+    Options options = new Options();
+    Option srcOpt = new Option(source, true, "The source rdf file or directory to index");
+    srcOpt.setRequired(true);
+    options.addOption(srcOpt);
+    Option nameOpt = new Option(archive, true, "The name of of the archive");
+    nameOpt.setRequired(true);
+    options.addOption(nameOpt);
+    
+    OptionGroup compareOpts = new OptionGroup();
+    compareOpts.addOption( new Option(compareAll, false, "Compare the full content of each documet") );
+    compareOpts.addOption( new Option(compareTxt, false, "Compare just text") );
+    compareOpts.addOption( new Option(compare, false, "Compare everything but text") );
+    options.addOptionGroup( compareOpts );
+    
+    OptionGroup textOpts = new OptionGroup();
+    textOpts.addOption( new Option(fullTextFlag, false, "Retrieve full text from web") );
+    textOpts.addOption( new Option(reindexFlag, false, "Retrieve full text from current index") );
+    options.addOptionGroup( textOpts );   
+    
+    options.addOption(maxDocsFlag, true, "Max docs processed per folder");
+    options.addOption(useIgnoreFile, true, "Ignore folders specified in this file");
+    options.addOption(useIncludeFile, true, "Include folders specified in this file");
+   
+    // create parser and handle the options
+    RDFIndexerConfig config = new RDFIndexerConfig();
+    CommandLineParser parser = new GnuParser();
+    try {
+      CommandLine line = parser.parse( options, args );
+     
+      // required params:
+      config.rdfSource = new File( line.getOptionValue(source) );
+      config.archiveName = line.getOptionValue(archive);
+      
+      // optional text handling flags
+      if (line.hasOption(fullTextFlag)) {
+        config.textMode = TextMode.RETRIEVE_FULL;
+      } else if (line.hasOption(reindexFlag)) {
+        config.textMode = TextMode.REINDEX_FULL;
+      }
+      
+      // optional Compare flags
+      if (line.hasOption(compareAll)) {
+        config.compareMode = CompareMode.FULL;
+      } else if (line.hasOption(compareTxt)) {
+        config.compareMode = CompareMode.TEXT;
+      } else if (line.hasOption(compare)) {
+        config.compareMode = CompareMode.FAST;
+      }
+      
+      // opt max docs per folder
+      if ( line.hasOption(maxDocsFlag)) {
+        config.maxDocsPerFolder = Integer.parseInt( line.getOptionValue(maxDocsFlag));
+      }
+      
+      // opt files 
+      config.ignoreFileName = line.getOptionValue(useIgnoreFile);
+      config.includeFileName =  line.getOptionValue(useIncludeFile);
+      
+    } catch( ParseException exp ) {
+      
+      System.out.println("Error parsing options: " + exp.getMessage());
+      
+      HelpFormatter formatter = new HelpFormatter();
+      formatter.printHelp( "rdf-idexer", options );
+      return;
+    }
+
+    // Launch the indexer with the parsed config
+    config.populateFileLists();
+    new RDFIndexer(config);
+  }
 }
+
+
+
