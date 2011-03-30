@@ -1,6 +1,8 @@
 package org.nines;
 
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -35,6 +37,7 @@ public class RDFCompare {
   private RDFIndexerConfig config;
   private boolean includesText = false;
   private Logger log;
+  private PrintStream sysOut;
   private HttpClient httpClient;
   private LinkedHashMap<String,List<String>> errors = new LinkedHashMap<String,List<String>>();
   private int errorCount = 0;
@@ -79,6 +82,13 @@ public class RDFCompare {
     fa.setEncoding("UTF-8");
     BasicConfigurator.configure( fa );
     this.log = Logger.getLogger(RDFIndexer.class.getName());
+    
+    // set up sys out so it can handle utf-8 output
+    try {
+        this.sysOut = new PrintStream(System.out, true, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+        this.sysOut = null;
+    }
     
     // init the solr connection
     this.httpClient = new HttpClient();
@@ -530,7 +540,12 @@ public class RDFCompare {
    */
   private void logInfo( final String msg) {
     log.info(msg);
-    System.out.println(msg);
+    if ( this.sysOut != null ) {
+      this.sysOut.println(msg);  
+    } else {
+      System.out.println(msg);
+    }
+    
   }
   
   /**

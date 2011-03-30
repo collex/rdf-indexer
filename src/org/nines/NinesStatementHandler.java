@@ -28,6 +28,7 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.nines.RDFIndexerConfig.TextMode;
 import org.openrdf.model.Resource;
@@ -414,7 +415,7 @@ public class NinesStatementHandler implements StatementHandler {
               // any corrections.
               text = fetchContent(object);
             } else if (config.textMode == TextMode.REINDEX_FULL) {
-              
+                              
               // in re-index mode, pull existing text from solr
               // and attempt to patch up any bad data we find
               text = getFullText(doc.get("uri").get(0), httpClient);
@@ -443,9 +444,8 @@ public class NinesStatementHandler implements StatementHandler {
   }
 
   /**
-   * Find any occurances of &# with a ; within 6 chars. Replace all
-   * with [?] and log an error in the logs
-   * 
+   * Find any occurances of &# with a ; within 6 chars. Attempt to
+   * unescape them into a utf8 char. If this is not possibe, flag it
    * @param text
    * @return
    */
@@ -461,17 +461,23 @@ public class NinesStatementHandler implements StatementHandler {
         // look for a trainling ; to end the sequence
         int pos2 = text.indexOf(";", pos);
         if (pos2 > -1) {
-          // if a semicolon is found within 6 of &# 
-          // it is likely to be an unrecognized escape
-          // Strip it
+          // this is likely an escape sequence
           if ( pos2 <= pos + 6) {
-            String bad = text.substring(pos, pos2+1);
-            text = text.replace(bad, "[?]");
-            errorReport.addError(new IndexerError( this.filename, this.documentURI, 
-                "Replaced potentially invalid escape sequece [" + bad + "]") );
             
-            // skip the new [?]
-            startPos = pos + 3;
+            // grab it and attempt to unescape it into a valid char
+            // If successful (no &# present) replace it, otherwise flag it
+            String bad = text.substring(pos, pos2+1);
+            String fixed = StringEscapeUtils.unescapeXml(bad);
+            if ( fixed.contains("&#")) {
+                text = text.replaceAll(bad, "[?]");
+                errorReport.addError(new IndexerError( this.filename, this.documentURI, 
+                    "Replaced potentially invalid escape sequece [" + bad + "]") );
+                
+                // skip the new [?]
+                startPos = pos + 3;
+            } else {
+               text = text.replaceAll(bad, fixed);
+            }
           } else {
           
             // no close ; found. Just skip over the &#
@@ -486,72 +492,6 @@ public class NinesStatementHandler implements StatementHandler {
     }
     return text;
   }
-
-  private String removeDirtyLines(String text, String [] matchList) {
-		String [] arr = text.split("\n");
-		Boolean foundOne = false;
-		for (int i = 0; i < arr.length; i++) {
-			String currLine = arr[i];
-			for (int j = 0; j < matchList.length; j++)
-				if (currLine.equals(matchList[j])) {
-					arr[i] = "";
-					foundOne = true;
-				}
-		}
-		if (foundOne) {
-			text = "";
-			for (int i = 0; i < arr.length; i++) {
-				if (arr[i].length() > 0)
-					text += arr[i] + "\n";
-			}
-		}
-		return text;
-  }
-
-  private void printLinesContaining(String text, String match) {
-		int amp = text.indexOf(match);
-		if ((text.indexOf("& ") == amp) || (text.indexOf("&c.") == amp) || (text.indexOf("&c ") == amp) || (text.indexOf("&\n") == amp))	// skip legitimate uses of &
-			amp = text.indexOf(match, amp + 1);
-		while (amp >= 0) {
-			int start = amp - 15;
-			if (start < 0) start = 0;
-			int end = amp + 30;
-			if (end >= text.length())
-				end = text.length() - 1;
-			String extract = text.substring(start, end);
-			extract = replaceMatch(extract, "\n", "\\n");
-			extract = replaceMatch(extract, "\r", "\\r");
-			Boolean skip = false;
-			if (text.length() > amp+3) {
-				if ((text.substring(amp, amp+2).equals("& ")) ||
-						(text.substring(amp, amp+2).equals("&\n")) ||
-						(text.substring(amp, amp+3).equals("&c ")) ||
-						(text.substring(amp-1, amp+3).equals("A&M ")) ||
-						(text.substring(amp-1, amp+3).equals("Q&A:")) ||
-						(text.substring(amp-1, amp+3).equals("1&2 ")) ||
-						(text.substring(amp-1, amp+3).equals("1&2\n")) ||
-						(text.substring(amp, amp+3).equals("&c.")))
-					skip = true;
-			}
-			if (!skip)
-				errorReport.addError(new IndexerError(filename, documentURI, "Text: " + extract));
-//			int nextAmp = text.indexOf(match, amp + 1);
-//			while ((amp >= 0) && ((text.indexOf("& ", amp + 1) == nextAmp) || (text.indexOf("&c.", amp + 1) == nextAmp) || (text.indexOf("&c ", amp + 1) == nextAmp))) {	// skip legitimate uses of &
-//				amp = nextAmp;
-//				nextAmp = text.indexOf(match, amp + 1);
-//			}
-//			amp = nextAmp;
-			amp = text.indexOf(match, amp + 1);
-		}
-  }
-
-	private String replaceDoubledUtfChar(String fullText, int c1, int c2, int c3) {
-		byte [] match = new byte [] { (byte)c1, (byte)c2, (byte)c3, (byte)c1, (byte)c2, (byte)c3 };
-		byte [] repl = new byte [] { (byte)c1, (byte)c2, (byte)c3 };
-
-		fullText = replaceMatchOnce(fullText, new String(match), new String(repl));
-		return fullText;
-	}
 
   private String getFullText(String uri, HttpClient httpclient) {
     String fullText = "";

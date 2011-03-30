@@ -191,6 +191,7 @@ public class RDFIndexer {
       // don't purge old log on startup -- that is handled before calling this app.
       String logPath = logName + "_progress.log";      
       FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), logPath);
+      fa.setEncoding("UTF-8");
       BasicConfigurator.configure( fa );
       log = Logger.getLogger(RDFIndexer.class.getName());
 
