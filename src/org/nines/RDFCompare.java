@@ -13,7 +13,6 @@ import java.util.Map.Entry;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
@@ -76,8 +75,8 @@ public class RDFCompare {
     logFileName = logFileName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
     String logFileRelativePath = "../../../log/";
     String logPath = logFileRelativePath+logFileName + "_compare_"+ config.compareMode+".log";
-    System.out.println("Log to "+logPath.toLowerCase());
     FileAppender fa = new FileAppender(new PatternLayout("%m\n"), logPath.toLowerCase());
+    fa.setEncoding("UTF-8");
     BasicConfigurator.configure( fa );
     this.log = Logger.getLogger(RDFIndexer.class.getName());
     
@@ -103,28 +102,37 @@ public class RDFCompare {
     String fl = getFieldList();
     
     // get docs from current index
-    List<SolrDocument> indexDocs = getAllPagesFromArchive(
+    List<SolrDocument> indexDocs = getSolrDocuments(
         "resources", config.archiveName, fl);
-    logInfo("retrieved " + indexDocs.size() +" old rdf objects;");
-    
+  
     // get docs from reindex archive
-    List<SolrDocument> archiveDocs = getAllPagesFromArchive(archiveToCoreName(
+    List<SolrDocument> archiveDocs = getSolrDocuments(archiveToCoreName(
         config.archiveName), config.archiveName, fl);
-    logInfo("retrieved "+archiveDocs.size()+" new rdf objects;");
+    
+    if ( this.config.compareMode.equals(CompareMode.TEXT) == false) {
+      logInfo("retrieved "+archiveDocs.size()+" new rdf objects;");
+      logInfo("retrieved " + indexDocs.size() +" old objects;");
+    }
     
     // do the comparison
     compareLists(indexDocs, archiveDocs);
     
     for (Map.Entry<String, List<String>> entry: this.errors.entrySet()) {
       String uri = entry.getKey();
-      logInfo("---"+uri+"---");
-      for (String msg : entry.getValue() ) {
-        logInfo("    "+msg);
+      if ( uri.equals("txt")) {
+        for (String msg : entry.getValue() ) {
+          logInfo(msg);
+        }
+      } else {
+        logInfo("---"+uri+"---");
+        for (String msg : entry.getValue() ) {
+          logInfo("    "+msg);
+        }
       }
     }
     
     // done log some stats
-    this.log.info("Total Docs Scanned: "+archiveDocs.size()+". Total Errors: "+this.errorCount+". Total Docs in index: "+indexDocs.size());
+    this.log.info("Total Docs Scanned: "+archiveDocs.size()+". Total Errors: "+this.errorCount+".");
     
     Date end = new Date();
     double durationSec = (end.getTime()-start.getTime())/1000.0;
@@ -135,6 +143,11 @@ public class RDFCompare {
     }
   }
 
+  /**
+   * Look at the compare config and generate a field list
+   * suitable for submission to Solr: 
+   * @return List in the form: field1+field2+...
+   */
   private String getFieldList() {
     
     this.includesText = true;
@@ -173,13 +186,18 @@ public class RDFCompare {
     // Run thru al items in new archive. Validate correct data
     // and compare against object in original index if possible
     for ( SolrDocument doc : archiveDocs) {
-      
-      // validaate all required data is present in new rev
+
+      // look up the corresponding object in the original index
       String uri = doc.get("uri").toString();
-      validateRequiredFields(doc);
-      
-      // look up the object in existing index
       SolrDocument indexDoc = indexed.get(uri);
+      
+      // On full compares, validaate all required
+      // fields are present and contain content
+      if ( this.config.compareMode.equals(CompareMode.FULL)) {
+        validateRequiredFields(doc);
+      }
+      
+      // If this doc is not a new one, diff it with the original
       if ( indexDoc != null) {
         compareFields( uri, indexDoc, doc);
       }
@@ -188,8 +206,7 @@ public class RDFCompare {
 
   /**
    * Walk through each field in the new doc and compare it with the
-   * old. Log any differences.
-   * 
+   * old. Log any differences. 
    * @param uri
    * @param indexDoc
    * @param doc
@@ -207,7 +224,7 @@ public class RDFCompare {
       }
       
       // grab new val
-      String newVal = entry.getValue().toString();
+      String newVal = toSolrString(entry.getValue());
       
       // is this a new key?
       if ( indexDoc.containsKey(key) == false) {
@@ -218,7 +235,7 @@ public class RDFCompare {
       }
       
       // get parallel val in indexDoc
-      String oldVal = indexDoc.get(key).toString();
+      String oldVal = toSolrString(indexDoc.get(key));
       
       // dump the key from indexDoc so we can detect
       // unindexed values later
@@ -233,8 +250,8 @@ public class RDFCompare {
       if ( newVal.equals(oldVal) == false) {
         
         // make sure everything is escaped and check again.
-        String escapedOrig = getProcessedOrigFied(oldVal);
-        String escapedNew = StringEscapeUtils.escapeXml(newVal);
+        String escapedOrig = getProcessedOrigField(oldVal);
+        String escapedNew = getProcessedReindexedField(newVal);
         if ( escapedNew.equals(escapedOrig) == false ) {
           
           // too long to dump in a single error line?
@@ -278,8 +295,22 @@ public class RDFCompare {
       if ( val.length() > 100) {
         val = val.substring(0,100);
       }
-      addError(uri, "Key not reindexed: "+key+"="+val);
+      addError(uri, "Key not reindexed: "+key+"="+val, true);
     }
+  }
+  
+  /**
+   * Convert an Entry contaning solr data to a string
+   * @param data
+   * @return The string data represented by the object
+   */
+  private final String toSolrString(final Object obj) {
+    if ( obj instanceof List ) {
+      @SuppressWarnings("unchecked")
+      List<String> strList = (List<String>)obj;
+      return StringUtils.join(strList.iterator(), " | ");
+    }
+    return obj.toString();
   }
   
   /**
@@ -318,61 +349,44 @@ public class RDFCompare {
     } else if (newTxt.equals(oldTxt) == false) {
     
       newTxt = getProcessedReindexedText(newTxt);
-      oldTxt = getProcessedOrigText(oldTxt);
-      if (oldTxt.equals(newTxt) == false ) {
+      oldTxt = getProcessedOrigText(oldTxt);  
+      
+      if (oldTxt.equals(newTxt) == false ) {        
         logMismatchedText(uri, oldTxt, newTxt);
       }
     }    
   }
   
   private void logMismatchedText(final String uri, final String oldTxt, final String newTxt) {
-    String[] oldLines = oldTxt.split("\n");
-    String[] newLines = newTxt.split("\n");
-    int firstMismatch = -1;
-    for (int i=0; i<Math.min(oldLines.length, newLines.length); i++) {
-      String oldLine = oldLines[i];
-      String newLine = newLines[i];
-      if ( oldLine.equals(newLine) == false ) {
-        firstMismatch = i;
-        break;
+    int pos = StringUtils.indexOfDifference(newTxt, oldTxt);
+    pos = Math.max(0, pos-4);
+    String newSub = newTxt.substring(pos, Math.min(pos+51, newTxt.length()));
+    String oldSub = oldTxt.substring(pos, Math.min(pos+51, oldTxt.length()));
+    addError("txt", "==== "+uri+" mismatch at line 0 col "+pos+":");
+    addError("txt", "(new "+newTxt.length()+")");
+    addError("txt", newSub, true);
+    addError("txt", "-- vs --");
+    addError("txt", "(old "+oldTxt.length()+")");
+    addError("txt", oldSub);
+    addError("txt", "NEW: "+ getBytesString(newSub) );
+    addError("txt", "OLD: "+ getBytesString(oldSub) );
+    this.errorCount++;
+  }
+
+
+  private String getBytesString(String text) {
+    try {
+      byte[] bytes = text.getBytes( "UTF-8" );
+      StringBuffer hexStr = new StringBuffer();
+      for (int i=0; i<bytes.length; i++ ) {
+        hexStr.append(Integer.toString(0xFF & bytes[i]) ).append(" ");
+        if (hexStr.length() > 45 ) break;
       }
+      return hexStr.toString();
+    } catch ( Exception e) {
+      addError("txt", "Invalid bytes in text: "+ e.getMessage());
+      return "** ERROR **";
     }
-    
-    // no mosmatch, but new is bigger than old, mismatch startsat end of old
-    if (firstMismatch == -1 && newLines.length > oldLines.length) {
-      firstMismatch = oldLines.length;
-    }
-    
-    // still no mismatch, just bail
-    if (firstMismatch == -1) {
-      return;
-    }
-  
-    String newLine = newLines[firstMismatch];
-    String oldLine = oldLines[firstMismatch];
-    int pos = StringUtils.indexOfDifference(newLine, oldLine);
-    String newSub = newLine.substring(pos, Math.min(pos+50, newLine.length()));
-    String oldSub = oldLine.substring(pos, Math.min(pos+50, oldLine.length()));
-    addError(uri, "==== "+uri+" mismatch at line "+firstMismatch+":col "+pos+":\n(new "+newTxt.length()+")");
-    addError(uri, newSub);
-    addError(uri, "-- vs --\n(old "+oldLine.length()+")");
-    addError(uri, oldSub);
-    
-    // generate hex string of new text
-    byte[] bytes = newSub.getBytes();
-    StringBuffer hexStr = new StringBuffer();
-    for (int i=0; i<bytes.length; i++ ) {
-      hexStr.append(Integer.toHexString(0xFF & bytes[i]) ).append(" ");
-    }
-    addError(uri, "NEW: "+hexStr.toString().trim());
-    
-    // generate hex of old bytes
-    bytes = oldSub.getBytes();
-    hexStr = new StringBuffer();
-    for (int i=0; i<bytes.length; i++ ) {
-      hexStr.append(Integer.toHexString(0xFF & bytes[i]) ).append(" ");
-    }
-    addError(uri, "OLD: "+hexStr.toString().trim());   
   }
 
 
@@ -399,33 +413,35 @@ public class RDFCompare {
   }
  
 
-  private String getProcessedOrigFied(String origVal) {
-    String val = StringEscapeUtils.escapeXml(origVal);
-    val = val.replaceAll("\n", " ");
-    return removeExtraWhiteSpace(val);
+  private String getProcessedOrigField(String origVal) {
+    return removeExtraWhiteSpace(origVal);
+  }
+  private String getProcessedReindexedField(String origVal) {
+    return removeExtraWhiteSpace(origVal);
   }
   
   private String getProcessedOrigText(String origTxt) {
-    String val = StringEscapeUtils.escapeXml(origTxt);
-    val = val.replaceAll("\n", " ");
-    val = val.replaceAll("““", "“");
+    String val = origTxt.replaceAll("““", "“");
     val = val.replaceAll("””", "””");
     val = val.replaceAll("††", "†");
-    val = val.replaceAll("〉〉", "〉");
-    val = val.replaceAll("\\—+", "—");
+    val = val.replaceAll("\\—+", "—"); 
     return removeExtraWhiteSpace(val);
   }
   
   private String getProcessedReindexedText(String srcTxt ) {
-    return removeExtraWhiteSpace(srcTxt);
+    String val = srcTxt.replaceAll("““", "“");
+    val = val.replaceAll("””", "””");
+    val = val.replaceAll("††", "†");
+    val = val.replaceAll("\\—+", "—"); 
+    return removeExtraWhiteSpace(val);
   }
   
   private String removeExtraWhiteSpace(final String srcTxt) {
     String result = srcTxt.replaceAll("\t", " ");   // change tabs to spaces
-    result = result.replaceAll("\\s+", " ");       // get rid of multiple spaces
+    result = result.replaceAll("\\s+", " ");        // get rid of multiple spaces
     result = result.replaceAll(" \n", "\n");        // get rid of trailing spaces
     result = result.replaceAll("\n ", "\n");        // get rid of leading spaces
-    result = result.replaceAll("\\n+", "\n");        // get rid of blank lines
+    result = result.replaceAll("\\n+", " ");        // get rid of lines
     return result;
   }
 
@@ -447,11 +463,22 @@ public class RDFCompare {
   }
 
   private void addError(String uri, String err) {
+    addError(uri, err, false);
+  }
+  private void addError(String uri, String err, boolean tail) {
     if ( this.errors.containsKey(uri) == false) {
       this.errors.put(uri, new ArrayList<String>() );
     }
-    this.errors.get(uri).add(0,err);
-    errorCount++;
+    
+    if ( uri.equals("txt") || tail) {
+      this.errors.get(uri).add(err);
+    } else {
+      this.errors.get(uri).add(0,err);
+    }
+    
+    if ( uri.equals("txt") == false) {
+      this.errorCount++;
+    }
   }
 
   /**
@@ -511,11 +538,20 @@ public class RDFCompare {
    * @param archive
    * @return
    */
-  private String archiveToCoreName( final String archive) {
+  private final String archiveToCoreName( final String archive) {
     return "archive_"+archive.replace(":", "_").replace(" ", "_").replace(",", "_");
   }
 
-  private List<SolrDocument> getAllPagesFromArchive(final String core, final String archive, final String fields) {
+  /**
+   * Get all data from the specified archive
+   * @param core The SOLR core from which to retrieve documents
+   * @param archive The SOLR archive to use
+   * @param fields The list of fields to retrieve
+   * @return A list of SolrDocuments
+   */
+  private final List<SolrDocument> getSolrDocuments(final String core, final String archive, final String fields) {
+    
+    // Start at beginning of list and return 500 hits at a time
     int page = 0;
     int size = 500;
     
@@ -549,7 +585,17 @@ public class RDFCompare {
     return results;
   }
   
-  private List<SolrDocument> getPageFromSolr(final String core, final String archive, 
+  /**
+   * Get one page of documents from solr
+   * @param core The SOLR core to search
+   * @param archive The SOLR archive to use
+   * @param page Starting page number
+   * @param pageSize Maximum hits to return
+   * @param fields List of fields to return
+   * @return List of SolrDocuments
+   * @throws IOException
+   */
+  private final List<SolrDocument> getPageFromSolr(final String core, final String archive, 
       final int page, final int pageSize, final String fields) throws IOException {
 
     // build the request query string
