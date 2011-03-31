@@ -47,7 +47,6 @@ import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
-import org.nines.RDFIndexerConfig.CompareMode;
 import org.nines.RDFIndexerConfig.TextMode;
 
 public class RDFIndexer {
@@ -83,17 +82,11 @@ public class RDFIndexer {
     // Use the archive name as the log file name
     String archiveName = config.archiveName;
     archiveName = archiveName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
-    //String logFileRelativePath = "../../../log/";
     String logFileRelativePath = config.logRoot+"/";
     initSystem(logFileRelativePath+archiveName);
 
     // log text mode
     this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
-    
-    // log comparison mode
-    if  (config.compareMode != CompareMode.NONE ) {
-      this.log.info("Comparison Mode: " + config.compareMode);
-    }
     
     // keep report file in the same  folder as the log file.
     File reportFile = new File(logFileRelativePath + archiveName + "_error.log"); 
@@ -142,12 +135,10 @@ public class RDFIndexer {
     }
     
     // do any testing if requested
-    if  (config.compareMode != CompareMode.NONE ) {
-
-      log.info("Staring " + config.compareMode + " comparison");
+    if  (config.compare ) {
       try {
         RDFCompare rdfCompare = new RDFCompare( config );
-        rdfCompare.compareArhive();
+        rdfCompare.compareArchive();
       } catch (Exception e) {
         System.err.println("Comparison exception: " + e.getMessage());
         e.printStackTrace();
@@ -165,8 +156,12 @@ public class RDFIndexer {
     
     String indexLog = rootLogName + "_progress.log"; 
     String compareLog = rootLogName + "_compare.log";
-    if ( this.config.compareMode.equals(CompareMode.NONE) == false) {
-      compareLog = rootLogName + "_compare_"+ config.compareMode+".log";
+    if ( this.config.compare ) {
+      if ( this.config.includeFields.equals("text")) {
+        compareLog = rootLogName + "_compare_text.log";
+      } else {
+        compareLog = rootLogName + "_compare.log";
+      }
     }
     String skippedLog = rootLogName + "_skipped.log";
     System.setProperty("index.log.file", indexLog);
@@ -224,20 +219,7 @@ public class RDFIndexer {
 			File fileList[] = dir.listFiles();
 			for (File entry : fileList) {
 				if (entry.isDirectory() && !entry.getName().endsWith(".svn")) {
-					String path = entry.toString();
-					if (config.ignoreFolders.size() > 0) {
-						int index = config.ignoreFolders.indexOf(path);
-						if (index == -1) {
-							recursivelyQueueFiles(entry);
-						}
-					} else if (config.includeFolders.size() > 0) {
-						int index = config.includeFolders.indexOf(path);
-						if (index != -1) {
-							recursivelyQueueFiles(entry);
-						}
-					} else {
-						recursivelyQueueFiles(entry);
-					}
+				  recursivelyQueueFiles(entry);
 				}
 				if (entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml")) {
 					numFilesInFolder++;
@@ -588,12 +570,10 @@ public class RDFIndexer {
     final String deleteFlag = "delete";       // delete an archive from solr
     final String fullTextFlag = "fulltext";   // This goes to the website to get the full text.
     final String reindexFlag = "reindex";     // This gets the full text from the current index instead of going to the website.
+    final String compareFlag = "compare";     // Compare mode
     final String maxDocsFlag = "maxDocs";     // This just looks at the first few docs in each folder.
-    final String useIgnoreFile = "ignore";    // This ignores the folders specified in the file.
-    final String useIncludeFile = "include";  // This ignores the folders specified in the file.
-    final String compareAll = "compareFull";  // Ful compare of archive vs resources
-    final String compareTxt = "compareTxt";   // compare ontly TEXT fields 
-    final String compare = "compare";         // fast compare; everything BUT text
+    final String ignoreFlag = "ignore";       // A list of fields to ignore
+    final String includeFlag = "include";     // A list of fields to include
     final String source = "source";           // fast compare; everything BUT text
     final String archive = "archive";         // fast compare; everything BUT text
     
@@ -605,20 +585,18 @@ public class RDFIndexer {
     nameOpt.setRequired(true);
     options.addOption(nameOpt);
     
-    OptionGroup compareOpts = new OptionGroup();
-    compareOpts.addOption( new Option(compareAll, false, "Compare the full content of each documet") );
-    compareOpts.addOption( new Option(compareTxt, false, "Compare just text") );
-    compareOpts.addOption( new Option(compare, false, "Compare everything but text") );
-    options.addOptionGroup( compareOpts );
-    
-    OptionGroup textOpts = new OptionGroup();
-    textOpts.addOption( new Option(fullTextFlag, false, "Retrieve full text from web") );
-    textOpts.addOption( new Option(reindexFlag, false, "Retrieve full text from current index") );
-    options.addOptionGroup( textOpts );   
+    OptionGroup modeOpts = new OptionGroup();
+    modeOpts.addOption( new Option(fullTextFlag, false, "Retrieve full text from web") );
+    modeOpts.addOption( new Option(reindexFlag, false, "Retrieve full text from current index") );
+    options.addOptionGroup( modeOpts );
+   
+    options.addOption( new Option(compareFlag, false, "Compare archive with index") );
+    OptionGroup fieldOpts = new OptionGroup();
+    fieldOpts.addOption( new Option(ignoreFlag, true, "Comma separated list of fields to ignore in compare. Default is none.") );
+    fieldOpts.addOption( new Option(includeFlag, true, "Comma separated list of fields to include in compare. Default is all.") );
+    options.addOptionGroup( fieldOpts );   
     
     options.addOption(maxDocsFlag, true, "Max docs processed per folder");
-    options.addOption(useIgnoreFile, true, "Ignore folders specified in this file");
-    options.addOption(useIncludeFile, true, "Include folders specified in this file");
     options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
     options.addOption(logDir, true, "Set the root directory for all indexer logs");
    
@@ -631,25 +609,16 @@ public class RDFIndexer {
       // required params:
       config.archiveName = line.getOptionValue(archive);
       
+      // determine mode
+      if ( line.hasOption(fullTextFlag)) {
+        config.textMode = TextMode.RETRIEVE_FULL;
+      } else if ( line.hasOption(reindexFlag)) {
+        config.textMode = TextMode.REINDEX_FULL;
+      } 
+      
       // source dir
       if (line.hasOption(source)) {
         config.rdfSource = new File( line.getOptionValue(source) );
-      }
-      
-      // optional text handling flags
-      if (line.hasOption(fullTextFlag)) {
-        config.textMode = TextMode.RETRIEVE_FULL;
-      } else if (line.hasOption(reindexFlag)) {
-        config.textMode = TextMode.REINDEX_FULL;
-      }
-      
-      // optional Compare flags
-      if (line.hasOption(compareAll)) {
-        config.compareMode = CompareMode.FULL;
-      } else if (line.hasOption(compareTxt)) {
-        config.compareMode = CompareMode.TEXT;
-      } else if (line.hasOption(compare)) {
-        config.compareMode = CompareMode.FAST;
       }
       
       // opt max docs per folder
@@ -664,6 +633,15 @@ public class RDFIndexer {
       
       // delete everything ?
       config.deleteAll = line.hasOption(deleteFlag);
+      
+      // compare stuff
+      config.compare = line.hasOption(compareFlag);
+      if ( line.hasOption(includeFlag)) {
+        config.includeFields = line.getOptionValue(includeFlag);
+      }
+      if ( line.hasOption(ignoreFlag)) {
+        config.ignoreFields = line.getOptionValue(ignoreFlag);
+      }
       
       // if we are indexing, make sure source is present
       if ( config.textMode.equals(TextMode.SKIP) == false  && config.rdfSource == null) {
@@ -680,7 +658,6 @@ public class RDFIndexer {
     }
 
     // Launch the indexer with the parsed config
-    config.populateFileLists();
     new RDFIndexer(config);
   }
 }
