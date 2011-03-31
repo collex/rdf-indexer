@@ -114,6 +114,11 @@ public class RDFIndexer {
     } catch (IOException e) {
       this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
     }
+    
+    // if a purge was requested, do it first
+    if ( config.deleteAll ) {
+      purgeArchive( client, archiveToCore(config.archiveName) );
+    }
 
     // do the indexing if requested
     if ( config.textMode != TextMode.SKIP ) {
@@ -153,15 +158,25 @@ public class RDFIndexer {
     }
   }
   
-  private void commitDocumentsToSolr( HttpClient client, String archive ) {
+  private void purgeArchive(HttpClient client, final String coreName) {
+    log.info("DELETING ALL INDEX DATA FROM CORE: "+coreName);
     try {
-        if (numObjects > 0) {
-            postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>",client, archive);
-            postToSolr("<commit/>",client, archive);
-        }
+        postToSolr("<delete><query>*:*</query></delete>", client, coreName);
+        postToSolr("<commit/>", client, coreName);
+    } catch (IOException e) {
+      errorReport.addError(new IndexerError("", "", "Unable to POST DELETE message to SOLR. " + e.getLocalizedMessage()));
     }
-    catch( IOException e ) {
-        errorReport.addError(new IndexerError("","","Unable to POST commit message to SOLR. "+e.getLocalizedMessage()));    		
+  }
+
+  private void commitDocumentsToSolr(HttpClient client, String archive) {
+    try {
+      if (numObjects > 0) {
+        postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>", client, archive);
+        postToSolr("<commit/>", client, archive);
+      }
+    } catch (IOException e) {
+      errorReport
+          .addError(new IndexerError("", "", "Unable to POST commit message to SOLR. " + e.getLocalizedMessage()));
     }
   }
   
@@ -467,7 +482,6 @@ public class RDFIndexer {
   public void postToSolr(String xml, HttpClient httpclient, String archive) throws IOException {
 
     PostMethod post = new PostMethod(config.solrBaseURL + "/" + archive + "/update");
-    // PostMethod post = new PostMethod(config.solrBaseURL + config.solrNewIndex + "/update");
     post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
     post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
 
@@ -574,6 +588,7 @@ public class RDFIndexer {
   public static void main(String[] args) {
     
     // Option constants
+    final String deleteFlag = "delete";       // delete an archive from solr
     final String fullTextFlag = "fulltext";   // This goes to the website to get the full text.
     final String reindexFlag = "reindex";     // This gets the full text from the current index instead of going to the website.
     final String maxDocsFlag = "maxDocs";     // This just looks at the first few docs in each folder.
@@ -588,7 +603,6 @@ public class RDFIndexer {
     // define the list of command line options
     Options options = new Options();
     Option srcOpt = new Option(source, true, "The source rdf file or directory to index");
-    srcOpt.setRequired(true);
     options.addOption(srcOpt);
     Option nameOpt = new Option(archive, true, "The name of of the archive");
     nameOpt.setRequired(true);
@@ -608,6 +622,7 @@ public class RDFIndexer {
     options.addOption(maxDocsFlag, true, "Max docs processed per folder");
     options.addOption(useIgnoreFile, true, "Ignore folders specified in this file");
     options.addOption(useIncludeFile, true, "Include folders specified in this file");
+    options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
    
     // create parser and handle the options
     RDFIndexerConfig config = new RDFIndexerConfig();
@@ -616,8 +631,12 @@ public class RDFIndexer {
       CommandLine line = parser.parse( options, args );
      
       // required params:
-      config.rdfSource = new File( line.getOptionValue(source) );
       config.archiveName = line.getOptionValue(archive);
+      
+      // source dir
+      if (line.hasOption(source)) {
+        config.rdfSource = new File( line.getOptionValue(source) );
+      }
       
       // optional text handling flags
       if (line.hasOption(fullTextFlag)) {
@@ -640,9 +659,13 @@ public class RDFIndexer {
         config.maxDocsPerFolder = Integer.parseInt( line.getOptionValue(maxDocsFlag));
       }
       
-      // opt files 
-      config.ignoreFileName = line.getOptionValue(useIgnoreFile);
-      config.includeFileName =  line.getOptionValue(useIncludeFile);
+      // delete everything ?
+      config.deleteAll = line.hasOption(deleteFlag);
+      
+      // if we are indexing, make sure source is present
+      if ( config.textMode.equals(TextMode.SKIP) == false  && config.rdfSource == null) {
+        throw new ParseException("Missing required -source parameter");
+      }
       
     } catch( ParseException exp ) {
       
