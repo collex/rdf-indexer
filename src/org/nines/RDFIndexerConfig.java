@@ -58,6 +58,7 @@ public class RDFIndexerConfig {
   public ArrayList<String> includeFolders = new ArrayList<String>();
   public boolean commitToSolr = true;
   public CompareMode compareMode = CompareMode.NONE;
+  public boolean deleteAll = false;
   
   /**
    * Called after all options are set. This will open the
