@@ -7,16 +7,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
@@ -80,8 +81,8 @@ public class RDFCompare {
     String logPath = logFileRelativePath+logFileName + "_compare_"+ config.compareMode+".log";
     FileAppender fa = new FileAppender(new PatternLayout("%m\n"), logPath.toLowerCase());
     fa.setEncoding("UTF-8");
-    BasicConfigurator.configure( fa );
     this.log = Logger.getLogger(RDFIndexer.class.getName());
+    this.log.addAppender(fa);
     
     // set up sys out so it can handle utf-8 output
     try {
@@ -117,16 +118,25 @@ public class RDFCompare {
   
     // get docs from reindex archive
     List<SolrDocument> archiveDocs = getSolrDocuments(archiveToCoreName(
-        config.archiveName), config.archiveName, fl);
+        this.config.archiveName), this.config.archiveName, fl);
     
     if ( this.config.compareMode.equals(CompareMode.TEXT) == false) {
       logInfo("retrieved "+archiveDocs.size()+" new rdf objects;");
       logInfo("retrieved " + indexDocs.size() +" old objects;");
     }
     
-    // do the comparison
-    compareLists(indexDocs, archiveDocs);
+    // hash the indexed docs by uri to hopefull speed stuff up
+    HashMap<String, SolrDocument> indexHash = new HashMap<String, SolrDocument>();
+    for ( SolrDocument doc : indexDocs) {
+      String uri = doc.get("uri").toString();
+      indexHash.put(uri, doc);
+    }
+    indexDocs.clear();
     
+    // do the comparison
+    compareLists(indexHash, archiveDocs);
+    
+    // dump results
     for (Map.Entry<String, List<String>> entry: this.errors.entrySet()) {
       String uri = entry.getKey();
       if ( uri.equals("txt")) {
@@ -151,9 +161,60 @@ public class RDFCompare {
     } else {
       logInfo( String.format("Finished in %3.2f seconds.", durationSec));
     }
+    
+    // now check for skipped stuff
+    doSkippedTest(indexHash.keySet(), archiveDocs);
   }
 
   /**
+   * Compare the set of URIs in the index ad archive. List out all new documents and
+   * all old. Show a skipped count (skipped is a doc in the original index, but not 
+   * the archive 
+   * @param indexUris Set uf URIs from the main index
+   * @param archiveDocs List of SolrDocuments in the index
+   */
+  private void doSkippedTest(Set<String> indexUris, List<SolrDocument> archiveDocs) {
+
+    // set up logger just for skipped files
+    try {
+      String logFileName = config.archiveName;
+      String logFileRelativePath = "../../../log/";
+      String skipLogPath = logFileRelativePath+logFileName + "_skipped.log";
+      FileAppender faSkip = new FileAppender(new PatternLayout("%m\n"), skipLogPath.toLowerCase());
+      faSkip.setEncoding("UTF-8");
+      Logger skippedLog = Logger.getLogger("skipped");
+      skippedLog.addAppender(faSkip);
+      
+      skippedLog.info("====== Scanning archive \"" + config.archiveName + "\" ====== ");
+      skippedLog.info("retrieved "+archiveDocs.size()+" new rdf objects;");
+      skippedLog.info("retrieved " + indexUris.size() +" old objects;");
+      
+      // get set all uris of new docs
+      Set<String> newUris = new HashSet<String>();
+      for (SolrDocument doc : archiveDocs) {
+        String uri = doc.get("uri").toString();
+        newUris.add(uri);
+      }
+           
+      Set<String> oldOnly = new HashSet<String>(indexUris);
+      oldOnly.removeAll( newUris );
+      newUris.removeAll(indexUris);
+      for (String uri: oldOnly) {
+        skippedLog.info("    Old: "+uri);
+      }
+      for (String uri: newUris) {
+        skippedLog.info("    New: "+uri);
+      }
+      
+      skippedLog.info("Total not indexed: "+oldOnly.size()+". Total new: " + newUris.size()+"."); 
+    } catch (Exception e) {
+      logInfo("Unable to check for skipped files: "+e.getMessage());
+    }
+    
+}
+
+
+/**
    * Look at the compare config and generate a field list
    * suitable for submission to Solr: 
    * @return List in the form: field1+field2+...
@@ -183,23 +244,15 @@ public class RDFCompare {
    * @param archiveDocs List of docs in the reindexed archive
    * @throws Exception
    */
-  private void compareLists(List<SolrDocument> indexDocs, List<SolrDocument> archiveDocs) {
-    
-    // hash the indexed docs by uri to hopefull speed stuff up
-    HashMap<String, SolrDocument> indexed = new HashMap<String, SolrDocument>();
-    for ( SolrDocument doc : indexDocs) {
-      String uri = doc.get("uri").toString();
-      indexed.put(uri, doc);
-    }
-    indexDocs.clear();
-    
+  private void compareLists(HashMap<String, SolrDocument>  indexHash, List<SolrDocument> archiveDocs) {
+       
     // Run thru al items in new archive. Validate correct data
     // and compare against object in original index if possible
     for ( SolrDocument doc : archiveDocs) {
 
       // look up the corresponding object in the original index
       String uri = doc.get("uri").toString();
-      SolrDocument indexDoc = indexed.get(uri);
+      SolrDocument indexDoc = indexHash.get(uri);
       
       // On full compares, validaate all required
       // fields are present and contain content
@@ -554,7 +607,16 @@ public class RDFCompare {
    * @return
    */
   private final String archiveToCoreName( final String archive) {
-    return "archive_"+archive.replace(":", "_").replace(" ", "_").replace(",", "_");
+    return "archive_"+safeArchiveName(archive);
+  }
+  
+  /**
+   * Generate a clean core name from an archive
+   * @param archive
+   * @return
+   */
+  private final String safeArchiveName( final String archive) {
+    return archive.replace(":", "_").replace(" ", "_").replace(",", "_");
   }
 
   /**
@@ -614,7 +676,7 @@ public class RDFCompare {
       final int page, final int pageSize, final String fields) throws IOException {
 
     // build the request query string
-    String query = this.config.solrBaseURL + "/" + core + "/select/?q=archive:"+archive;
+    String query = this.config.solrBaseURL + "/" + core + "/select/?q=archive:"+safeArchiveName(archive);
     query = query + "&start="+(page*pageSize)+"&rows="+pageSize;
     query = query + "&fl="+fields;
     query = query + "&sort=uri+asc";
