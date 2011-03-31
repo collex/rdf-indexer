@@ -45,6 +45,7 @@ public class RDFIndexerConfig {
     REINDEX_FULL    // pull full text from existing index
   };
   
+  public String logRoot = ".";
   public File rdfSource;
   public String archiveName;
   public String solrBaseURL = "http://localhost:8983/solr";

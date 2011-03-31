@@ -41,10 +41,8 @@ import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.io.IOUtils;
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
+import org.apache.log4j.xml.DOMConfigurator;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.output.Format;
@@ -83,10 +81,11 @@ public class RDFIndexer {
     this.config = config;
     
     // Use the archive name as the log file name
-    String reportFilename = config.archiveName;
-    reportFilename = reportFilename.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
-    String logFileRelativePath = "../../../log/";
-    initSystem(logFileRelativePath + reportFilename);
+    String archiveName = config.archiveName;
+    archiveName = archiveName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
+    //String logFileRelativePath = "../../../log/";
+    String logFileRelativePath = config.logRoot+"/";
+    initSystem(logFileRelativePath+archiveName);
 
     // log text mode
     this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
@@ -97,7 +96,7 @@ public class RDFIndexer {
     }
     
     // keep report file in the same  folder as the log file.
-    File reportFile = new File(logFileRelativePath + reportFilename + "_error.log"); 
+    File reportFile = new File(logFileRelativePath + archiveName + "_error.log"); 
     try {
       this.errorReport = new ErrorReport(reportFile);
     } catch (IOException e1) {
@@ -105,7 +104,7 @@ public class RDFIndexer {
       return;
     }
 
-    this.linkCollector = new LinkCollector(logFileRelativePath + reportFilename);
+    this.linkCollector = new LinkCollector(logFileRelativePath + archiveName);
 
     HttpClient client = new HttpClient();
 
@@ -158,6 +157,28 @@ public class RDFIndexer {
     }
   }
   
+  private void initSystem(String rootLogName) {
+    // Use the SAX2-compliant Xerces parser:
+    System.setProperty(
+        "org.xml.sax.driver",
+        "org.apache.xerces.parsers.SAXParser");
+    
+    String indexLog = rootLogName + "_progress.log"; 
+    String compareLog = rootLogName + "_compare.log";
+    if ( this.config.compareMode.equals(CompareMode.NONE) == false) {
+      compareLog = rootLogName + "_compare_"+ config.compareMode+".log";
+    }
+    String skippedLog = rootLogName + "_skipped.log";
+    System.setProperty("index.log.file", indexLog.toLowerCase());
+    System.setProperty("compare.log.file", compareLog.toLowerCase());
+    System.setProperty("skipped.log.file", skippedLog.toLowerCase());
+    DOMConfigurator.configure("log4j.xml");
+    this.log = Logger.getLogger(RDFIndexer.class.getName());
+      
+    System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
+    System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+  }
+  
   private void purgeArchive(HttpClient client, final String coreName) {
     log.info("DELETING ALL INDEX DATA FROM CORE: "+coreName);
     try {
@@ -193,31 +214,6 @@ public class RDFIndexer {
            */
         guid = java.util.UUID.randomUUID().toString();
       }
-  }
-
-  private void initSystem(String logName) {
-    // Use the SAX2-compliant Xerces parser:
-    System.setProperty(
-        "org.xml.sax.driver",
-        "org.apache.xerces.parsers.SAXParser");
-    
-   
-    try {
-      // don't purge old log on startup -- that is handled before calling this app.
-      String logPath = logName + "_progress.log";      
-      FileAppender fa = new FileAppender(new PatternLayout("%d{E MMM dd, HH:mm:ss} [%p] - %m\n"), logPath);
-      fa.setEncoding("UTF-8");
-      BasicConfigurator.configure( fa );
-      log = Logger.getLogger(RDFIndexer.class.getName());
-
-    }
-    catch( IOException e ) {
-        log.error("Error, unable to initialize logging, exiting.");
-        System.exit(0);
-    }
-      
-    System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
-    System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
   }
   
 	private void recursivelyQueueFiles(File dir) {
@@ -588,6 +584,7 @@ public class RDFIndexer {
   public static void main(String[] args) {
     
     // Option constants
+    final String logDir = "logDir";           // logging directory
     final String deleteFlag = "delete";       // delete an archive from solr
     final String fullTextFlag = "fulltext";   // This goes to the website to get the full text.
     final String reindexFlag = "reindex";     // This gets the full text from the current index instead of going to the website.
@@ -597,7 +594,7 @@ public class RDFIndexer {
     final String compareAll = "compareFull";  // Ful compare of archive vs resources
     final String compareTxt = "compareTxt";   // compare ontly TEXT fields 
     final String compare = "compare";         // fast compare; everything BUT text
-    final String source = "source";         // fast compare; everything BUT text
+    final String source = "source";           // fast compare; everything BUT text
     final String archive = "archive";         // fast compare; everything BUT text
     
     // define the list of command line options
@@ -623,6 +620,7 @@ public class RDFIndexer {
     options.addOption(useIgnoreFile, true, "Ignore folders specified in this file");
     options.addOption(useIncludeFile, true, "Include folders specified in this file");
     options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
+    options.addOption(logDir, true, "Set the root directory for all indexer logs");
    
     // create parser and handle the options
     RDFIndexerConfig config = new RDFIndexerConfig();
@@ -657,6 +655,11 @@ public class RDFIndexer {
       // opt max docs per folder
       if ( line.hasOption(maxDocsFlag)) {
         config.maxDocsPerFolder = Integer.parseInt( line.getOptionValue(maxDocsFlag));
+      }
+      
+      // logging directory
+      if ( line.hasOption(logDir)) {
+        config.logRoot = line.getOptionValue(logDir);
       }
       
       // delete everything ?

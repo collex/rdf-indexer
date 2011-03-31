@@ -18,9 +18,7 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.util.JavaBinCodec;
@@ -75,14 +73,7 @@ public class RDFCompare {
     this.config = config;
     
     // init logging
-    String logFileName = config.archiveName;
-    logFileName = logFileName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
-    String logFileRelativePath = "../../../log/";
-    String logPath = logFileRelativePath+logFileName + "_compare_"+ config.compareMode+".log";
-    FileAppender fa = new FileAppender(new PatternLayout("%m\n"), logPath.toLowerCase());
-    fa.setEncoding("UTF-8");
-    this.log = Logger.getLogger(RDFIndexer.class.getName());
-    this.log.addAppender(fa);
+    this.log = Logger.getLogger("compare");
     
     // set up sys out so it can handle utf-8 output
     try {
@@ -176,41 +167,30 @@ public class RDFCompare {
   private void doSkippedTest(Set<String> indexUris, List<SolrDocument> archiveDocs) {
 
     // set up logger just for skipped files
-    try {
-      String logFileName = config.archiveName;
-      String logFileRelativePath = "../../../log/";
-      String skipLogPath = logFileRelativePath+logFileName + "_skipped.log";
-      FileAppender faSkip = new FileAppender(new PatternLayout("%m\n"), skipLogPath.toLowerCase());
-      faSkip.setEncoding("UTF-8");
-      Logger skippedLog = Logger.getLogger("skipped");
-      skippedLog.addAppender(faSkip);
-      
-      skippedLog.info("====== Scanning archive \"" + config.archiveName + "\" ====== ");
-      skippedLog.info("retrieved "+archiveDocs.size()+" new rdf objects;");
-      skippedLog.info("retrieved " + indexUris.size() +" old objects;");
-      
-      // get set all uris of new docs
-      Set<String> newUris = new HashSet<String>();
-      for (SolrDocument doc : archiveDocs) {
-        String uri = doc.get("uri").toString();
-        newUris.add(uri);
-      }
-           
-      Set<String> oldOnly = new HashSet<String>(indexUris);
-      oldOnly.removeAll( newUris );
-      newUris.removeAll(indexUris);
-      for (String uri: oldOnly) {
-        skippedLog.info("    Old: "+uri);
-      }
-      for (String uri: newUris) {
-        skippedLog.info("    New: "+uri);
-      }
-      
-      skippedLog.info("Total not indexed: "+oldOnly.size()+". Total new: " + newUris.size()+"."); 
-    } catch (Exception e) {
-      logInfo("Unable to check for skipped files: "+e.getMessage());
+    Logger skippedLog = Logger.getLogger("skipped");
+    
+    skippedLog.info("====== Scanning archive \"" + config.archiveName + "\" ====== ");
+    skippedLog.info("retrieved "+archiveDocs.size()+" new rdf objects;");
+    skippedLog.info("retrieved " + indexUris.size() +" old objects;");
+    
+    // get set all uris of new docs
+    Set<String> newUris = new HashSet<String>();
+    for (SolrDocument doc : archiveDocs) {
+      String uri = doc.get("uri").toString();
+      newUris.add(uri);
+    }
+         
+    Set<String> oldOnly = new HashSet<String>(indexUris);
+    oldOnly.removeAll( newUris );
+    newUris.removeAll(indexUris);
+    for (String uri: oldOnly) {
+      skippedLog.info("    Old: "+uri);
+    }
+    for (String uri: newUris) {
+      skippedLog.info("    New: "+uri);
     }
     
+    skippedLog.info("Total not indexed: "+oldOnly.size()+". Total new: " + newUris.size()+"."); 
 }
 
 

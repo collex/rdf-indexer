@@ -37,10 +37,14 @@
 				  </chainedmapper>
 			</mapper>
 		</pathconvert>
-		
-    <copy todir="${dist}/lib">
-      <fileset dir="${lib}"/>
-    </copy>
+	
+		<!-- copy lib files to dist directory -->
+      <copy todir="${dist}/lib">
+        <fileset dir="${lib}"/>
+      </copy>
+
+      <!-- copy log4j cfg file to dist -->
+		<copy file="log4j.xml" todir="${dist}"/>
 
 		<jar jarfile="${dist}/rdf-indexer.jar" basedir="${build}">
 			<manifest>

@@ -84,8 +84,8 @@ public class ValidationUtility {
       int pos = finalXmlStr.indexOf("&#", startPos);
       if (pos > -1) {
         String snip = finalXmlStr.substring(Math.max(0, pos-25), Math.min(finalXmlStr.length(), pos+25));
-        messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence. Position: [" +
-            pos + "], Snippet: [" +
+        messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence.\n   Position: [" +
+            pos + "]\n   Snippet: [" +
             snip + "]"));
         startPos = pos+2;
       } else {
