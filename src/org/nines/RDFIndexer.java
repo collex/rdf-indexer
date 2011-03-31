@@ -169,9 +169,9 @@ public class RDFIndexer {
       compareLog = rootLogName + "_compare_"+ config.compareMode+".log";
     }
     String skippedLog = rootLogName + "_skipped.log";
-    System.setProperty("index.log.file", indexLog.toLowerCase());
-    System.setProperty("compare.log.file", compareLog.toLowerCase());
-    System.setProperty("skipped.log.file", skippedLog.toLowerCase());
+    System.setProperty("index.log.file", indexLog);
+    System.setProperty("compare.log.file", compareLog);
+    System.setProperty("skipped.log.file", skippedLog);
     DOMConfigurator.configure("log4j.xml");
     this.log = Logger.getLogger(RDFIndexer.class.getName());
       

@@ -3,6 +3,7 @@ package org.nines;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -587,16 +588,7 @@ public class RDFCompare {
    * @return
    */
   private final String archiveToCoreName( final String archive) {
-    return "archive_"+safeArchiveName(archive);
-  }
-  
-  /**
-   * Generate a clean core name from an archive
-   * @param archive
-   * @return
-   */
-  private final String safeArchiveName( final String archive) {
-    return archive.replace(":", "_").replace(" ", "_").replace(",", "_");
+    return "archive_"+archive.replace(":", "_").replace(" ", "_").replace(",", "_");
   }
 
   /**
@@ -641,7 +633,7 @@ public class RDFCompare {
     }
     return results;
   }
-  
+ 
   /**
    * Get one page of documents from solr
    * @param core The SOLR core to search
@@ -656,7 +648,8 @@ public class RDFCompare {
       final int page, final int pageSize, final String fields) throws IOException {
 
     // build the request query string
-    String query = this.config.solrBaseURL + "/" + core + "/select/?q=archive:"+safeArchiveName(archive);
+    String a = URLEncoder.encode("\"" + archive + "\"", "UTF-8");
+    String query = this.config.solrBaseURL + "/" + core + "/select/?q=archive:"+a;
     query = query + "&start="+(page*pageSize)+"&rows="+pageSize;
     query = query + "&fl="+fields;
     query = query + "&sort=uri+asc";
