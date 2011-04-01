@@ -65,7 +65,6 @@ public class RDFIndexer {
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
   private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
   public static final int HTTP_CLIENT_TIMEOUT = 2*60*1000; // 2 minutes
-  private static final int NUMBER_OF_INDEXER_THREADS = 5;
   private static final int PROGRESS_MILESTONE_INTERVAL = 100;
   private static final int DOCUMENTS_PER_POST = 100;
   
@@ -247,7 +246,7 @@ public class RDFIndexer {
 
     // fire off the indexing threads
     ArrayList<IndexerThread> threads = new ArrayList<IndexerThread>(); 
-    for( int i = 0; i < NUMBER_OF_INDEXER_THREADS; i++ ) {
+    for( int i = 0; i < this.config.numThreads; i++ ) {
         IndexerThread thread = new IndexerThread(i);
         threads.add(thread);
         thread.start();
@@ -576,6 +575,8 @@ public class RDFIndexer {
     final String includeFlag = "include";     // A list of fields to include
     final String source = "source";           // fast compare; everything BUT text
     final String archive = "archive";         // fast compare; everything BUT text
+    final String threadCnt = "threadCnt";         // fast compare; everything BUT text
+    final String pageSize = "pageSize";         // fast compare; everything BUT text
     
     // define the list of command line options
     Options options = new Options();
@@ -599,6 +600,8 @@ public class RDFIndexer {
     options.addOption(maxDocsFlag, true, "Max docs processed per folder");
     options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
     options.addOption(logDir, true, "Set the root directory for all indexer logs");
+    options.addOption(threadCnt, true, "Set number of worker threads. Default 5");
+    options.addOption(pageSize, true, "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
    
     // create parser and handle the options
     RDFIndexerConfig config = new RDFIndexerConfig();
@@ -624,6 +627,14 @@ public class RDFIndexer {
       // opt max docs per folder
       if ( line.hasOption(maxDocsFlag)) {
         config.maxDocsPerFolder = Integer.parseInt( line.getOptionValue(maxDocsFlag));
+      }
+      
+      // opt threads & page size
+      if ( line.hasOption(threadCnt)) {
+        config.numThreads = Integer.parseInt( line.getOptionValue(threadCnt));
+      }
+      if ( line.hasOption(pageSize)) {
+        config.pageSize = Integer.parseInt( line.getOptionValue(pageSize));
       }
       
       // logging directory

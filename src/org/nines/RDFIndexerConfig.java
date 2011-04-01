@@ -45,4 +45,6 @@ public class RDFIndexerConfig {
   public String includeFields = "*";
   public boolean commitToSolr = true;
   public boolean deleteAll = false;
+  public int pageSize = 500;
+  public int numThreads = 5;
 }

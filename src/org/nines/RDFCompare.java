@@ -105,7 +105,7 @@ public class RDFCompare {
     
     // Start at beginning of list and return 500 hits at a time
     int page = 0;
-    int size = 500;
+    int size = this.config.pageSize;
     List<SolrDocument> archiveDocs = new ArrayList<SolrDocument>();
     HashMap<String, SolrDocument> indexHash = new HashMap<String, SolrDocument>();
     Set<String> indexUris = new HashSet<String>();
