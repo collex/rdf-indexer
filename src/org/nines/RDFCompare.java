@@ -130,8 +130,6 @@ public class RDFCompare {
         List<SolrDocument> pageHits = getPageFromSolr(reindexCore, config.archiveName, page, size, fl);
         if (pageHits.size()  < size ){
           done= true;
-        } else {
-          page += 1;
         }
         
         // save off te set of uris for the archived docs
@@ -155,6 +153,9 @@ public class RDFCompare {
         
         // dump results
         logErrors();
+        
+        // next page!!
+        page++;
         
       } catch (IOException e) {
         System.err.println("Error retrieving data from solr:" + e.getMessage());
