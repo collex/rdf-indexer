@@ -78,17 +78,32 @@ public class RDFIndexer {
 
     this.config = config;
     
-    // Use the archive name as the log file name
+    // Use the SAX2-compliant Xerces parser:
+    System.setProperty("org.xml.sax.driver", "org.apache.xerces.parsers.SAXParser");
+    
+    // get partial log filename
     String archiveName = config.archiveName;
     archiveName = archiveName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
     String logFileRelativePath = config.logRoot+"/";
-    initSystem(logFileRelativePath+archiveName);
-
-    // log text mode
-    this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text" : "Offline: Not Indexing Full Text");
     
-    // keep report file in the same  folder as the log file.
-    File reportFile = new File(logFileRelativePath + archiveName + "_error.log"); 
+    // config system based oncmdline flags
+    if ( this.config.compare ) {
+        initCompareMode( logFileRelativePath+archiveName );
+    } else {
+        initIndexMode( logFileRelativePath+archiveName );
+    }
+  }
+  
+  private void initIndexMode( final String logFileRoot ) {
+    
+    // setup logger
+    String indexLog = logFileRoot + "_progress.log";
+    System.setProperty("index.log.file", indexLog);
+    DOMConfigurator.configure("log4j-index.xml");
+    this.log = Logger.getLogger(RDFIndexer.class.getName());
+    
+    // keep report file in the same folder as the log file.
+    File reportFile = new File(logFileRoot + "_error.log");
     try {
       this.errorReport = new ErrorReport(reportFile);
     } catch (IOException e1) {
@@ -96,7 +111,7 @@ public class RDFIndexer {
       return;
     }
 
-    this.linkCollector = new LinkCollector(logFileRelativePath + archiveName);
+    this.linkCollector = new LinkCollector( logFileRoot );
 
     HttpClient client = new HttpClient();
 
@@ -105,14 +120,19 @@ public class RDFIndexer {
     } catch (IOException e) {
       this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
     }
-    
+
     // if a purge was requested, do it first
-    if ( config.deleteAll ) {
-      purgeArchive( client, archiveToCore(config.archiveName) );
+    if (config.deleteAll) {
+      purgeArchive(client, archiveToCore(config.archiveName));
     }
 
     // do the indexing if requested
-    if ( config.textMode != TextMode.SKIP ) {
+    if (config.textMode != TextMode.SKIP) {
+
+      // log text mode
+      this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text"
+          : "Offline: Not Indexing Full Text");
+
       createGUID(config.rdfSource);
       Date start = new Date();
       log.info("Started indexing at " + start);
@@ -132,45 +152,30 @@ public class RDFIndexer {
       this.errorReport.close();
       this.linkCollector.close();
     }
-    
-    // do any testing if requested
-    if  (config.compare ) {
-      try {
-        RDFCompare rdfCompare = new RDFCompare( config );
-        rdfCompare.compareArchive();
-      } catch (Exception e) {
-        System.err.println("Comparison exception: " + e.getMessage());
-        e.printStackTrace();
-        log.error("Comparison exception: " + e.getMessage());
-        
-      }
-    }
   }
-  
-  private void initSystem(String rootLogName) {
-    // Use the SAX2-compliant Xerces parser:
-    System.setProperty(
-        "org.xml.sax.driver",
-        "org.apache.xerces.parsers.SAXParser");
+
+  private void initCompareMode(final String logFileRoot) {
     
-    String indexLog = rootLogName + "_progress.log"; 
-    String compareLog = rootLogName + "_compare.log";
-    if ( this.config.compare ) {
-      if ( this.config.includeFields.equals("text")) {
-        compareLog = rootLogName + "_compare_text.log";
-      } else {
-        compareLog = rootLogName + "_compare.log";
-      }
-    }
-    String skippedLog = rootLogName + "_skipped.log";
-    System.setProperty("index.log.file", indexLog);
+    String compareLog = logFileRoot + "_compare.log";
+    String skippedLog = logFileRoot + "_skipped.log";
+    String compareTxtLog = logFileRoot + "_compare_text.log";
+
     System.setProperty("compare.log.file", compareLog);
+    System.setProperty("compare.text.log.file", compareTxtLog);
     System.setProperty("skipped.log.file", skippedLog);
-    DOMConfigurator.configure("log4j.xml");
-    this.log = Logger.getLogger(RDFIndexer.class.getName());
-      
-    System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.SimpleLog");
-    System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+    DOMConfigurator.configure("log4j-compare.xml");
+    
+    HttpClient client = new HttpClient();
+
+    try {
+      beSureCoreExists(client, archiveToCore(config.archiveName));
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
+
+    RDFCompare rdfCompare = new RDFCompare(config);
+    rdfCompare.compareArchive();
   }
   
   private void purgeArchive(HttpClient client, final String coreName) {

@@ -37,10 +37,12 @@ public class RDFCompare {
   private RDFIndexerConfig config;
   private boolean includesText = false;
   private Logger log;
+  private Logger txtLog;
   private PrintStream sysOut;
   private HttpClient httpClient;
   private LinkedHashMap<String,List<String>> errors = new LinkedHashMap<String,List<String>>();
   private int errorCount = 0;
+  private int txtErrorCount = 0;
   
   // all of the solr instance fields. Text is the last field
   private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>( Arrays.asList(
@@ -70,11 +72,12 @@ public class RDFCompare {
    * @param config
    * @throws IOException 
    */
-  public RDFCompare(RDFIndexerConfig config) throws IOException {
+  public RDFCompare(RDFIndexerConfig config) {
     this.config = config;
     
     // init logging
     this.log = Logger.getLogger("compare");
+    this.txtLog = Logger.getLogger("compareTxt");
     
     // set up sys out so it can handle utf-8 output
     try {
@@ -166,20 +169,23 @@ public class RDFCompare {
     
     // if theres stuff left in the archiveDocs, and we are lookin at text, dump it
     if (archiveDocs.size() > 0 && this.includesText) {
-      this.log.info(" ============================= TEXT ADDED TO ARCHIVE ===========================");
+      this.txtLog.info(" ============================= TEXT ADDED TO ARCHIVE ===========================");
       for (SolrDocument doc : archiveDocs) {
-        this.log.info("---------------------------------------------------------------------------------------------------------------");
-        this.log.info(" --- " + doc.get("uri").toString() + " ---");
+        this.txtLog.info("---------------------------------------------------------------------------------------------------------------");
+        this.txtLog.info(" --- " + doc.get("uri").toString() + " ---");
         if ( doc.containsKey("text")) {
-          this.logInfo(doc.get("text").toString());
-          this.errorCount++;
+          this.txtLog.info(doc.get("text").toString());
+          this.txtErrorCount++;
         }
       }
-      this.log.info("---------------------------------------------------------------------------------------------------------------");
+      this.txtLog.info("---------------------------------------------------------------------------------------------------------------");
     }
     
     // done log some stats
     this.log.info("Total Docs Scanned: "+archiveUris.size()+". Total Errors: "+this.errorCount+".");
+    if ( this.includesText) {
+      this.txtLog.info("Total Docs Scanned: "+archiveUris.size()+". Total Errors: "+this.txtErrorCount+".");
+    }
     
     Date end = new Date();
     double durationSec = (end.getTime()-start.getTime())/1000.0;
@@ -438,19 +444,23 @@ public class RDFCompare {
     if (newTxt == null) {
       String val = doc.get("has_full_text").toString();
       if ( val.equalsIgnoreCase("false")) {
-        addError(uri, "field has_full_text is "+val+" but full text does not exist.");
+        this.txtLog.error(uri + ": field has_full_text is "+val+" but full text does not exist.");
+        this.txtErrorCount++;
       }
       
       val = doc.get("is_ocr").toString();
       if ( val.equalsIgnoreCase("false")) {
-        addError(uri, "field is_ocr is "+val+" but full text does not exist.");
+        this.txtLog.error(uri + ": field is_ocr is "+val+" but full text does not exist.");
+        this.txtErrorCount++;
       }
     }
     
     if (newTxt == null && oldTxt != null) {
-      addError(uri, "text field has disappeared from the new index. (old text size = "+oldTxt.length());
+      this.txtLog.error(uri + ":text field has disappeared from the new index. (old text size = "+oldTxt.length());
+      this.txtErrorCount++;
     } else if (newTxt != null && oldTxt == null) {
-      addError(uri, "text field has appeared in the new index.");
+      this.txtLog.error(uri + ":text field has appeared in the new index.");
+      this.txtErrorCount++;
     } else if (newTxt.equals(oldTxt) == false) {
     
       newTxt = getProcessedReindexedText(newTxt);
@@ -467,15 +477,15 @@ public class RDFCompare {
     pos = Math.max(0, pos-4);
     String newSub = newTxt.substring(pos, Math.min(pos+51, newTxt.length()));
     String oldSub = oldTxt.substring(pos, Math.min(pos+51, oldTxt.length()));
-    addError("txt", "==== "+uri+" mismatch at line 0 col "+pos+":");
-    addError("txt", "(new "+newTxt.length()+")");
-    addError("txt", newSub, true);
-    addError("txt", "-- vs --");
-    addError("txt", "(old "+oldTxt.length()+")");
-    addError("txt", oldSub);
-    addError("txt", "NEW: "+ getBytesString(newSub) );
-    addError("txt", "OLD: "+ getBytesString(oldSub) );
-    this.errorCount++;
+    this.txtLog.error( "==== "+uri+" mismatch at line 0 col "+pos+":");
+    this.txtLog.error("(new "+newTxt.length()+")");
+    this.txtLog.error( newSub );
+    this.txtLog.error( "-- vs --");
+    this.txtLog.error("(old "+oldTxt.length()+")");
+    this.txtLog.error( oldSub);
+    this.txtLog.error("NEW: "+ getBytesString(newSub) );
+    this.txtLog.error("OLD: "+ getBytesString(oldSub) );
+    this.txtErrorCount++;
   }
 
 
