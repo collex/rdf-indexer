@@ -183,6 +183,8 @@ public class RDFCompare {
     
     // done log some stats
     this.log.info("Total Docs Scanned: "+archiveUris.size()+". Total Errors: "+this.errorCount+".");
+    this.log.info("  retrieved " + archiveUris.size() + " new objects;");
+    this.log.info("  retrieved " + indexUris.size() + " old objects;");
     if ( this.includesText) {
       this.txtLog.info("Total Docs Scanned: "+archiveUris.size()+". Total Errors: "+this.txtErrorCount+".");
     }
@@ -227,9 +229,11 @@ public class RDFCompare {
 
     // set up logger just for skipped files
     Logger skippedLog = Logger.getLogger("skipped");
-
+    
+    Date started = new Date();
+    skippedLog.info("Started: " + started); 
     skippedLog.info("====== Scanning archive \"" + config.archiveName + "\" ====== ");
-    skippedLog.info("retrieved " + archiveUris.size() + " new rdf objects;");
+    skippedLog.info("retrieved " + archiveUris.size() + " new objects;");
     skippedLog.info("retrieved " + indexUris.size() + " old objects;");
 
     Set<String> oldOnly = new HashSet<String>(indexUris);
