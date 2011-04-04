@@ -53,7 +53,7 @@ public class RDFCompare {
     "language", "geospacial", "text"));
 
   private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
-      "PQCh-EAF", "amdeveryday", "oldBailey" ));
+      "PQCh-EAF", "amdeveryday", "amdecj", "oldBailey" ));
   
   private static final ArrayList<String> REQUIRED_FIELDS = new ArrayList<String>( Arrays.asList(
       "title_sort", "title", "genre", "archive", "url", 
@@ -160,6 +160,7 @@ public class RDFCompare {
       } catch (IOException e) {
         System.err.println("Error retrieving data from solr:" + e.getMessage());
         e.printStackTrace();
+        done = true;
       }
     }
     
