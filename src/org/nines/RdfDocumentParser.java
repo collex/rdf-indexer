@@ -35,11 +35,17 @@ import org.openrdf.sesame.sail.SailInitializationException;
 import org.openrdf.sesame.sailimpl.memory.RdfSource;
 
 public class RdfDocumentParser {
+  private static long largestTextSize = 0;
   public final static Logger log = Logger.getLogger(RdfDocumentParser.class.getName());
 
+  public static long getLargestTextSize() {
+    return largestTextSize;
+  }
+  
   public static HashMap<String, HashMap<String, ArrayList<String>>> parse(final File file, ErrorReport errorReport,
       LinkCollector linkCollector, RDFIndexerConfig config) throws IOException {
     RdfSource rdfSource = new RdfSource();
+    largestTextSize = 0;
     try {
       rdfSource.initialize();
     } catch (SailInitializationException e) {
@@ -107,6 +113,7 @@ public class RdfDocumentParser {
       }
     }
 
+    largestTextSize = statementHandler.getLargestTextSize();
     return docHash;
   }
 }

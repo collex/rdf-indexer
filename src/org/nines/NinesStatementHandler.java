@@ -52,6 +52,7 @@ public class NinesStatementHandler implements StatementHandler {
   private ErrorReport errorReport;
   private HttpClient httpClient;
   private String documentURI;
+  private long largestTextField = -1;
   private LinkCollector linkCollector;
   private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
   private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
@@ -261,13 +262,13 @@ public class NinesStatementHandler implements StatementHandler {
     return false;
   }
 
-  public boolean handleTitle( String predicate, String object ) {
+  public boolean handleTitle(String predicate, String object) {
     if ("http://purl.org/dc/elements/1.1/title".equals(predicate)) {
       addField(doc, "title", object);
-	  if (!title_sort_added) {
-		  addField(doc, "title_sort", object);
-		  title_sort_added = true;
-	  }
+      if (!title_sort_added) {
+        addField(doc, "title_sort", object);
+        title_sort_added = true;
+      }
       return true;
     }
     return false;
@@ -417,21 +418,15 @@ public class NinesStatementHandler implements StatementHandler {
             } else if (config.textMode == TextMode.REINDEX_FULL) {
                               
               // in re-index mode, pull existing text from solr
-              // and attempt to patch up any bad data we find
               text = getFullText(doc.get("uri").get(0), httpClient);
-              text = stripEscapeSequences(text);
-            }
+            } 
           }
         }
         
         // At this point, we have the text. Do some high-level cleanups
         // and add it to the data hashmap
         if (text.length() > 0) {
-          text = text.replaceAll("\t", " ");
-          text = text.replaceAll(" +", " ");
-          text = text.replaceAll(" \n", "\n");
-          text = text.replaceAll("\n ", "\n");
-          text = text.replaceAll("\n+", "\n");
+          this.largestTextField = Math.max(this.largestTextField, text.length());
           addFieldEntry(doc, "text", text, false);
         }
       } catch (IOException e) {
@@ -640,15 +635,23 @@ public class NinesStatementHandler implements StatementHandler {
     addFieldEntry(map,name,value, true);
   }
 
-  public static void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
+  public void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
+    
+    // clean everythign going in. No escape sequences and no witespace
+    String cleanValue = stripEscapeSequences(value);
+    cleanValue = cleanValue.replaceAll("\t", " ");
+    cleanValue = cleanValue.replaceAll("\n", " ");
+    cleanValue = cleanValue.replaceAll(" +", " ");
+    
+
     // make sure we add to array for already existing fields
     if (map.containsKey(name) && replace == false) {
       ArrayList<String> pastValues = map.get(name);
-      pastValues.add(value);
+      pastValues.add(cleanValue);
       map.put(name, pastValues);
     } else {
       ArrayList<String> values = new ArrayList<String>();
-      values.add(value);
+      values.add(cleanValue);
       map.put(name, values);
     }
   }
@@ -857,4 +860,8 @@ public class NinesStatementHandler implements StatementHandler {
 	private String removeTag(String fullText, String tag) {
 		return removeBracketed(fullText, "<" + tag, "</" + tag + ">");
 	}
+
+  public long getLargestTextSize() {
+    return this.largestTextField;
+  }
 }

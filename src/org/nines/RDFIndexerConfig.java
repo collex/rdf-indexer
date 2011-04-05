@@ -27,7 +27,7 @@ public class RDFIndexerConfig {
   
   //Modes for handling docs with ecternal text
   public enum TextMode {
-    SKIP,           // external text is ignored
+    DEBUG,          // default mode with no params. ignore all ext text
     RETRIEVE_FULL,  // retrieve full text from web
     REINDEX_FULL    // pull full text from existing index
   };
@@ -38,7 +38,7 @@ public class RDFIndexerConfig {
   public String solrBaseURL = "http://localhost:8983/solr";
   public String solrExistingIndex = "/resources";
   public boolean collectLinks = true;
-  public TextMode textMode = TextMode.SKIP;
+  public TextMode textMode = TextMode.DEBUG;
   public boolean compare = false;
   public int maxDocsPerFolder = 99999999;
   public String ignoreFields = "";

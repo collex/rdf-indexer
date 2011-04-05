@@ -53,6 +53,7 @@ public class RDFIndexer {
 
   private int numFiles = 0;
   private int numObjects = 0;
+  private long largestTextSize = 0;
   private String guid = "";
   private RDFIndexerConfig config;
   private ConcurrentLinkedQueue<File> dataFileQueue;
@@ -126,32 +127,29 @@ public class RDFIndexer {
       purgeArchive(client, archiveToCore(config.archiveName));
     }
 
-    // do the indexing if requested
-    if (config.textMode != TextMode.SKIP) {
-
-      // log text mode
-      this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text"
-          : "Offline: Not Indexing Full Text");
-
-      createGUID(config.rdfSource);
-      Date start = new Date();
-      log.info("Started indexing at " + start);
-
-      indexDirectory(config.rdfSource);
-      if (config.commitToSolr) {
-        // for (String archive : archives)
-        commitDocumentsToSolr(client, archiveToCore(config.archiveName));
-      } else {
-        log.info("Skipping Commit to SOLR...");
-      }
-
-      // report indexing time
-      Date end = new Date();
-      long duration = (end.getTime() - start.getTime()) / 60000;
-      this.log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
-      this.errorReport.close();
-      this.linkCollector.close();
+    // log text mode
+    this.log.info(config.textMode == TextMode.RETRIEVE_FULL ? "Online: Indexing Full Text"
+        : "Offline: Not Indexing Full Text");
+  
+    createGUID(config.rdfSource);
+    Date start = new Date();
+    log.info("Started indexing at " + start);
+  
+    indexDirectory(config.rdfSource);
+    if (config.commitToSolr) {
+      // for (String archive : archives)
+      commitDocumentsToSolr(client, archiveToCore(config.archiveName));
+    } else {
+      log.info("Skipping Commit to SOLR...");
     }
+  
+    // report indexing time
+    Date end = new Date();
+    long duration = (end.getTime() - start.getTime()) / 60000;
+    this.log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
+    this.log.info("Largest text field size: "+ this.largestTextSize);
+    this.errorReport.close();
+    this.linkCollector.close();
   }
 
   private void initCompareMode(final String logFileRoot) {
@@ -306,6 +304,9 @@ public class RDFIndexer {
         errorReport.flush();
         return;
       }
+      
+      // save the largest text field size
+      this.largestTextSize = Math.max(this.largestTextSize, RdfDocumentParser.getLargestTextSize());
       
       // XML doc containing rdf docs to be posted to solr
       Document solrDoc = new Document();
@@ -660,7 +661,7 @@ public class RDFIndexer {
       }
       
       // if we are indexing, make sure source is present
-      if ( config.textMode.equals(TextMode.SKIP) == false  && config.rdfSource == null) {
+      if ( config.compare == false  && config.rdfSource == null) {
         throw new ParseException("Missing required -source parameter");
       }
       
