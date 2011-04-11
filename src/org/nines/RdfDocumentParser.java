@@ -19,8 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -74,9 +72,12 @@ public class RdfDocumentParser {
 
     // parse file
     try {
-      Charset cs = Charset.availableCharsets().get("UTF-8");
-      CharsetDecoder decoder = cs.newDecoder();
-      InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
+
+      // NOTE: Removed the char set and decoder here. If it is used and the 
+      // file has an invalid character, the parsing just quits mid-stream and
+      // reports NO errror, but data is incomplete. Instead, suck all data in
+      // regardless of format and catch the bad characters elsewhere.
+      InputStreamReader is = new InputStreamReader(new FileInputStream(file));
       parser.parse(is, "http://foo/" + file.getName());
 
     } catch (ParseException e) {
