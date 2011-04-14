@@ -302,7 +302,7 @@ public class RDFIndexer {
           linkCollector, config);
 
       // Log an error for no objects abd bail if size is zero
-      if (objects.size() == 0) {
+      if (objects == null || objects.size() == 0) {
         errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
         errorReport.flush();
         return;

@@ -31,16 +31,15 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.nines.RDFIndexerConfig.TextMode;
-import org.openrdf.model.Resource;
-import org.openrdf.model.URI;
+import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
-import org.openrdf.rio.StatementHandler;
-import org.openrdf.rio.StatementHandlerException;
-import org.openrdf.sesame.sailimpl.memory.BNodeNode;
-import org.openrdf.sesame.sailimpl.memory.LiteralNode;
-import org.openrdf.sesame.sailimpl.memory.URINode;
+import org.openrdf.model.impl.BNodeImpl;
+import org.openrdf.model.impl.LiteralImpl;
+import org.openrdf.model.impl.URIImpl;
+import org.openrdf.rio.RDFHandler;
+import org.openrdf.rio.RDFHandlerException;
 
-public class NinesStatementHandler implements StatementHandler {
+public class NinesStatementHandler implements RDFHandler {
     public final static Logger log = Logger.getLogger(NinesStatementHandler.class.getName());
 
     private HashMap<String, HashMap<String, ArrayList<String>>> documents;
@@ -72,20 +71,21 @@ public class NinesStatementHandler implements StatementHandler {
         System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.commons.httpclient", "error");
     }
 
-    public void handleStatement(Resource resource, URI uri, Value value) throws StatementHandlerException {
+    public void handleStatement(Statement statement) throws RDFHandlerException {
+        
         if (ignore)
             return;
 
-        String subject = resource.toString();
-        String predicate = uri.getURI();
-        String object = value.toString().trim();
+        String subject = statement.getSubject().stringValue();
+        String predicate = statement.getPredicate().stringValue();
+        String object = statement.getObject().stringValue();
 
         // if the object of the triple is blank, skip it, it is nothing worth indexing
         if (object == null || object.length() == 0)
             return;
 
         // start of a new document
-        if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate) && resource instanceof URINode) {
+        if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate) && statement.getSubject() instanceof URIImpl ) {
             if (documents.size() >= config.maxDocsPerFolder) {
                 ignore = true;
                 log.info("*** Ignoring rest of file starting here: " + subject);
@@ -100,7 +100,6 @@ public class NinesStatementHandler implements StatementHandler {
             documents.put(subject, doc);
             title_sort_added = false;
             documentURI = subject;
-            // if( documentURI.equals("") ) documentURI = subject;
             log.info("Parsing RDF for document: " + subject);
             errorReport.flush();
         }
@@ -140,7 +139,7 @@ public class NinesStatementHandler implements StatementHandler {
         if (handleTitle(predicate, object)) return;
         if (handleAlternative(predicate, object)) return;
         if (handleGenre(predicate, object)) return;
-        if (handleDate(subject, predicate, value)) return;
+        if (handleDate(subject, predicate, statement.getObject())) return;
         if (handleDateLabel(subject, predicate, object)) return;
         if (handleSource(predicate, object)) return;
         if (handleThumbnail(predicate, object)) return;
@@ -296,8 +295,8 @@ public class NinesStatementHandler implements StatementHandler {
 
     public boolean handleDate(String subject, String predicate, Value value) {
         if ("http://purl.org/dc/elements/1.1/date".equals(predicate)) {
-            String object = value.toString().trim();
-            if (value instanceof LiteralNode) {
+            String object = value.stringValue().trim();
+            if (value instanceof LiteralImpl) {
                 // For backwards compatibility of simple <dc:date>, but also useful for cases where label and value are
                 // the same
                 if (object.matches("^[0-9]{4}.*")) {
@@ -322,7 +321,7 @@ public class NinesStatementHandler implements StatementHandler {
                     errorReport.addError(new IndexerError(filename, documentURI, "Invalid date format: " + object));
                 }
             } else {
-                BNodeNode bnode = (BNodeNode) value;
+                BNodeImpl bnode = (BNodeImpl) value;
                 dateBNodeId = bnode.getID();
             }
 
@@ -879,5 +878,21 @@ public class NinesStatementHandler implements StatementHandler {
 
     public long getLargestTextSize() {
         return this.largestTextField;
+    }
+
+    public void endRDF() throws RDFHandlerException {
+        // no-op
+    }
+
+    public void handleComment(String arg0) throws RDFHandlerException {
+        // no-op
+    }
+
+    public void handleNamespace(String arg0, String arg1) throws RDFHandlerException {
+        // no-op
+    }
+
+    public void startRDF() throws RDFHandlerException {
+        // no-op
     }
 }
