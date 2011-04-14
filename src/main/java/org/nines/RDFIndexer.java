@@ -18,6 +18,7 @@ package org.nines;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -100,7 +101,8 @@ public class RDFIndexer {
     // setup logger
     String indexLog = logFileRoot + "_progress.log";
     System.setProperty("index.log.file", indexLog);
-    DOMConfigurator.configure("log4j-index.xml");
+    URL url = ClassLoader.getSystemResource("log4j-index.xml");
+    DOMConfigurator.configure( url );
     this.log = Logger.getLogger(RDFIndexer.class.getName());
     
     // keep report file in the same folder as the log file.
@@ -161,7 +163,8 @@ public class RDFIndexer {
     System.setProperty("compare.log.file", compareLog);
     System.setProperty("compare.text.log.file", compareTxtLog);
     System.setProperty("skipped.log.file", skippedLog);
-    DOMConfigurator.configure("log4j-compare.xml");
+    URL url = ClassLoader.getSystemResource("log4j-compare.xml");
+    DOMConfigurator.configure( url );
     
     HttpClient client = new HttpClient();
 

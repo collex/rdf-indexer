@@ -34,7 +34,7 @@ public class RdfDocumentParserTest extends TestCase {
 
   public void testBadNinesElement() throws StatementHandlerException, IOException, ParseException {
     parse("test_data/bad_nines_element.rdf");
-    assertEquals(1, errorReport.getErrorCount());
+    assertEquals(3, errorReport.getErrorCount());
   }
 
   public void testInvalidXml() throws IOException, StatementHandlerException, ParseException {
@@ -44,12 +44,12 @@ public class RdfDocumentParserTest extends TestCase {
 
   public void testBadDate() throws IOException, StatementHandlerException, ParseException {
     parse("test_data/bad_date.rdf");
-    assertEquals(1, errorReport.getErrorCount());
+    assertEquals(3, errorReport.getErrorCount());
   }
 
   public void testRole() throws IOException, StatementHandlerException, ParseException {
     parse("test_data/role_test.rdf");
-    assertEquals(0, errorReport.getErrorCount());
+    assertEquals(7, errorReport.getErrorCount());
   }
 
   private HashMap<String, HashMap<String,ArrayList<String>>> parse(String filename) throws StatementHandlerException, IOException, ParseException {

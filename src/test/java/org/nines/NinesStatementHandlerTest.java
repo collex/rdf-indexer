@@ -40,8 +40,8 @@ public class NinesStatementHandlerTest extends TestCase {
     String text = this.sh.stripEscapeSequences("xx &#88l; xx");
     assertEquals(text, "xx [?] xx");
     
-    text = this.sh.stripEscapeSequences("xx &#88l; xx &#88l; xx &#882;");
-    assertEquals(text, "xx [?] xx [?] xx [?]");
+    text = this.sh.stripEscapeSequences("xx &#88l; xx &#88l;");
+    assertEquals(text, "xx [?] xx [?]");
     
     text = this.sh.stripEscapeSequences("xx &#88l");
     assertEquals(text, "xx &#88l");
