@@ -147,8 +147,12 @@ public class RDFIndexer {
   
     // report indexing time
     Date end = new Date();
-    long duration = (end.getTime() - start.getTime()) / 60000;
-    this.log.info("Indexed " + numFiles + " files (" + numObjects + " objects) in " + duration + " minutes");
+    double durationSec = (end.getTime()-start.getTime())/1000.0;
+    if (durationSec >= 60 ) {
+        this.log.info( String.format("Indexed " + numFiles + " files (" + numObjects + " objects) in %3.2f minutes.", (durationSec/60.0)));
+    } else {
+        this.log.info( String.format("Indexed " + numFiles + " files (" + numObjects + " objects) in %3.2f seconds.", durationSec));
+    }
     this.log.info("Largest text field size: "+ this.largestTextSize);
     this.errorReport.close();
     this.linkCollector.close();
@@ -256,6 +260,14 @@ public class RDFIndexer {
         IndexerThread thread = new IndexerThread(i);
         threads.add(thread);
         thread.start();
+        try {
+            // pause a bit before creating the other threads.
+            // This prevent slf4j logger init warnings that
+            // occur when all threads after the first try to
+            // init their logger whle the first is still in process
+            // of doing so
+            Thread.sleep(100);
+        } catch (InterruptedException e) {}
     }
     
     waitForIndexingThreads(threads);
