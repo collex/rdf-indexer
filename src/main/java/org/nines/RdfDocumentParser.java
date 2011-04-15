@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
-import java.nio.charset.MalformedInputException;
+import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -69,6 +69,8 @@ public class RdfDocumentParser {
         try {
             Charset cs = Charset.availableCharsets().get("UTF-8");
             CharsetDecoder decoder = cs.newDecoder();
+            decoder.onMalformedInput(CodingErrorAction.REPLACE);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
             InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
             parser.parse(is, "http://foo/" + file.getName());
 
@@ -77,10 +79,6 @@ public class RdfDocumentParser {
                     + e.getMessage()));
         } catch (RDFHandlerException e) {
             errorReport.addError(new IndexerError(file.getName(), "", "StatementHandler Exception: " + e.getMessage()));
-        } catch (MalformedInputException me) {
-            // can't continue with this; just return a null now
-            errorReport.addError(new IndexerError(file.getName(), "", "Contains invalid characters. Unable to parse"));
-            return null;
         } catch (Exception e) {
             errorReport.addError(new IndexerError(file.getName(), "", "RDF Parser Error: " + e.getMessage()));
         }
