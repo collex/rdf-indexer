@@ -54,8 +54,8 @@ public class RDFCompare {
     "author_sort", "year_sort", "source_html", "source_sgml", "person", "format", 
     "language", "geospacial", "text"));
 
-  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
-      "PQCh-EAF", "amdeveryday", "amdecj", "oldBailey" ));
+//  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
+//      "PQCh-EAF", "amdeveryday", "amdecj", "oldBailey" ));
   
   private static final ArrayList<String> REQUIRED_FIELDS = new ArrayList<String>( Arrays.asList(
       "title_sort", "title", "genre", "archive", "url", 
@@ -118,9 +118,9 @@ public class RDFCompare {
     
     // When fieldlist includes test, and the archive is one that contains
     // large text fields, limit page size to 1
-    if ( this.includesText && LARGE_TEXT_ARCHIVES.contains(config.archiveName)) {
-      size = 1;
-    }
+//    if ( this.includesText && LARGE_TEXT_ARCHIVES.contains(config.archiveName)) {
+//      size = 1;
+//    }
     
     // counts for text size
     int totalText = 0;
