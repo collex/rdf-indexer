@@ -25,7 +25,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.SimpleOrderedMap;
-
+import java.text.*;
 /**
  * RDF Compare will perform comparisions on the target arcive and the main SOLR index.
  * 
@@ -121,8 +121,38 @@ public class RDFCompare {
     if ( this.includesText && LARGE_TEXT_ARCHIVES.contains(config.archiveName)) {
       size = 1;
     }
+    
+    // counts for text size
+    int totalText = 0;
+    int maxTextSize = 0;
+    int docsWithText = 0;
+    int maxText2 = 0;
+    int maxText5 = 0;
+    int maxText10 = 0;
+    int maxText50 = 0;
+    int maxText100 = 0;
+    int maxText200 = 0;
+    int maxText500 = 0;
+    int maxText1000 = 0;
+    int maxText2000 = 0;
+    int maxText5000 = 0;
+    int maxText10000 = 0;
+    int runningText2 = 0;
+    int runningText5 = 0;
+    int runningText10 = 0;
+    int runningText50 = 0;
+    int runningText100 = 0;
+    int runningText200 = 0;
+    int runningText500 = 0;
+    int runningText1000 = 0;
+    int runningText2000 = 0;
+    int runningText5000 = 0;
+    int runningText10000 = 0;
+    int count = 0;
+    DecimalFormat df = new DecimalFormat();
+    
 
-    // read a page of docs back from index ad archive. Compare the page hits.
+    // read a page of docs back from index and archive. Compare the page hits.
     // If comparisons were complete, remove the docs from lists.
     // Repeat til all lists are gone.
     while ( done == false) {
@@ -135,8 +165,83 @@ public class RDFCompare {
           done= true;
         }
         
-        // save off te set of uris for the archived docs
+        // save off the set of uris for the archived docs
         for ( SolrDocument doc : pageHits) {
+        	int thisSize = 0;
+            if ( doc.containsKey("text")) {
+            	docsWithText++;
+                thisSize = doc.get("text").toString().length();
+                totalText += thisSize;
+                if (thisSize > maxTextSize)
+                	maxTextSize = thisSize;
+            }
+            runningText2 += thisSize;
+            runningText5 += thisSize;
+            runningText10 += thisSize;
+            runningText50 += thisSize;
+            runningText100 += thisSize;
+            runningText200 += thisSize;
+            runningText500 += thisSize;
+            runningText1000 += thisSize;
+            runningText2000 += thisSize;
+            runningText5000 += thisSize;
+            runningText10000 += thisSize;
+            count++;
+            if (count % 2 == 0) {
+            	if (runningText2 > maxText2)
+            		maxText2 = runningText2;
+            	runningText2 = 0;
+            }
+            if (count % 5 == 0) {
+            	if (runningText5 > maxText5)
+            		maxText5 = runningText5;
+            	runningText5 = 0;
+            }
+            if (count % 10 == 0) {
+            	if (runningText10 > maxText10)
+            		maxText10 = runningText10;
+            	runningText10 = 0;
+            }
+            if (count % 50 == 0) {
+            	if (runningText50 > maxText50)
+            		maxText50 = runningText50;
+            	runningText50 = 0;
+            }
+            if (count % 100 == 0) {
+            	if (runningText100 > maxText100)
+            		maxText100 = runningText100;
+            	runningText100 = 0;
+            }
+            if (count % 200 == 0) {
+            	if (runningText200 > maxText200)
+            		maxText200 = runningText200;
+            	runningText200 = 0;
+            }
+            if (count % 500 == 0) {
+            	if (runningText500 > maxText500)
+            		maxText500 = runningText500;
+            	runningText500 = 0;
+            }
+            if (count % 1000 == 0) {
+            	if (runningText1000 > maxText1000)
+            		maxText1000 = runningText1000;
+            	runningText1000 = 0;
+            }
+            if (count % 2000 == 0) {
+            	if (runningText2000 > maxText2000)
+            		maxText2000 = runningText2000;
+            	runningText2000 = 0;
+            }
+            if (count % 5000 == 0) {
+            	if (runningText5000 > maxText5000)
+            		maxText5000 = runningText5000;
+            	runningText5000 = 0;
+            }
+            if (count % 10000 == 0) {
+            	if (runningText10000 > maxText10000)
+            		maxText10000 = runningText10000;
+            	runningText10000 = 0;
+            }
           archiveDocs.add(doc);
           archiveUris.add( doc.get("uri").toString());
         }
@@ -166,8 +271,30 @@ public class RDFCompare {
         done = true;
       }
     }
+	if (runningText2 > maxText2)
+		maxText2 = runningText2;
+	if (runningText5 > maxText5)
+		maxText5 = runningText5;
+	if (runningText10 > maxText10)
+		maxText10 = runningText10;
+	if (runningText50 > maxText50)
+		maxText50 = runningText50;
+	if (runningText100 > maxText100)
+		maxText100 = runningText100;
+	if (runningText200 > maxText200)
+		maxText200 = runningText200;
+	if (runningText500 > maxText500)
+		maxText500 = runningText500;
+	if (runningText1000 > maxText1000)
+		maxText1000 = runningText1000;
+	if (runningText2000 > maxText2000)
+		maxText2000 = runningText2000;
+	if (runningText5000 > maxText5000)
+		maxText5000 = runningText5000;
+	if (runningText10000 > maxText10000)
+		maxText10000 = runningText10000;
     
-    // if theres stuff left in the archiveDocs, and we are lookin at text, dump it
+    // if there's stuff left in the archiveDocs, and we are looking at text, dump it
     if (archiveDocs.size() > 0 && this.includesText) {
       this.txtLog.info(" ============================= TEXT ADDED TO ARCHIVE ===========================");
       for (SolrDocument doc : archiveDocs) {
@@ -188,6 +315,10 @@ public class RDFCompare {
     if ( this.includesText) {
       this.txtLog.info("Total Docs Scanned: "+archiveUris.size()+". Total Errors: "+this.txtErrorCount+".");
     }
+    this.txtLog.info("Largest Text Size: "+df.format(maxTextSize)+".");
+    this.txtLog.info("Number of Docs with Text: "+df.format(docsWithText)+".");
+    this.txtLog.info("Total Text Size: "+df.format(totalText)+".");
+    this.txtLog.info("Running Text Sizes:\n2="+df.format(maxText2)+"\n5="+df.format(maxText5)+"\n10="+df.format(maxText10)+"\n50="+df.format(maxText50)+"\n100="+df.format(maxText100)+"\n200="+df.format(maxText200)+"\n500="+df.format(maxText500)+"\n1000="+df.format(maxText1000)+"\n2000="+df.format(maxText2000)+"\n5000="+df.format(maxText5000)+"\n10000="+df.format(maxText10000));
     
     Date end = new Date();
     double durationSec = (end.getTime()-start.getTime())/1000.0;
