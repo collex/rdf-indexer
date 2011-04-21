@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -26,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.openrdf.rio.ParseErrorListener;
 import org.openrdf.rio.RDFHandlerException;
@@ -63,16 +66,13 @@ public class RdfDocumentParser {
             }
         });
         parser.setVerifyData(true);
-        parser.setStopAtFirstError(true);
+        parser.setStopAtFirstError(false);
 
         // parse file
         try {
-            Charset cs = Charset.availableCharsets().get("UTF-8");
-            CharsetDecoder decoder = cs.newDecoder();
-            decoder.onMalformedInput(CodingErrorAction.REPLACE);
-            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
-            InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
-            parser.parse(is, "http://foo/" + file.getName());
+            
+            String content = validateContent(file, errorReport);
+            parser.parse( new StringReader(content), "http://foo/" + file.getName());
 
         } catch (RDFParseException e) {
             errorReport.addError(new IndexerError(file.getName(), "", "Parse Error on Line " + e.getLineNumber() + ": "
@@ -81,6 +81,7 @@ public class RdfDocumentParser {
             errorReport.addError(new IndexerError(file.getName(), "", "StatementHandler Exception: " + e.getMessage()));
         } catch (Exception e) {
             errorReport.addError(new IndexerError(file.getName(), "", "RDF Parser Error: " + e.getMessage()));
+            e.printStackTrace();
         }
 
         // retrieve parsed data
@@ -110,5 +111,40 @@ public class RdfDocumentParser {
 
         largestTextSize = statementHandler.getLargestTextSize();
         return docHash;
+    }
+
+    private static String validateContent(File file, ErrorReport errorReport) {
+        try {
+            Charset cs = Charset.availableCharsets().get("UTF-8");
+            CharsetDecoder decoder = cs.newDecoder();
+            decoder.onMalformedInput(CodingErrorAction.REPLACE);
+            decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+            
+            InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
+            String content = IOUtils.toString(is);
+
+            // look for unescaped sequences and flag them as trouble
+            String unescaped = StringEscapeUtils.unescapeXml(content);
+            int startPos = 0;
+            while ( true ) {
+              int pos = unescaped.indexOf("&#", startPos);
+              if (pos > -1) {
+                String snip = unescaped.substring(Math.max(0, pos-25), Math.min(unescaped.length(), pos+25));
+                IndexerError e = new IndexerError(file.getName(), "","Potentially Invalid Escape sequence.\n   Position: [" +
+                    pos + "]\n   Snippet: [" +
+                    snip + "]");
+                errorReport.addError(e);
+                startPos = pos+2;
+              } else {
+                break;
+              }
+            }
+            
+        
+            return content;
+        } catch (IOException e) {
+            errorReport.addError(new IndexerError(file.getName(), "", "Error validating content: " + e.getMessage()));
+        }
+        return "";
     }
 }

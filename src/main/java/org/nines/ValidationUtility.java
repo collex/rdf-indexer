@@ -23,7 +23,6 @@ import java.util.Set;
 import org.jdom.Element;
 import org.jdom.IllegalDataException;
 import org.jdom.Verifier;
-import org.jdom.output.XMLOutputter;
 
 public class ValidationUtility {
   
@@ -62,37 +61,6 @@ public class ValidationUtility {
     messages.addAll( ValidationUtility.validateRole(object));
     messages.addAll( ValidationUtility.validateUri(object));
 
-    return messages;
-  }
-  
-  /**
-   * Eaxmine final SOLR DOM. Look for any '&#' sequences in text that is not
-   * supposed to have them. Log all ocurances in error messages.
-   * 
-   * @param solrDom
-   * @return
-   */
-  public static final ArrayList<ErrorMessage> validateSolrDOM(Element solrDom){
-    
-    final XMLOutputter xmlOut = new XMLOutputter();
-    
-    ArrayList<ErrorMessage> messages = new ArrayList<ErrorMessage>();
-    String finalXmlStr = xmlOut.outputString(solrDom);
-    
-    int startPos = 0;
-    while ( true ) {
-      int pos = finalXmlStr.indexOf("&#", startPos);
-      if (pos > -1) {
-        String snip = finalXmlStr.substring(Math.max(0, pos-25), Math.min(finalXmlStr.length(), pos+25));
-        messages.add(new ErrorMessage(false, "Potentially Invalid Escape sequence.\n   Position: [" +
-            pos + "]\n   Snippet: [" +
-            snip + "]"));
-        startPos = pos+2;
-      } else {
-        break;
-      }
-    }
-    
     return messages;
   }
 

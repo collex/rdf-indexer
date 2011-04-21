@@ -25,11 +25,11 @@ import java.io.File;
  */
 public class RDFIndexerConfig {
   
-  //Modes for handling docs with ecternal text
-  public enum TextMode {
-    DEBUG,          // default mode with no params. ignore all ext text
-    RETRIEVE_FULL,  // retrieve full text from web
-    REINDEX_FULL    // pull full text from existing index
+  // indexing mode
+  public enum IndexMode {
+    TEST,       // Testing mode: ignore all ext text, dont post to solr
+    FULL,       // retrieve full text from web
+    REINDEX     // pull full text from existing index
   };
 
   public String logRoot = ".";
@@ -38,13 +38,15 @@ public class RDFIndexerConfig {
   public String solrBaseURL = "http://localhost:8983/solr";
   public String solrExistingIndex = "/resources";
   public boolean collectLinks = true;
-  public TextMode textMode = TextMode.DEBUG;
+  public IndexMode indexMode = IndexMode.TEST;
   public boolean compare = false;
-  public int maxDocsPerFolder = 99999999;
   public String ignoreFields = "";
   public String includeFields = "*";
-  public boolean commitToSolr = true;
   public boolean deleteAll = false;
   public int pageSize = 500;
-  public int numThreads = 5;
+  public long maxUploadSize = 10000000; // 10m of characters
+  
+  public final boolean isTestMode() {
+      return this.indexMode.equals(IndexMode.TEST);
+  }
 }

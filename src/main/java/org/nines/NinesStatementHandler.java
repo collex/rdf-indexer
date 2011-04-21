@@ -30,7 +30,7 @@ import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
-import org.nines.RDFIndexerConfig.TextMode;
+import org.nines.RDFIndexerConfig.IndexMode;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.BNodeImpl;
@@ -56,7 +56,6 @@ public class NinesStatementHandler implements RDFHandler {
     private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before
                                                            // giving up
     private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
-    private Boolean ignore = false;
 
     public NinesStatementHandler(ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config) {
         this.errorReport = errorReport;
@@ -72,9 +71,6 @@ public class NinesStatementHandler implements RDFHandler {
     }
 
     public void handleStatement(Statement statement) throws RDFHandlerException {
-        
-        if (ignore)
-            return;
 
         String subject = statement.getSubject().stringValue();
         String predicate = statement.getPredicate().stringValue();
@@ -86,11 +82,6 @@ public class NinesStatementHandler implements RDFHandler {
 
         // start of a new document
         if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate) && statement.getSubject() instanceof URIImpl ) {
-            if (documents.size() >= config.maxDocsPerFolder) {
-                ignore = true;
-                log.info("*** Ignoring rest of file starting here: " + subject);
-                return;
-            }
             if (documents.get(subject) != null) {
                 errorReport.addError(new IndexerError(filename, subject, "Duplicate URI"));
                 log.info("*** Duplicate: " + subject);
@@ -408,17 +399,16 @@ public class NinesStatementHandler implements RDFHandler {
                         text = "";
                     } else {
 
-                        // Two modes of operation, index and re-index. Only when indexing go
-                        // to the site and scrape text content for addition to solr
-                        if (config.textMode == TextMode.RETRIEVE_FULL) {
-
+                        if (config.indexMode.equals( IndexMode.FULL)) {
                             // Scrape content from source site. Do not attempt
                             // any corrections.
                             text = fetchContent(object);
-                        } else if (config.textMode == TextMode.REINDEX_FULL) {
-
+                        } else if (config.indexMode == IndexMode.REINDEX) {
                             // in re-index mode, pull existing text from solr
-                            text = getFullText(doc.get("uri").get(0), httpClient);
+                            text = getFullText(doc.get("uri").get(0), httpClient);                     
+                        } else {
+                            // Must be text mode. Dont get any external text
+                            text = "";
                         }
                     }
                 }
