@@ -35,21 +35,6 @@ public class NinesStatementHandlerTest extends TestCase {
     errorReport = new ErrorReport(new File("test_data","test_report.txt"));
     sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
   }
-
-  public void testReplaceSequence() {
-    String text = this.sh.stripEscapeSequences("xx &#88l; xx");
-    assertEquals(text, "xx [?] xx");
-    
-    text = this.sh.stripEscapeSequences("xx &#88l; xx &#88l;");
-    assertEquals(text, "xx [?] xx [?]");
-    
-    text = this.sh.stripEscapeSequences("xx &#88l");
-    assertEquals(text, "xx &#88l");
-    
-    text = this.sh.stripEscapeSequences("xx xx");
-    assertEquals(text, "xx xx");
-    
-  }
   public void testProblematicFullTextSource() {
 	File data = new File(System.getProperty("test.data.dir"),"test_data/problematic_full_text_source.html");
 

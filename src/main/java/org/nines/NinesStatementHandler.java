@@ -428,57 +428,6 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    /**
-     * Find any occurances of &# with a ; within 6 chars. Attempt to unescape them into a utf8 char. If this is not
-     * possibe, flag it
-     * 
-     * @param text
-     * @return
-     */
-    protected String stripEscapeSequences(String text) {
-
-        int startPos = 0;
-        while (true) {
-            int pos = text.indexOf("&#", startPos);
-            if (pos == -1) {
-                // none found. All done
-                break;
-            } else {
-                // look for a trainling ; to end the sequence
-                int pos2 = text.indexOf(";", pos);
-                if (pos2 > -1) {
-                    // this is likely an escape sequence
-                    if (pos2 <= pos + 6) {
-
-                        // grab it and attempt to unescape it into a valid char
-                        // If successful (no &# present) replace it, otherwise flag it
-                        String bad = text.substring(pos, pos2 + 1);
-                        String fixed = StringEscapeUtils.unescapeXml(bad);
-                        if (fixed.contains("&#")) {
-                            text = text.replaceAll(bad, "[?]");
-                            errorReport.addError(new IndexerError(this.filename, this.documentURI,
-                                    "Replaced potentially invalid escape sequece [" + bad + "]"));
-
-                            // skip the new [?]
-                            startPos = pos + 3;
-                        } else {
-                            text = text.replaceAll(bad, fixed);
-                        }
-                    } else {
-
-                        // no close ; found. Just skip over the &#
-                        startPos = pos + 2;
-                    }
-
-                } else {
-                    // NO ; found - skip over the &#
-                    startPos = pos + 2;
-                }
-            }
-        }
-        return text;
-    }
-
     private String getFullText(String uri, HttpClient httpclient) {
         String fullText = "";
         String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
@@ -633,7 +582,7 @@ public class NinesStatementHandler implements RDFHandler {
     public void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
 
         // clean everythign going in. No escape sequences and no whitespace
-        String cleanValue = stripEscapeSequences(value);
+        String cleanValue = StringEscapeUtils.unescapeXml(value);
         cleanValue = cleanValue.replaceAll("\t", " ");
         cleanValue = cleanValue.replaceAll("\n", " ");
         cleanValue = cleanValue.replaceAll(" +", " ");
