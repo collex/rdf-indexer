@@ -11,6 +11,11 @@
     <name>RDF Indexer</name>
     <url>http://ww.performantsoftware.com</url>
 
+	 <!-- project property settings -->
+	 <properties>
+	     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
     <!-- Organization developing the application -->
     <organization>
         <name>Performant Software</name>
