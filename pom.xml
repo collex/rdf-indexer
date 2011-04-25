@@ -115,9 +115,9 @@
             <version>1.6.1</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.solr</groupId>
-            <artifactId>solr-solrj</artifactId>
-            <version>1.4.1</version>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>1.7.1</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

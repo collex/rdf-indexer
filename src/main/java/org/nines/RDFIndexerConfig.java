@@ -27,24 +27,33 @@ public class RDFIndexerConfig {
   
   // indexing mode
   public enum IndexMode {
+    SKIP,       // Do not index
     TEST,       // Testing mode: ignore all ext text, dont post to solr
     FULL,       // retrieve full text from web
     REINDEX     // pull full text from existing index
   };
 
+  // general properties
   public String logRoot = ".";
   public File rdfSource;
   public String archiveName;
-  public String solrBaseURL = "http://localhost:8983/solr";
+  public String solrLegacyURL = "http://localhost:8983/solr";
+  public String solrBaseURL = "http://localhost:8984/solr";
   public String solrExistingIndex = "/resources";
+  
+  // indexing properties
   public boolean collectLinks = true;
-  public IndexMode indexMode = IndexMode.TEST;
+  public boolean deleteAll = false;
+  public IndexMode indexMode = IndexMode.SKIP;
+  public boolean upgadeSolr=false;      // used when reindex from solr 1.4 -> 3.1
+                                        // pulls external text from 1.4 version
+  public long maxUploadSize = 10000000; // 10m of characters
+  
+  // comparison properties
   public boolean compare = false;
   public String ignoreFields = "";
   public String includeFields = "*";
-  public boolean deleteAll = false;
   public int pageSize = 500;
-  public long maxUploadSize = 10000000; // 10m of characters
   
   public final boolean isTestMode() {
       return this.indexMode.equals(IndexMode.TEST);

@@ -1,9 +1,11 @@
 package org.nines;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -21,11 +23,11 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrDocumentList;
-import org.apache.solr.common.util.JavaBinCodec;
-import org.apache.solr.common.util.SimpleOrderedMap;
-import java.text.*;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 /**
  * RDF Compare will perform comparisions on the target arcive and the main SOLR index.
  * 
@@ -109,8 +111,8 @@ public class RDFCompare {
     // Start at beginning of list and return 500 hits at a time
     int page = 0;
     int size = this.config.pageSize;
-    List<SolrDocument> archiveDocs = new ArrayList<SolrDocument>();
-    HashMap<String, SolrDocument> indexHash = new HashMap<String, SolrDocument>();
+    List<JsonObject> archiveDocs = new ArrayList<JsonObject>();
+    HashMap<String, JsonObject> indexHash = new HashMap<String, JsonObject>();
     Set<String> indexUris = new HashSet<String>();
     Set<String> archiveUris = new HashSet<String>();
     boolean done = false;
@@ -151,6 +153,10 @@ public class RDFCompare {
     int count = 0;
     DecimalFormat df = new DecimalFormat();
     
+    String baseUrl = this.config.solrBaseURL;
+    if ( this.config.upgadeSolr) {
+        baseUrl = this.config.solrLegacyURL;
+    }
 
     // read a page of docs back from index and archive. Compare the page hits.
     // If comparisons were complete, remove the docs from lists.
@@ -160,15 +166,15 @@ public class RDFCompare {
       try {
         
         // get hits from archive, tally totals and check for end
-        List<SolrDocument> pageHits = getPageFromSolr(reindexCore, config.archiveName, page, size, fl);
+        List<JsonObject> pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName, page, size, fl);
         if (pageHits.size()  < size ){
           done= true;
         }
         
         // save off the set of uris for the archived docs
-        for ( SolrDocument doc : pageHits) {
+        for ( JsonObject doc : pageHits) {
         	int thisSize = 0;
-            if ( doc.containsKey("text")) {
+            if ( doc.has("text")) {
             	docsWithText++;
                 thisSize = doc.get("text").toString().length();
                 totalText += thisSize;
@@ -247,10 +253,10 @@ public class RDFCompare {
         }
         
         // get index docs
-        pageHits = getPageFromSolr("resources", config.archiveName, page, size, fl);
+        pageHits = getPageFromSolr(baseUrl, "resources", config.archiveName, page, size, fl);
         
         // hash the indexed docs by uri to speed stuff up
-        for ( SolrDocument doc : pageHits) {
+        for ( JsonObject doc : pageHits) {
           String uri = doc.get("uri").toString();
           indexHash.put(uri, doc);
           indexUris.add(uri);
@@ -297,10 +303,10 @@ public class RDFCompare {
     // if there's stuff left in the archiveDocs, and we are looking at text, dump it
     if (archiveDocs.size() > 0 && this.includesText) {
       this.txtLog.info(" ============================= TEXT ADDED TO ARCHIVE ===========================");
-      for (SolrDocument doc : archiveDocs) {
+      for (JsonObject doc : archiveDocs) {
         this.txtLog.info("---------------------------------------------------------------------------------------------------------------");
         this.txtLog.info(" --- " + doc.get("uri").toString() + " ---");
-        if ( doc.containsKey("text")) {
+        if ( doc.has("text")) {
           this.txtLog.info(doc.get("text").toString());
           this.txtErrorCount++;
         }
@@ -420,17 +426,17 @@ public class RDFCompare {
    * @param archiveDocs List of docs in the reindexed archive
    * @throws Exception
    */
-  private void compareLists(HashMap<String, SolrDocument>  indexHash, List<SolrDocument> archiveDocs) {
+  private void compareLists(HashMap<String, JsonObject>  indexHash, List<JsonObject> archiveDocs) {
        
     // Run thru al items in new archive. Validate correct data
     // and compare against object in original index if possible
-    Iterator<SolrDocument> itr = archiveDocs.iterator();
+    Iterator<JsonObject> itr = archiveDocs.iterator();
     while (itr.hasNext() ) {
 
       // look up the corresponding object in the original index
-      SolrDocument doc = itr.next();
+      JsonObject doc = itr.next();
       String uri = doc.get("uri").toString();
-      SolrDocument indexDoc = indexHash.get(uri);
+      JsonObject indexDoc = indexHash.get(uri);
           
       // If we have matches do the work
       if ( indexDoc != null) {
@@ -457,10 +463,10 @@ public class RDFCompare {
    * @param indexDoc
    * @param doc
    */
-  private void compareFields(String uri, SolrDocument indexDoc, SolrDocument doc) {
+  private void compareFields(String uri, JsonObject indexDoc, JsonObject doc) {
     
     // loop over all keys in doc
-    for (Entry<String, Object> entry: doc.entrySet()) {
+    for (Entry<String, JsonElement> entry: doc.entrySet()) {
       
       // get key and do special handing for text fields
       String key = entry.getKey();
@@ -473,7 +479,7 @@ public class RDFCompare {
       String newVal = toSolrString(entry.getValue());
       
       // is this a new key?
-      if ( indexDoc.containsKey(key) == false) {
+      if ( indexDoc.has(key) == false) {
         if (isIgnoredNewField(key) == false) {
           addError( uri, key+" "+newVal.replaceAll("\n", " / ")+" introduced in reindexing.");
         } 
@@ -535,7 +541,7 @@ public class RDFCompare {
     
     // now see if there are any leftover fields in indexDoc
     // log them is not reindexed
-    for (Entry<String, Object> entry: indexDoc.entrySet()) {
+    for (Entry<String, JsonElement> entry: indexDoc.entrySet()) {
       String val = entry.getValue().toString();
       String key = entry.getKey();
       if ( val.length() > 100) {
@@ -565,7 +571,7 @@ public class RDFCompare {
    * @param indexDoc
    * @param doc
    */
-  private void compareText(String uri, SolrDocument indexDoc, SolrDocument doc) {
+  private void compareText(String uri, JsonObject indexDoc, JsonObject doc) {
     
     Object newTxtObj = doc.get("text");
     Object oldTxtObj = indexDoc.get("text");
@@ -737,7 +743,7 @@ public class RDFCompare {
    * @param doc Document XML data
    * @throws Exception
    */
-  private void validateRequiredFields(SolrDocument doc)  {
+  private void validateRequiredFields(JsonObject doc)  {
 
     for ( String fieldName : REQUIRED_FIELDS) {
 
@@ -807,16 +813,16 @@ public class RDFCompare {
    * @return List of SolrDocuments
    * @throws IOException
    */
-  private final List<SolrDocument> getPageFromSolr(final String core, final String archive, 
+  private final List<JsonObject> getPageFromSolr(final String url, final String core, final String archive, 
       final int page, final int pageSize, final String fields) throws IOException {
 
     // build the request query string
     String a = URLEncoder.encode("\"" + archive + "\"", "UTF-8");
-    String query = this.config.solrBaseURL + "/" + core + "/select/?q=archive:"+a;
+    String query = url + "/" + core + "/select/?q=archive:"+a;
     query = query + "&start="+(page*pageSize)+"&rows="+pageSize;
     query = query + "&fl="+fields;
     query = query + "&sort=uri+asc";
-    query = query + "&wt=javabin";
+    query = query + "&wt=json";
     GetMethod get = new GetMethod( query );
 
     // Execute request
@@ -842,12 +848,19 @@ public class RDFCompare {
       if (result != 200) {
         throw new IOException("Non-OK response: " + result + "\n" );
       }
-
-      JavaBinCodec jbc = new JavaBinCodec();
-      @SuppressWarnings("rawtypes")
-      SimpleOrderedMap map = (SimpleOrderedMap)jbc.unmarshal( get.getResponseBodyAsStream() );
-      SolrDocumentList docList = (SolrDocumentList)map.get("response");
-      return docList;
+      
+      JsonParser parser = new JsonParser();
+      JsonElement parsed = parser.parse( new InputStreamReader(get.getResponseBodyAsStream()) );
+      JsonObject data = parsed.getAsJsonObject();
+      JsonObject re = data.get("response").getAsJsonObject();
+      JsonElement de = re.get("docs");
+      JsonArray docs = de.getAsJsonArray();
+      ArrayList<JsonObject> out = new ArrayList<JsonObject>();
+      Iterator<JsonElement> i =  docs.iterator();
+      while ( i.hasNext() ) {
+          out.add(  i.next().getAsJsonObject() );
+      }
+      return out;
 
     } finally {
       // Release current connection to the connection pool once you are done

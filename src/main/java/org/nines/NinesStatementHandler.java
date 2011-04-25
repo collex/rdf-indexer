@@ -405,7 +405,7 @@ public class NinesStatementHandler implements RDFHandler {
                             text = fetchContent(object);
                         } else if (config.indexMode == IndexMode.REINDEX) {
                             // in re-index mode, pull existing text from solr
-                            text = getFullText(doc.get("uri").get(0), httpClient);                     
+                            text = getFullText(doc.get("uri").get(0), httpClient);    
                         } else {
                             // Must be text mode. Dont get any external text
                             text = "";
@@ -430,7 +430,10 @@ public class NinesStatementHandler implements RDFHandler {
 
     private String getFullText(String uri, HttpClient httpclient) {
         String fullText = "";
-        String solrUrl = config.solrBaseURL + config.solrExistingIndex + "/select";
+        String solrUrl = this.config.solrBaseURL + this.config.solrExistingIndex + "/select";
+        if ( this.config.upgadeSolr ) {
+            solrUrl = this.config.solrLegacyURL + this.config.solrExistingIndex + "/select";
+        }
 
         GetMethod get = new GetMethod(solrUrl);
         NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
@@ -583,6 +586,7 @@ public class NinesStatementHandler implements RDFHandler {
 
         // clean everythign going in. No escape sequences and no whitespace
         String cleanValue = StringEscapeUtils.unescapeXml(value);
+        cleanValue = stripBadEscapeSequences(cleanValue);
         cleanValue = cleanValue.replaceAll("\t", " ");
         cleanValue = cleanValue.replaceAll("\n", " ");
         cleanValue = cleanValue.replaceAll(" +", " ");
@@ -590,9 +594,12 @@ public class NinesStatementHandler implements RDFHandler {
         // Look for unknown character and warn
         int pos = value.indexOf("\ufffd");
         if (pos > -1) {
+            
+            String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
             errorReport.addError(new IndexerError(filename, documentURI, 
                     "Invalid UTF-8 character at position " + pos
-                    + " of field " + name));
+                    + " of field " + name 
+                    + "\n  Snippet: ["+snip+"]"));
         }
 
         // make sure we add to array for already existing fields
@@ -605,6 +612,51 @@ public class NinesStatementHandler implements RDFHandler {
             values.add(cleanValue);
             map.put(name, values);
         }
+    }
+    
+    /**
+     * Find any occurances of &# with a ; within 6 chars. Attempt to unescape them into a utf8 char. If this is not
+     * possibe, flag it
+     * 
+     * @param text
+     * @return
+     */
+    protected String stripBadEscapeSequences(String text) {
+
+        int startPos = 0;
+        while (true) {
+            int pos = text.indexOf("&#", startPos);
+            if (pos == -1) {
+                break;
+            } else {
+                // look for a trainling ; to end the sequence
+                int pos2 = text.indexOf(";", pos);
+                if (pos2 > -1) {
+                    // this is likely an escape sequence
+                    if (pos2 <= pos + 6) {
+
+                        // dump the bad sequence
+                        String bad = text.substring(pos, pos2 + 1);
+                        text = text.replaceAll(bad, "[?]");
+                            errorReport.addError(new IndexerError(this.filename, this.documentURI,
+                                    "Replaced potentially invalid escape sequece [" + bad + "]"));
+
+                            // skip the new [?]
+                            startPos = pos + 3;
+
+                    } else {
+
+                        // no close ; found. Just skip over the &#
+                        startPos = pos + 2;
+                    }
+
+                } else {
+                    // NO ; found - skip over the &#
+                    startPos = pos + 2;
+                }
+            }
+        }
+        return text;
     }
 
     private String getFirstField(HashMap<String, ArrayList<String>> object, String field) {
