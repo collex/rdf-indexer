@@ -588,7 +588,7 @@ public class NinesStatementHandler implements RDFHandler {
         String cleanValue = StringEscapeUtils.unescapeXml(value);
         cleanValue = stripBadEscapeSequences(cleanValue);
         cleanValue = cleanValue.replaceAll("\t", " ");
-        cleanValue = cleanValue.replaceAll("\n", " ");
+        cleanValue = cleanValue.replaceAll("\n+", "\n");
         cleanValue = cleanValue.replaceAll(" +", " ");
 
         // Look for unknown character and warn
