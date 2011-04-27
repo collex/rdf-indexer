@@ -262,9 +262,6 @@ public class RDFCompare {
         // compare. This will also remove processed docs from each
         compareLists(indexHash, archiveDocs);
         
-        // dump results
-        logErrors();
-        
         // next page!!
         page++;
         
@@ -446,6 +443,9 @@ public class RDFCompare {
         // comapre all fields
         compareFields( uri, indexDoc, doc);
         
+        // dump results
+        logErrors();
+        
         // done with them
         indexHash.remove(uri);
         itr.remove();
@@ -509,7 +509,7 @@ public class RDFCompare {
             // log a summary
             addError(uri, key
                 + " mismatched: length= " + newVal.length()+" (new)"
-                + " vs. "+oldVal.length()+" (old)");
+                + " vs. "+oldVal.length()+" (old)", true);
             
             // then find first diff and log it
             String[] oldArray = oldVal.split("\n");
@@ -519,7 +519,7 @@ public class RDFCompare {
                
                 addError(uri, "        at line "+i+":\n"
                     + "\"" + newArray[i].replaceAll("\n", " / ") + "\" vs.\n" 
-                    + "\"" + oldArray[i].replaceAll("\n", " / ") + "\"");
+                    + "\"" + oldArray[i].replaceAll("\n", " / ") + "\"",true);
                 break;
               }
             }
@@ -553,13 +553,21 @@ public class RDFCompare {
    * @param data
    * @return The string data represented by the object
    */
-  private final String toSolrString(final Object obj) {
-    if ( obj instanceof List ) {
-      @SuppressWarnings("unchecked")
-      List<String> strList = (List<String>)obj;
-      return StringUtils.join(strList.iterator(), " | ");
+  private final String toSolrString(final JsonElement obj) {
+    if ( obj.isJsonArray() ) {
+
+      JsonArray jsonArray = (JsonArray)obj;
+      Iterator<JsonElement> itr = jsonArray.iterator();
+      StringBuilder out = new StringBuilder();
+      while ( itr.hasNext() ) {
+          if ( out.length() > 0 ) {
+              out.append(" | ");
+          }
+          out.append(  itr.next().getAsString() );
+      }
+      return out.toString();
     }
-    return obj.toString();
+    return obj.getAsString();
   }
   
   /**
