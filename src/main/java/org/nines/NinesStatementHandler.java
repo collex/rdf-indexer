@@ -480,7 +480,7 @@ public class NinesStatementHandler implements RDFHandler {
         fullText = replaceMatch(fullText, "&amp;", "&");
         fullText = replaceMatchOnce(fullText, "““", "“");
         fullText = replaceMatchOnce(fullText, "――", "―");
-        fullText = stripUnknownUTF8(uri, fullText);
+        fullText = stripUnknownUTF8(fullText);
         return fullText;
     }
 
@@ -751,7 +751,7 @@ public class NinesStatementHandler implements RDFHandler {
             cleanedFullText = replaceMatch(cleanedFullText, "&lt;", "<");
             cleanedFullText = replaceMatch(cleanedFullText, "&gt;", ">");
             cleanedFullText = replaceMatch(cleanedFullText, "&amp;", "&");
-            cleanedFullText = stripUnknownUTF8( url,cleanedFullText );
+            cleanedFullText = stripUnknownUTF8( cleanedFullText );
             
             return cleanedFullText;
         } finally {
@@ -759,7 +759,7 @@ public class NinesStatementHandler implements RDFHandler {
         }
     }
 
-    private String stripUnknownUTF8( String srcUri, String value) {
+    private String stripUnknownUTF8(String value) {
         // Look for unknown character and warn
         int curPos= 0;
         while ( true ) {
@@ -772,7 +772,7 @@ public class NinesStatementHandler implements RDFHandler {
             String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
             errorReport.addError(new IndexerError(filename, documentURI, 
                     "Invalid UTF-8 character at position " + pos
-                    + " of external text from "+srcUri
+                    + " of field text"
                     + "\n  Snippet: ["+snip+"]"));
                 
         }
