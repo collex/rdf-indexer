@@ -761,14 +761,22 @@ public class NinesStatementHandler implements RDFHandler {
 
     private String stripUnknownUTF8( String srcUri, String value) {
         // Look for unknown character and warn
-        int pos = value.indexOf("\ufffd");
-        if (pos > -1) {
+        int curPos= 0;
+        while ( true ) {
+            int pos = value.indexOf("\ufffd", curPos);
+            if (pos == -1) {
+                break;
+            }
+            curPos = pos+1;
             
-            this.errorReport.addError(new IndexerError(filename, documentURI, 
-                    "Stripped all unknown UTF-8 characters from " + srcUri));
-            value = value.replaceAll("\ufffd", "");
+            String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
+            errorReport.addError(new IndexerError(filename, documentURI, 
+                    "Invalid UTF-8 character at position " + pos
+                    + " of external text from "+srcUri
+                    + "\n  Snippet: ["+snip+"]"));
+                
         }
-        return value;
+        return value.replaceAll("\ufffd", "");
     }
 
     public String cleanText(String fullText, Boolean removeHtml) {
