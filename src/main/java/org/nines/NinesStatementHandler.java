@@ -431,9 +431,6 @@ public class NinesStatementHandler implements RDFHandler {
     private String getFullText(String uri, HttpClient httpclient) {
         String fullText = "";
         String solrUrl = this.config.solrBaseURL + this.config.solrExistingIndex + "/select";
-        if ( this.config.upgadeSolr ) {
-            solrUrl = this.config.solrLegacyURL + this.config.solrExistingIndex + "/select";
-        }
 
         GetMethod get = new GetMethod(solrUrl);
         NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
@@ -483,6 +480,7 @@ public class NinesStatementHandler implements RDFHandler {
         fullText = replaceMatch(fullText, "&amp;", "&");
         fullText = replaceMatchOnce(fullText, "““", "“");
         fullText = replaceMatchOnce(fullText, "――", "―");
+        fullText = stripUnknownUTF8(uri, fullText);
         return fullText;
     }
 
@@ -753,10 +751,24 @@ public class NinesStatementHandler implements RDFHandler {
             cleanedFullText = replaceMatch(cleanedFullText, "&lt;", "<");
             cleanedFullText = replaceMatch(cleanedFullText, "&gt;", ">");
             cleanedFullText = replaceMatch(cleanedFullText, "&amp;", "&");
+            cleanedFullText = stripUnknownUTF8( url,cleanedFullText );
+            
             return cleanedFullText;
         } finally {
             get.releaseConnection();
         }
+    }
+
+    private String stripUnknownUTF8( String srcUri, String value) {
+        // Look for unknown character and warn
+        int pos = value.indexOf("\ufffd");
+        if (pos > -1) {
+            
+            this.errorReport.addError(new IndexerError(filename, documentURI, 
+                    "Stripped all unknown UTF-8 characters from " + srcUri));
+            value = value.replaceAll("\ufffd", "");
+        }
+        return value;
     }
 
     public String cleanText(String fullText, Boolean removeHtml) {

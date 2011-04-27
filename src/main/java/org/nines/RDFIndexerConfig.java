@@ -37,16 +37,13 @@ public class RDFIndexerConfig {
   public String logRoot = ".";
   public File rdfSource;
   public String archiveName;
-  public String solrLegacyURL = "http://localhost:8983/solr";
-  public String solrBaseURL = "http://localhost:8984/solr";
+  public String solrBaseURL = "http://localhost:8983/solr";
   public String solrExistingIndex = "/resources";
   
   // indexing properties
   public boolean collectLinks = true;
   public boolean deleteAll = false;
   public IndexMode indexMode = IndexMode.SKIP;
-  public boolean upgadeSolr=false;      // used when reindex from solr 1.4 -> 3.1
-                                        // pulls external text from 1.4 version
   public long maxUploadSize = 10000000; // 10m of characters
   
   // comparison properties

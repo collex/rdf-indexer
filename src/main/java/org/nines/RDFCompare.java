@@ -154,9 +154,6 @@ public class RDFCompare {
     DecimalFormat df = new DecimalFormat();
     
     String baseUrl = this.config.solrBaseURL;
-    if ( this.config.upgadeSolr) {
-        baseUrl = this.config.solrLegacyURL;
-    }
 
     // read a page of docs back from index and archive. Compare the page hits.
     // If comparisons were complete, remove the docs from lists.

@@ -555,7 +555,6 @@ public class RDFIndexer {
         final String archive = "archive";       // both: REQUIRED name of archive
         final String pageSize = "pageSize";     // compare: max results per solr page
         final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
-        final String from = "from";             // both: the url of the 1.4.1 solr instance
 
         // define the list of command line options
         Options options = new Options();
@@ -581,7 +580,6 @@ public class RDFIndexer {
             "Comma separated list of fields to include in compare. Default is all."));
         options.addOptionGroup(fieldOpts);
 
-        options.addOption(from, true, "URL of the SOLR 1.4 instance");
         options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
         options.addOption(pageSize, true,
@@ -620,10 +618,6 @@ public class RDFIndexer {
             }
             
             config.deleteAll = line.hasOption(deleteFlag);
-            if ( line.hasOption(from) ) {
-                config.upgadeSolr = true;
-                config.solrLegacyURL = line.getOptionValue(from);
-            }
 
             // compare stuff
             config.compare = line.hasOption(compareFlag);
