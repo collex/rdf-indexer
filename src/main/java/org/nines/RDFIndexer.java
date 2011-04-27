@@ -314,7 +314,7 @@ public class RDFIndexer {
         this.largestTextSize = Math.max(this.largestTextSize, RdfDocumentParser.getLargestTextSize());
 
       
-        XMLOutputter outputter = new XMLOutputter(Format.getCompactFormat());
+        XMLOutputter outputter = new XMLOutputter(Format.getRawFormat());
         for (Map.Entry<String, HashMap<String, ArrayList<String>>> entry : objects.entrySet()) {
 
             this.targetArchive = "";
