@@ -173,7 +173,7 @@ public class RDFCompare {
         	int thisSize = 0;
             if ( doc.has("text")) {
             	docsWithText++;
-                thisSize = doc.get("text").toString().length();
+                thisSize = doc.get("text").getAsString().length();
                 totalText += thisSize;
                 if (thisSize > maxTextSize)
                 	maxTextSize = thisSize;
@@ -246,7 +246,7 @@ public class RDFCompare {
             	runningText10000 = 0;
             }
           archiveDocs.add(doc);
-          archiveUris.add( doc.get("uri").toString());
+          archiveUris.add( doc.get("uri").getAsString());
         }
         
         // get index docs
@@ -254,7 +254,7 @@ public class RDFCompare {
         
         // hash the indexed docs by uri to speed stuff up
         for ( JsonObject doc : pageHits) {
-          String uri = doc.get("uri").toString();
+          String uri = doc.get("uri").getAsString();
           indexHash.put(uri, doc);
           indexUris.add(uri);
         }
@@ -302,9 +302,9 @@ public class RDFCompare {
       this.txtLog.info(" ============================= TEXT ADDED TO ARCHIVE ===========================");
       for (JsonObject doc : archiveDocs) {
         this.txtLog.info("---------------------------------------------------------------------------------------------------------------");
-        this.txtLog.info(" --- " + doc.get("uri").toString() + " ---");
+        this.txtLog.info(" --- " + doc.get("uri").getAsString() + " ---");
         if ( doc.has("text")) {
-          this.txtLog.info(doc.get("text").toString());
+          this.txtLog.info(doc.get("text").getAsString());
           this.txtErrorCount++;
         }
       }
@@ -432,7 +432,7 @@ public class RDFCompare {
 
       // look up the corresponding object in the original index
       JsonObject doc = itr.next();
-      String uri = doc.get("uri").toString();
+      String uri = doc.get("uri").getAsString();
       JsonObject indexDoc = indexHash.get(uri);
           
       // If we have matches do the work
@@ -539,7 +539,7 @@ public class RDFCompare {
     // now see if there are any leftover fields in indexDoc
     // log them is not reindexed
     for (Entry<String, JsonElement> entry: indexDoc.entrySet()) {
-      String val = entry.getValue().toString();
+      String val = entry.getValue().getAsString();
       String key = entry.getKey();
       if ( val.length() > 100) {
         val = val.substring(0,100);
@@ -570,12 +570,9 @@ public class RDFCompare {
    */
   private void compareText(String uri, JsonObject indexDoc, JsonObject doc) {
     
-    Object newTxtObj = doc.get("text");
-    Object oldTxtObj = indexDoc.get("text");
+    String newTxt = doc.get("text").getAsString();
+    String oldTxt = indexDoc.get("text").getAsString();
     indexDoc.remove("text");
-    
-    String newTxt = getTextFromObject(uri, "new", newTxtObj);
-    String oldTxt = getTextFromObject(uri, "old", oldTxtObj);
     
     // log additional errors if no new text and doc is flagged
     // such that it must have text (ocr or full text)
@@ -640,29 +637,6 @@ public class RDFCompare {
       addError("txt", "Invalid bytes in text: "+ e.getMessage());
       return "** ERROR **";
     }
-  }
-
-
-  private String getTextFromObject(String uri, String prefix, Object txtObj) {
-    if ( txtObj == null) {
-      return null;
-    }
-    
-    if ( txtObj instanceof List ) {
-      @SuppressWarnings("unchecked")
-      List<String> dat = (List<String>)txtObj;
-      addError(uri, prefix+" text is an array of size "+dat.size());
-      StringBuffer sb = new StringBuffer();
-      for (String s: dat) {
-        if (sb.length() > 0) {
-          sb.append(" | ");
-        }
-        sb.append( s);
-      }
-      return sb.toString();
-    } else {
-      return txtObj.toString().trim();
-    }  
   }
  
 
@@ -746,7 +720,7 @@ public class RDFCompare {
 
       // find the first element in the correct doc that
       // has a name attribute matching the  required field
-      String uri = doc.get("uri").toString();
+      String uri = doc.get("uri").getAsString();
       Object docField = doc.get(fieldName);
       
       // make sure field is present
