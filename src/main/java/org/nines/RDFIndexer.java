@@ -258,7 +258,6 @@ public class RDFIndexer {
         if ( this.config.isTestMode() == false  ) {
             HttpClient client = new HttpClient();
             try {
-                postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>", client, this.targetArchive);
                 postToSolr("<commit/>", client, this.targetArchive);
             } catch (IOException e) {
                 this.log.error("Commit to SOLR FAILED: "+e.getMessage());
@@ -526,8 +525,6 @@ public class RDFIndexer {
         public void run() {
             try {
                 postToSolr(this.payload, this.httpClient, this.tgtArchive);
-                postToSolr("<optimize waitFlush=\"true\" waitSearcher=\"true\"/>", this.httpClient, this.tgtArchive);
-                postToSolr("<commit/>", this.httpClient, this.tgtArchive);
             } catch (IOException e) {
                 Logger.getLogger(RDFIndexer.class.getName()).error("Post to SOLR FAILED: "+e.getMessage());
                 e.printStackTrace();
@@ -646,7 +643,7 @@ public class RDFIndexer {
         try {
             new RDFIndexer(config);
         } catch (Exception e) {
-            Logger.getLogger(RDFIndexer.class.getName()).error("Inder threw exception: " + e.getMessage());
+            Logger.getLogger(RDFIndexer.class.getName()).error("Unhandled exception: " + e.toString());
         }
         System.exit(0);
     }

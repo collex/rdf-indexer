@@ -111,7 +111,6 @@ public class RDFCompare {
         HashMap<String, JsonObject> indexHash = new HashMap<String, JsonObject>();
         Set<String> indexUris = new HashSet<String>();
         Set<String> archiveUris = new HashSet<String>();
-        boolean done = false;
         String reindexCore = archiveToCoreName(this.config.archiveName);
 
         // When fieldlist includes test, and the archive is one that contains
@@ -154,106 +153,116 @@ public class RDFCompare {
         // read a page of docs back from index and archive. Compare the page hits.
         // If comparisons were complete, remove the docs from lists.
         // Repeat til all lists are gone.
-        while (done == false) {
+        boolean newDocsDone = false;
+        boolean oldDocsDone = false;
+        while (newDocsDone && oldDocsDone) {
 
+            List<JsonObject> pageHits;
             try {
 
                 // get hits from archive, tally totals and check for end
-                List<JsonObject> pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName,
-                    page, size, fl);
-                if (pageHits.size() < size) {
-                    done = true;
-                }
-
-                // save off the set of uris for the archived docs
-                for (JsonObject doc : pageHits) {
-                    int thisSize = 0;
-                    if (doc.has("text")) {
-                        docsWithText++;
-                        thisSize = doc.get("text").getAsString().length();
-                        totalText += thisSize;
-                        if (thisSize > maxTextSize)
-                            maxTextSize = thisSize;
+                if ( newDocsDone == false ) {
+                   pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName,
+                        page, size, fl);
+                    if (pageHits.size() < size) {
+                        newDocsDone = true;
                     }
-                    runningText2 += thisSize;
-                    runningText5 += thisSize;
-                    runningText10 += thisSize;
-                    runningText50 += thisSize;
-                    runningText100 += thisSize;
-                    runningText200 += thisSize;
-                    runningText500 += thisSize;
-                    runningText1000 += thisSize;
-                    runningText2000 += thisSize;
-                    runningText5000 += thisSize;
-                    runningText10000 += thisSize;
-                    count++;
-                    if (count % 2 == 0) {
-                        if (runningText2 > maxText2)
-                            maxText2 = runningText2;
-                        runningText2 = 0;
+    
+                    // save off the set of uris for the archived docs
+                    for (JsonObject doc : pageHits) {
+                        int thisSize = 0;
+                        if (doc.has("text")) {
+                            docsWithText++;
+                            thisSize = doc.get("text").getAsString().length();
+                            totalText += thisSize;
+                            if (thisSize > maxTextSize)
+                                maxTextSize = thisSize;
+                        }
+                        runningText2 += thisSize;
+                        runningText5 += thisSize;
+                        runningText10 += thisSize;
+                        runningText50 += thisSize;
+                        runningText100 += thisSize;
+                        runningText200 += thisSize;
+                        runningText500 += thisSize;
+                        runningText1000 += thisSize;
+                        runningText2000 += thisSize;
+                        runningText5000 += thisSize;
+                        runningText10000 += thisSize;
+                        count++;
+                        if (count % 2 == 0) {
+                            if (runningText2 > maxText2)
+                                maxText2 = runningText2;
+                            runningText2 = 0;
+                        }
+                        if (count % 5 == 0) {
+                            if (runningText5 > maxText5)
+                                maxText5 = runningText5;
+                            runningText5 = 0;
+                        }
+                        if (count % 10 == 0) {
+                            if (runningText10 > maxText10)
+                                maxText10 = runningText10;
+                            runningText10 = 0;
+                        }
+                        if (count % 50 == 0) {
+                            if (runningText50 > maxText50)
+                                maxText50 = runningText50;
+                            runningText50 = 0;
+                        }
+                        if (count % 100 == 0) {
+                            if (runningText100 > maxText100)
+                                maxText100 = runningText100;
+                            runningText100 = 0;
+                        }
+                        if (count % 200 == 0) {
+                            if (runningText200 > maxText200)
+                                maxText200 = runningText200;
+                            runningText200 = 0;
+                        }
+                        if (count % 500 == 0) {
+                            if (runningText500 > maxText500)
+                                maxText500 = runningText500;
+                            runningText500 = 0;
+                        }
+                        if (count % 1000 == 0) {
+                            if (runningText1000 > maxText1000)
+                                maxText1000 = runningText1000;
+                            runningText1000 = 0;
+                        }
+                        if (count % 2000 == 0) {
+                            if (runningText2000 > maxText2000)
+                                maxText2000 = runningText2000;
+                            runningText2000 = 0;
+                        }
+                        if (count % 5000 == 0) {
+                            if (runningText5000 > maxText5000)
+                                maxText5000 = runningText5000;
+                            runningText5000 = 0;
+                        }
+                        if (count % 10000 == 0) {
+                            if (runningText10000 > maxText10000)
+                                maxText10000 = runningText10000;
+                            runningText10000 = 0;
+                        }
+                        archiveDocs.add(doc);
+                        archiveUris.add(doc.get("uri").getAsString());
                     }
-                    if (count % 5 == 0) {
-                        if (runningText5 > maxText5)
-                            maxText5 = runningText5;
-                        runningText5 = 0;
-                    }
-                    if (count % 10 == 0) {
-                        if (runningText10 > maxText10)
-                            maxText10 = runningText10;
-                        runningText10 = 0;
-                    }
-                    if (count % 50 == 0) {
-                        if (runningText50 > maxText50)
-                            maxText50 = runningText50;
-                        runningText50 = 0;
-                    }
-                    if (count % 100 == 0) {
-                        if (runningText100 > maxText100)
-                            maxText100 = runningText100;
-                        runningText100 = 0;
-                    }
-                    if (count % 200 == 0) {
-                        if (runningText200 > maxText200)
-                            maxText200 = runningText200;
-                        runningText200 = 0;
-                    }
-                    if (count % 500 == 0) {
-                        if (runningText500 > maxText500)
-                            maxText500 = runningText500;
-                        runningText500 = 0;
-                    }
-                    if (count % 1000 == 0) {
-                        if (runningText1000 > maxText1000)
-                            maxText1000 = runningText1000;
-                        runningText1000 = 0;
-                    }
-                    if (count % 2000 == 0) {
-                        if (runningText2000 > maxText2000)
-                            maxText2000 = runningText2000;
-                        runningText2000 = 0;
-                    }
-                    if (count % 5000 == 0) {
-                        if (runningText5000 > maxText5000)
-                            maxText5000 = runningText5000;
-                        runningText5000 = 0;
-                    }
-                    if (count % 10000 == 0) {
-                        if (runningText10000 > maxText10000)
-                            maxText10000 = runningText10000;
-                        runningText10000 = 0;
-                    }
-                    archiveDocs.add(doc);
-                    archiveUris.add(doc.get("uri").getAsString());
                 }
 
                 // get index docs
-                pageHits = getPageFromSolr(baseUrl, "resources", config.archiveName, page, size, fl);
-
-                // hash the indexed docs by uri to speed stuff up
-                for (JsonObject doc : pageHits) {
-                    String uri = doc.get("uri").getAsString();
-                    indexHash.put(uri, doc);
-                    indexUris.add(uri);
+                if ( oldDocsDone == false ) {    
+                    pageHits = getPageFromSolr(baseUrl, "resources", config.archiveName, page, size, fl);
+                    if (pageHits.size() < size) {
+                        oldDocsDone = true;
+                    }
+    
+                    // hash the indexed docs by uri to speed stuff up
+                    for (JsonObject doc : pageHits) {
+                        String uri = doc.get("uri").getAsString();
+                        indexHash.put(uri, doc);
+                        indexUris.add(uri);
+                    }
                 }
 
                 // compare. This will also remove processed docs from each
@@ -265,7 +274,8 @@ public class RDFCompare {
             } catch (IOException e) {
                 System.err.println("Error retrieving data from solr:" + e.getMessage());
                 e.printStackTrace();
-                done = true;
+                this.log.error("Error retrieving data from solr", e);
+                break;
             }
         }
         if (runningText2 > maxText2)
