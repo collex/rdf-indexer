@@ -588,6 +588,7 @@ public class NinesStatementHandler implements RDFHandler {
         cleanValue = cleanValue.replaceAll("\t", " ");
         cleanValue = cleanValue.replaceAll("\n+", "\n");
         cleanValue = cleanValue.replaceAll(" +", " ");
+        cleanValue = cleanValue.trim();
 
         // Look for unknown character and warn
         int pos = value.indexOf("\ufffd");
