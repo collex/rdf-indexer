@@ -52,19 +52,7 @@ public class RdfDocumentParser {
         statementHandler.setFilename(file.getName());
 
         parser.setRDFHandler(statementHandler);
-        parser.setParseErrorListener(new ParseErrorListener() {
-            public void warning(String string, int i, int i1) {
-                log.info("warning = " + string);
-            }
-
-            public void error(String string, int i, int i1) {
-                log.info("error = " + string);
-            }
-
-            public void fatalError(String string, int i, int i1) {
-                log.info("fatalError = " + string);
-            }
-        });
+        parser.setParseErrorListener( new ParseListener(file, errorReport));
         parser.setVerifyData(true);
         parser.setStopAtFirstError(false);
 
@@ -146,5 +134,31 @@ public class RdfDocumentParser {
             errorReport.addError(new IndexerError(file.getName(), "", "Error validating content: " + e.getMessage()));
         }
         return "";
+    }
+    
+    private static final class ParseListener implements ParseErrorListener {
+
+        private ErrorReport errorReport;
+        private File file;
+        
+        ParseListener(File file, ErrorReport errorReport ) {
+            this.errorReport   = errorReport;
+            this.file = file;
+        }
+        public void warning(String msg, int lineNo, int colNo) {
+            this.errorReport.addError(new IndexerError(file.getName(), "", 
+                "Parse warning at line "+lineNo+", col "+colNo+" : " + msg));   
+        }
+
+        public void error(String msg, int lineNo, int colNo) {
+            this.errorReport.addError(new IndexerError(file.getName(), "", 
+                "Parse error at line "+lineNo+", col "+colNo+" : " + msg)); 
+        }
+
+        public void fatalError(String msg, int lineNo, int colNo) {
+            this.errorReport.addError(new IndexerError(file.getName(), "", 
+                "FATAL PARSE ERROR at line "+lineNo+", col "+colNo+" : " + msg)); 
+        }
+        
     }
 }
