@@ -139,7 +139,7 @@ public class RDFCompare {
         // Repeat til all lists are gone.
         boolean archiveDone = false;
         boolean indexDone = false;
-        while (archiveDone == false && indexDone == false) {
+        while ( true ) {
             List<JsonObject> pageHits = null;
 
             // get hits from archive, tally totals and check for end
@@ -234,6 +234,9 @@ public class RDFCompare {
             // get index docs
             if ( indexDone == false) {
                 pageHits = this.solrClient.getResultsPage( "resources", config.archiveName, page, size, fl);
+                if (pageHits.size() < size) {
+                    indexDone = true;
+                }
 
                 // hash the indexed docs by uri to speed stuff up
                 for (JsonObject doc : pageHits) {
@@ -246,8 +249,12 @@ public class RDFCompare {
             // compare. This will also remove processed docs from each
             compareLists(indexHash, archiveDocs);
 
-            // next page!!
-            page++;
+            // next page?
+            if ( archiveDone == true && indexDone == true ) {
+                break;
+            } else {
+                page++;
+            } 
         }
             
         if (runningText2 > maxText2)
@@ -308,9 +315,9 @@ public class RDFCompare {
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            logInfo(String.format("Finished in %3.2f minutes.", (durationSec / 60.0)));
+            logInfo(String.format("JAVA Finished in %3.2f minutes.", (durationSec / 60.0)));
         } else {
-            logInfo(String.format("Finished in %3.2f seconds.", durationSec));
+            logInfo(String.format("JAVA Finished in %3.2f seconds.", durationSec));
         }
 
         // now check for skipped stuff
