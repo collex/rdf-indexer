@@ -153,19 +153,18 @@ public class RDFCompare {
         // read a page of docs back from index and archive. Compare the page hits.
         // If comparisons were complete, remove the docs from lists.
         // Repeat til all lists are gone.
-        boolean newDocsDone = false;
-        boolean oldDocsDone = false;
-        while (newDocsDone && oldDocsDone) {
-
-            List<JsonObject> pageHits;
+        boolean archiveDone = false;
+        boolean indexDone = false;
+        while (archiveDone == false && indexDone == false) {
+            List<JsonObject> pageHits = null;
             try {
 
                 // get hits from archive, tally totals and check for end
-                if ( newDocsDone == false ) {
-                   pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName,
+                if ( archiveDone == false ) {
+                    pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName,
                         page, size, fl);
                     if (pageHits.size() < size) {
-                        newDocsDone = true;
+                        archiveDone = true;
                     }
     
                     // save off the set of uris for the archived docs
@@ -251,11 +250,8 @@ public class RDFCompare {
                 }
 
                 // get index docs
-                if ( oldDocsDone == false ) {    
+                if ( indexDone == false) {
                     pageHits = getPageFromSolr(baseUrl, "resources", config.archiveName, page, size, fl);
-                    if (pageHits.size() < size) {
-                        oldDocsDone = true;
-                    }
     
                     // hash the indexed docs by uri to speed stuff up
                     for (JsonObject doc : pageHits) {
@@ -274,7 +270,7 @@ public class RDFCompare {
             } catch (IOException e) {
                 System.err.println("Error retrieving data from solr:" + e.getMessage());
                 e.printStackTrace();
-                this.log.error("Error retrieving data from solr", e);
+                log.error("Error retrieving data from solr:", e);
                 break;
             }
         }
