@@ -1,10 +1,8 @@
 package org.nines;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,16 +16,12 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 /**
  * RDF Compare will perform comparisions on the target arcive and the main SOLR index.
@@ -42,10 +36,10 @@ public class RDFCompare {
     private Logger log;
     private Logger txtLog;
     private PrintStream sysOut;
-    private HttpClient httpClient;
     private LinkedHashMap<String, List<String>> errors = new LinkedHashMap<String, List<String>>();
     private int errorCount = 0;
     private int txtErrorCount = 0;
+    private SolrClient solrClient;
 
     // all of the solr instance fields. Text is the last field
     private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>(Arrays.asList("uri", "archive",
@@ -60,11 +54,6 @@ public class RDFCompare {
 
     private static final ArrayList<String> REQUIRED_FIELDS = new ArrayList<String>(Arrays.asList("title_sort", "title",
         "genre", "archive", "url", "federation", "year_sort", "freeculture", "is_ocr"));
-
-    // Static connecton config
-    private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before giving up
-    private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
-    private static final int HTTP_CLIENT_TIMEOUT = 2 * 60 * 1000; // 2 minutes
 
     /**
      * Construct an instance of the RDFCompare with the specified config
@@ -86,10 +75,7 @@ public class RDFCompare {
         }
 
         // init the solr connection
-        this.httpClient = new HttpClient();
-        this.httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-        this.httpClient.getHttpConnectionManager().getParams()
-            .setIntParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
+        this.solrClient = new SolrClient(this.config.solrBaseURL);
     }
 
     /**
@@ -148,8 +134,6 @@ public class RDFCompare {
         int count = 0;
         DecimalFormat df = new DecimalFormat();
 
-        String baseUrl = this.config.solrBaseURL;
-
         // read a page of docs back from index and archive. Compare the page hits.
         // If comparisons were complete, remove the docs from lists.
         // Repeat til all lists are gone.
@@ -157,123 +141,115 @@ public class RDFCompare {
         boolean indexDone = false;
         while (archiveDone == false && indexDone == false) {
             List<JsonObject> pageHits = null;
-            try {
 
-                // get hits from archive, tally totals and check for end
-                if ( archiveDone == false ) {
-                    pageHits = getPageFromSolr(this.config.solrBaseURL, reindexCore, config.archiveName,
-                        page, size, fl);
-                    if (pageHits.size() < size) {
-                        archiveDone = true;
-                    }
-    
-                    // save off the set of uris for the archived docs
-                    for (JsonObject doc : pageHits) {
-                        int thisSize = 0;
-                        if (doc.has("text")) {
-                            docsWithText++;
-                            thisSize = doc.get("text").getAsString().length();
-                            totalText += thisSize;
-                            if (thisSize > maxTextSize)
-                                maxTextSize = thisSize;
-                        }
-                        runningText2 += thisSize;
-                        runningText5 += thisSize;
-                        runningText10 += thisSize;
-                        runningText50 += thisSize;
-                        runningText100 += thisSize;
-                        runningText200 += thisSize;
-                        runningText500 += thisSize;
-                        runningText1000 += thisSize;
-                        runningText2000 += thisSize;
-                        runningText5000 += thisSize;
-                        runningText10000 += thisSize;
-                        count++;
-                        if (count % 2 == 0) {
-                            if (runningText2 > maxText2)
-                                maxText2 = runningText2;
-                            runningText2 = 0;
-                        }
-                        if (count % 5 == 0) {
-                            if (runningText5 > maxText5)
-                                maxText5 = runningText5;
-                            runningText5 = 0;
-                        }
-                        if (count % 10 == 0) {
-                            if (runningText10 > maxText10)
-                                maxText10 = runningText10;
-                            runningText10 = 0;
-                        }
-                        if (count % 50 == 0) {
-                            if (runningText50 > maxText50)
-                                maxText50 = runningText50;
-                            runningText50 = 0;
-                        }
-                        if (count % 100 == 0) {
-                            if (runningText100 > maxText100)
-                                maxText100 = runningText100;
-                            runningText100 = 0;
-                        }
-                        if (count % 200 == 0) {
-                            if (runningText200 > maxText200)
-                                maxText200 = runningText200;
-                            runningText200 = 0;
-                        }
-                        if (count % 500 == 0) {
-                            if (runningText500 > maxText500)
-                                maxText500 = runningText500;
-                            runningText500 = 0;
-                        }
-                        if (count % 1000 == 0) {
-                            if (runningText1000 > maxText1000)
-                                maxText1000 = runningText1000;
-                            runningText1000 = 0;
-                        }
-                        if (count % 2000 == 0) {
-                            if (runningText2000 > maxText2000)
-                                maxText2000 = runningText2000;
-                            runningText2000 = 0;
-                        }
-                        if (count % 5000 == 0) {
-                            if (runningText5000 > maxText5000)
-                                maxText5000 = runningText5000;
-                            runningText5000 = 0;
-                        }
-                        if (count % 10000 == 0) {
-                            if (runningText10000 > maxText10000)
-                                maxText10000 = runningText10000;
-                            runningText10000 = 0;
-                        }
-                        archiveDocs.add(doc);
-                        archiveUris.add(doc.get("uri").getAsString());
-                    }
+            // get hits from archive, tally totals and check for end
+            if ( archiveDone == false ) {
+                pageHits = this.solrClient.getResultsPage(reindexCore, config.archiveName, page, size, fl);
+                if (pageHits.size() < size) {
+                    archiveDone = true;
                 }
 
-                // get index docs
-                if ( indexDone == false) {
-                    pageHits = getPageFromSolr(baseUrl, "resources", config.archiveName, page, size, fl);
-    
-                    // hash the indexed docs by uri to speed stuff up
-                    for (JsonObject doc : pageHits) {
-                        String uri = doc.get("uri").getAsString();
-                        indexHash.put(uri, doc);
-                        indexUris.add(uri);
+                // save off the set of uris for the archived docs
+                for (JsonObject doc : pageHits) {
+                    int thisSize = 0;
+                    if (doc.has("text")) {
+                        docsWithText++;
+                        thisSize = doc.get("text").getAsString().length();
+                        totalText += thisSize;
+                        if (thisSize > maxTextSize)
+                            maxTextSize = thisSize;
                     }
+                    runningText2 += thisSize;
+                    runningText5 += thisSize;
+                    runningText10 += thisSize;
+                    runningText50 += thisSize;
+                    runningText100 += thisSize;
+                    runningText200 += thisSize;
+                    runningText500 += thisSize;
+                    runningText1000 += thisSize;
+                    runningText2000 += thisSize;
+                    runningText5000 += thisSize;
+                    runningText10000 += thisSize;
+                    count++;
+                    if (count % 2 == 0) {
+                        if (runningText2 > maxText2)
+                            maxText2 = runningText2;
+                        runningText2 = 0;
+                    }
+                    if (count % 5 == 0) {
+                        if (runningText5 > maxText5)
+                            maxText5 = runningText5;
+                        runningText5 = 0;
+                    }
+                    if (count % 10 == 0) {
+                        if (runningText10 > maxText10)
+                            maxText10 = runningText10;
+                        runningText10 = 0;
+                    }
+                    if (count % 50 == 0) {
+                        if (runningText50 > maxText50)
+                            maxText50 = runningText50;
+                        runningText50 = 0;
+                    }
+                    if (count % 100 == 0) {
+                        if (runningText100 > maxText100)
+                            maxText100 = runningText100;
+                        runningText100 = 0;
+                    }
+                    if (count % 200 == 0) {
+                        if (runningText200 > maxText200)
+                            maxText200 = runningText200;
+                        runningText200 = 0;
+                    }
+                    if (count % 500 == 0) {
+                        if (runningText500 > maxText500)
+                            maxText500 = runningText500;
+                        runningText500 = 0;
+                    }
+                    if (count % 1000 == 0) {
+                        if (runningText1000 > maxText1000)
+                            maxText1000 = runningText1000;
+                        runningText1000 = 0;
+                    }
+                    if (count % 2000 == 0) {
+                        if (runningText2000 > maxText2000)
+                            maxText2000 = runningText2000;
+                        runningText2000 = 0;
+                    }
+                    if (count % 5000 == 0) {
+                        if (runningText5000 > maxText5000)
+                            maxText5000 = runningText5000;
+                        runningText5000 = 0;
+                    }
+                    if (count % 10000 == 0) {
+                        if (runningText10000 > maxText10000)
+                            maxText10000 = runningText10000;
+                        runningText10000 = 0;
+                    }
+                    archiveDocs.add(doc);
+                    archiveUris.add(doc.get("uri").getAsString());
                 }
-
-                // compare. This will also remove processed docs from each
-                compareLists(indexHash, archiveDocs);
-
-                // next page!!
-                page++;
-
-            } catch (IOException e) {
-                System.err.println("Error retrieving data from solr:" + e.getMessage());
-                e.printStackTrace();
-                log.error("Error retrieving data from solr:", e);
-                break;
             }
+
+            // get index docs
+            if ( indexDone == false) {
+                pageHits = this.solrClient.getResultsPage( "resources", config.archiveName, page, size, fl);
+
+                // hash the indexed docs by uri to speed stuff up
+                for (JsonObject doc : pageHits) {
+                    String uri = doc.get("uri").getAsString();
+                    indexHash.put(uri, doc);
+                    indexUris.add(uri);
+                }
+            }
+
+            // compare. This will also remove processed docs from each
+            compareLists(indexHash, archiveDocs);
+
+            // next page!!
+            page++;
         }
+            
         if (runningText2 > maxText2)
             maxText2 = runningText2;
         if (runningText5 > maxText5)
@@ -791,70 +767,5 @@ public class RDFCompare {
      */
     private final String archiveToCoreName(final String archive) {
         return "archive_" + archive.replace(":", "_").replace(" ", "_").replace(",", "_");
-    }
-
-    /**
-     * Get one page of documents from solr
-     * @param core The SOLR core to search
-     * @param archive The SOLR archive to use
-     * @param page Starting page number
-     * @param pageSize Maximum hits to return
-     * @param fields List of fields to return
-     * @return List of SolrDocuments
-     * @throws IOException
-     */
-    private final List<JsonObject> getPageFromSolr(final String url, final String core, final String archive,
-        final int page, final int pageSize, final String fields) throws IOException {
-
-        // build the request query string
-        String a = URLEncoder.encode("\"" + archive + "\"", "UTF-8");
-        String query = url + "/" + core + "/select/?q=archive:" + a;
-        query = query + "&start=" + (page * pageSize) + "&rows=" + pageSize;
-        query = query + "&fl=" + fields;
-        query = query + "&sort=uri+asc";
-        query = query + "&wt=json";
-        GetMethod get = new GetMethod(query);
-
-        // Execute request
-        try {
-            int result;
-            int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-            do {
-                result = this.httpClient.executeMethod(get);
-                if (result != 200) {
-                    try {
-                        Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                        log.info(">>>> postToSolr error in archive " + archive + ": " + result + " (retrying...)");
-                    } catch (InterruptedException e) {
-                        log.info(">>>> Thread Interrupted");
-                    }
-                } else {
-                    if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES)
-                        log.info(">>>> postToSolr: " + archive + ":  (succeeded!)");
-                }
-                solrRequestNumRetries--;
-            } while (result != 200 && solrRequestNumRetries > 0);
-
-            if (result != 200) {
-                throw new IOException("Non-OK response: " + result + "\n");
-            }
-
-            JsonParser parser = new JsonParser();
-            JsonElement parsed = parser.parse(new InputStreamReader(get.getResponseBodyAsStream()));
-            JsonObject data = parsed.getAsJsonObject();
-            JsonObject re = data.get("response").getAsJsonObject();
-            JsonElement de = re.get("docs");
-            JsonArray docs = de.getAsJsonArray();
-            ArrayList<JsonObject> out = new ArrayList<JsonObject>();
-            Iterator<JsonElement> i = docs.iterator();
-            while (i.hasNext()) {
-                out.add(i.next().getAsJsonObject());
-            }
-            return out;
-
-        } finally {
-            // Release current connection to the connection pool once you are done
-            get.releaseConnection();
-        }
     }
 }

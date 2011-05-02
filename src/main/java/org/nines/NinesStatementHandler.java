@@ -23,10 +23,7 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.StringTokenizer;
 
-import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.NameValuePair;
-import org.apache.commons.httpclient.NoHttpResponseException;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
@@ -53,9 +50,6 @@ public class NinesStatementHandler implements RDFHandler {
     private String documentURI;
     private long largestTextField = -1;
     private LinkCollector linkCollector;
-    private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before
-                                                           // giving up
-    private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
 
     public NinesStatementHandler(ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config) {
         this.errorReport = errorReport;
@@ -429,59 +423,28 @@ public class NinesStatementHandler implements RDFHandler {
     }
 
     private String getFullText(String uri, HttpClient httpclient) {
-        String fullText = "";
-        String solrUrl = this.config.solrBaseURL + this.config.solrExistingIndex + "/select";
 
-        GetMethod get = new GetMethod(solrUrl);
-        NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
-        NameValuePair fieldsParam = new NameValuePair("fl", "text");
-        NameValuePair params[] = new NameValuePair[] { queryParam, fieldsParam };
-        get.setQueryString(params);
-
-        int result;
         try {
-            int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-            do {
-                result = httpclient.executeMethod(get);
-                solrRequestNumRetries--;
-                if (result != 200) {
-                    try {
-                        Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                    } catch (InterruptedException e) {
-                        log.info(">>>> Thread Interrupted");
-                    }
-                }
-            } while (result != 200 && solrRequestNumRetries > 0);
-
-            if (result != 200) {
-                errorReport.addError(new IndexerError("", "", "cannot reach URL: " + solrUrl));
-            }
-
-            fullText = RDFIndexer.getResponseString(get);
-
+            SolrClient solr = new SolrClient( this.config.solrBaseURL );
+            String fullText = solr.getFullText(uri, this.config.solrExistingIndex);
+            
             String start = "<arr name=\"text\"><str>";
             String stop = "</str></arr>";
             fullText = trimBracketed(fullText, start, stop);
-
-        } catch (NoHttpResponseException e) {
-            errorReport.addError(new IndexerError("", "", "The SOLR server didn't respond to the http request to: "
-                    + solrUrl));
-        } catch (ConnectTimeoutException e) {
-            errorReport.addError(new IndexerError("", "", "The SOLR server timed out on the http request to: "
-                    + solrUrl));
+            
+            fullText = replaceMatch(fullText, "&lt;", "<");
+            fullText = replaceMatch(fullText, "&gt;", ">");
+            fullText = replaceMatch(fullText, "&amp;", "&");
+            fullText = replaceMatchOnce(fullText, "““", "“");
+            fullText = replaceMatchOnce(fullText, "――", "―");
+            fullText = stripUnknownUTF8(fullText);
+            return fullText;
+            
         } catch (IOException e) {
-            errorReport.addError(new IndexerError("", "", "An IO Error occurred attempting to access: " + solrUrl));
-        } finally {
-            get.releaseConnection();
-        }
-
-        fullText = replaceMatch(fullText, "&lt;", "<");
-        fullText = replaceMatch(fullText, "&gt;", ">");
-        fullText = replaceMatch(fullText, "&amp;", "&");
-        fullText = replaceMatchOnce(fullText, "““", "“");
-        fullText = replaceMatchOnce(fullText, "――", "―");
-        fullText = stripUnknownUTF8(fullText);
-        return fullText;
+            errorReport.addError(new IndexerError("", "", "Unable to get full text for "+uri
+                +": " +e.toString() ));
+            return "";
+        } 
     }
 
     public boolean handleRole(String predicate, String object) {

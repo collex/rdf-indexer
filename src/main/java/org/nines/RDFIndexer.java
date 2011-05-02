@@ -17,7 +17,6 @@ package org.nines;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,8 +27,6 @@ import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -39,13 +36,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.jdom.Element;
@@ -68,11 +58,7 @@ public class RDFIndexer {
     private StringBuilder solrXmlPayload;
     private int docCount = 0;
     private String targetArchive;
-
-    private static final int SOLR_REQUEST_NUM_RETRIES = 5; // how many times we should try to connect with solr before
-                                                           // giving up
-    private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; // milliseconds
-    public static final int HTTP_CLIENT_TIMEOUT = 2 * 60 * 1000; // 2 minutes
+    private SolrClient solrClient; 
 
     /**
      * 
@@ -119,18 +105,17 @@ public class RDFIndexer {
         }
 
         this.linkCollector = new LinkCollector(logFileRoot);
-
-        HttpClient client = new HttpClient();
+        this.solrClient = new SolrClient(this.config.solrBaseURL);
 
         try {
-            beSureCoreExists(client, archiveToCore(config.archiveName));
+            this.solrClient.validateCore( archiveToCore(config.archiveName) );
         } catch (IOException e) {
             this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
         }
 
         // if a purge was requested, do it first
         if (config.deleteAll) {
-            purgeArchive(client, archiveToCore(config.archiveName));
+            purgeArchive( archiveToCore(config.archiveName));
         }
 
         // log text mode
@@ -177,24 +162,15 @@ public class RDFIndexer {
         URL url = ClassLoader.getSystemResource("log4j-compare.xml");
         DOMConfigurator.configure(url);
 
-        HttpClient client = new HttpClient();
-
-        try {
-            beSureCoreExists(client, archiveToCore(config.archiveName));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
-
         RDFCompare rdfCompare = new RDFCompare(config);
         rdfCompare.compareArchive();
     }
 
-    private void purgeArchive(HttpClient client, final String coreName) {
+    private void purgeArchive(final String coreName) {
         log.info("DELETING ALL INDEX DATA FROM CORE: " + coreName);
         try {
-            postToSolr("<delete><query>*:*</query></delete>", client, coreName);
-            postToSolr("<commit/>", client, coreName);
+            this.solrClient.post("<delete><query>*:*</query></delete>", coreName);
+            this.solrClient.post("<commit/>", coreName);
         } catch (IOException e) {
             errorReport.addError(new IndexerError("", "", "Unable to POST DELETE message to SOLR. "
                 + e.getLocalizedMessage()));
@@ -256,9 +232,8 @@ public class RDFIndexer {
         }
         
         if ( this.config.isTestMode() == false  ) {
-            HttpClient client = new HttpClient();
             try {
-                postToSolr("<commit/>", client, this.targetArchive);
+                this.solrClient.post("<commit/>", this.targetArchive);
             } catch (IOException e) {
                 this.log.error("Commit to SOLR FAILED: "+e.getMessage());
             }
@@ -368,115 +343,6 @@ public class RDFIndexer {
         this.errorReport.flush();
     }
 
-    private void beSureCoreExists(HttpClient httpclient, String core) throws IOException {
-        GetMethod request = new GetMethod(config.solrBaseURL + "/admin/cores?action=STATUS");
-
-        httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-        httpclient.getHttpConnectionManager().getParams()
-            .setIntParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
-
-        // Execute request
-        try {
-            int result;
-            int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-            do {
-                result = httpclient.executeMethod(request);
-                solrRequestNumRetries--;
-                if (result != 200) {
-                    try {
-                        Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                        log.info(">>>> postToSolr error: " + result + " (retrying...)");
-                        log.info(">>>> getting core information");
-                    } catch (InterruptedException e) {
-                        log.info(">>>> Thread Interrupted");
-                    }
-                }
-            } while (result != 200 && solrRequestNumRetries > 0);
-
-            if (result != 200) {
-                throw new IOException("Non-OK response: " + result + "\n\n");
-            }
-            String response = RDFIndexer.getResponseString(request);
-            int exists = response.indexOf(">" + core + "<");
-            if (exists <= 0) {
-                // The core doesn't exist: create it.
-                request = new GetMethod(config.solrBaseURL + "/admin/cores?action=CREATE&name=" + core
-                    + "&instanceDir=.");
-                result = httpclient.executeMethod(request);
-                log.info(">>>> Created core: " + core);
-                try {
-                    Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                } catch (InterruptedException e) {
-                    log.info(">>>> Thread Interrupted");
-                }
-            }
-        } finally {
-            // Release current connection to the connection pool once you are done
-            request.releaseConnection();
-        }
-    }
-
-    /**
-     * Get the response body string from the HttpMethod. Internally uses getResponseBodyAsStream.
-     * 
-     * @param httpMethod
-     * @return The response body string
-     * 
-     * @throws IOException
-     */
-    public static final String getResponseString(HttpMethod httpMethod) throws IOException {
-        InputStream is = httpMethod.getResponseBodyAsStream();
-        return IOUtils.toString(is, "UTF-8");
-    }
-
-    public void postToSolr(String xml, HttpClient httpclient, String archive) throws IOException {
-
-        PostMethod post = new PostMethod(config.solrBaseURL + "/" + archive + "/update");
-        post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
-        post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
-
-        httpclient.getHttpConnectionManager().getParams().setConnectionTimeout(HTTP_CLIENT_TIMEOUT);
-        httpclient.getHttpConnectionManager().getParams()
-            .setIntParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
-        // Execute request
-        try {
-            int result;
-            int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
-            do {
-                result = httpclient.executeMethod(post);
-                if (result != 200) {
-                    try {
-                        Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                        log.info(">>>> postToSolr error in archive " + archive + ": " + result + " (retrying...)");
-                    } catch (InterruptedException e) {
-                        log.info(">>>> Thread Interrupted");
-                    }
-                } else {
-                    if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES)
-                        log.info(">>>> postToSolr: " + archive + ":  (succeeded!)");
-                }
-                solrRequestNumRetries--;
-            } while (result != 200 && solrRequestNumRetries > 0);
-
-            if (result != 200) {
-                throw new IOException("Non-OK response: " + result + "\n\n" + xml);
-            }
-            String response = RDFIndexer.getResponseString(post);
-            Pattern pattern = Pattern.compile("status=\\\"(\\d*)\\\">(.*)\\<\\/result\\>", Pattern.DOTALL);
-            Matcher matcher = pattern.matcher(response);
-            while (matcher.find()) {
-                String status = matcher.group(1);
-                String message = matcher.group(2);
-                if (!"0".equals(status)) {
-                    throw new IOException(message);
-                }
-            }
-        } finally {
-            // Release current connection to the connection pool once you are done
-            post.releaseConnection();
-        }
-    }
-
     private Element convertObjectToSolrDOM(String documentName, HashMap<String, ArrayList<String>> fields) {
 
         Element doc = new Element("doc");
@@ -510,13 +376,11 @@ public class RDFIndexer {
      */
     private class SolrWorker implements Runnable {
 
-        private HttpClient httpClient;
         private final String payload;
         private final String tgtArchive;
         
         public SolrWorker( final StringBuilder data, final String tgtArchive, int docCnt ) {
             this.tgtArchive = tgtArchive;
-            this.httpClient = new HttpClient();
             this.payload = "<add>" + data.toString() + "</add>";
             
             log.info("  posting: payload size " + this.payload.length() 
@@ -524,7 +388,7 @@ public class RDFIndexer {
         }
         public void run() {
             try {
-                postToSolr(this.payload, this.httpClient, this.tgtArchive);
+                solrClient.post(this.payload, this.tgtArchive);
             } catch (IOException e) {
                 Logger.getLogger(RDFIndexer.class.getName()).error("Post to SOLR FAILED: "+e.getMessage());
                 e.printStackTrace();
