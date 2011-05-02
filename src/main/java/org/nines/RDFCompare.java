@@ -2,6 +2,8 @@ package org.nines;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -432,7 +434,14 @@ public class RDFCompare {
                 }
 
                 // comapre all fields
-                compareFields(uri, indexDoc, doc);
+                try {
+                    compareFields(uri, indexDoc, doc);
+                } catch (Exception e) {
+                    addError(uri, "Threw exception during compareFields: "+e.toString() );
+                    StringWriter sw = new StringWriter();
+                    e.printStackTrace( new PrintWriter(sw) );
+                    addError(uri, "Stack Trace:\n\n"+sw.toString());
+                }
 
                 // dump results
                 logErrors();
@@ -529,7 +538,7 @@ public class RDFCompare {
         // now see if there are any leftover fields in indexDoc
         // log them is not reindexed
         for (Entry<String, JsonElement> entry : indexDoc.entrySet()) {
-            String val = entry.getValue().getAsString();
+            String val = toSolrString(entry.getValue());
             String key = entry.getKey();
             if (val.length() > 100) {
                 val = val.substring(0, 100);
