@@ -231,6 +231,13 @@ public class RDFIndexer {
             this.solrExecutorService.execute( new SolrWorker(this.solrXmlPayload, this.targetArchive, this.docCount) );
         }
         
+        // signal shutdown and wait until it is comlete
+        this.solrExecutorService.shutdown();
+        try {
+            this.solrExecutorService.awaitTermination(15, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {}
+        
+        // Now that all workers re finished, it is safe to commit
         if ( this.config.isTestMode() == false  ) {
             try {
                 this.solrClient.post("<commit/>", this.targetArchive);
@@ -238,12 +245,6 @@ public class RDFIndexer {
                 this.log.error("Commit to SOLR FAILED: "+e.getMessage());
             }
         }
-        
-        // signal shutdown and wait unti it is comlete
-        this.solrExecutorService.shutdown();
-        try {
-            this.solrExecutorService.awaitTermination(10, TimeUnit.MINUTES);
-        } catch (InterruptedException e) {}
     }
     
     private boolean postThresholdMet() {
