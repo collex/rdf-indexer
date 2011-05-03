@@ -395,6 +395,7 @@ public class RDFIndexer {
         final String logDir = "logDir";         // both: logging directory
         final String deleteFlag = "delete";     // delete an archive from solr
         final String fullTextFlag = "fulltext"; // This goes to the website to get the full text.
+        final String force = "force";           // when in full text mode, set this to force a refresh
         final String reindexFlag = "reindex";   // Get text from the current index instead external
         final String compareFlag = "compare";   // Compare mode
         final String ignoreFlag = "ignore";     // both: A list of fields to ignore
@@ -431,6 +432,7 @@ public class RDFIndexer {
 
         options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
+        options.addOption(force, false, "Force full text to be refreshed from external source");
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
 
@@ -465,7 +467,7 @@ public class RDFIndexer {
             if (line.hasOption(logDir)) {
                 config.logRoot = line.getOptionValue(logDir);
             }
-            
+            config.refreshFullText = line.hasOption(force);
             config.deleteAll = line.hasOption(deleteFlag);
 
             // compare stuff

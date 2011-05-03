@@ -45,6 +45,7 @@ public class RDFIndexerConfig {
   public boolean deleteAll = false;
   public IndexMode indexMode = IndexMode.SKIP;
   public long maxUploadSize = 10000000; // 10m of characters
+  public boolean refreshFullText = false; 
   
   // comparison properties
   public boolean compare = false;
@@ -60,6 +61,13 @@ public class RDFIndexerConfig {
       String path = this.rdfSource.toString();
       int pos = path.indexOf("/rdf/");
       path = path.substring(0,pos) + "/fulltext/";
+      return path;
+  }
+  
+  public String getRawTextRoot() {
+      String path = this.rdfSource.toString();
+      int pos = path.indexOf("/rdf/");
+      path = path.substring(0,pos) + "/rawtext/";
       return path;
   }
 }
