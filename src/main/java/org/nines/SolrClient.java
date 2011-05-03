@@ -13,7 +13,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
@@ -74,32 +73,6 @@ public final class SolrClient {
         } finally {
             if ( request != null ) {
                 request.releaseConnection();
-            }
-        }
-    }
-    
-    /**
-     * Get the full documeny text from the specifed URI and core name
-     * @param uri
-     * @return
-     * @throws IOException
-     */
-    public final String getFullText( final String uri, final String core ) throws IOException {
-        GetMethod get = null;
-        try {
-            String solrUrl = this.baseUrl + core + "/select";
-            get = new GetMethod(solrUrl);
-            NameValuePair queryParam = new NameValuePair("q", "uri:\"" + uri + "\"");
-            NameValuePair fieldsParam = new NameValuePair("fl", "text");
-            NameValuePair params[] = new NameValuePair[] { queryParam, fieldsParam };
-            get.setQueryString(params);
-            execRequest(get);
-            return getResponseString(get);
-        } catch (IOException e ){
-            throw e;
-        } finally {
-            if ( get != null ) {
-                get.releaseConnection();
             }
         }
     }
@@ -215,6 +188,29 @@ public final class SolrClient {
             // Release current connection to the connection pool once you are done
             post.releaseConnection();
         }
+    }
+    
+    /**
+     * Generate a core name given the archive. The core name is of the format: archive_[name]
+     * 
+     * @param archive
+     * @return
+     */
+    public static final String archiveToCore(String archive) {
+        return "archive_" + safeCore(archive);
+    }
+    
+    /**
+     * Generate a safe core name
+     * 
+     * @param archive
+     * @return
+     */
+    public static final String safeCore(String archive) {
+        String core = archive.replaceAll(":", "_");
+        core = core.replaceAll(" ", "_");
+        core = core.replaceAll(",", "_");
+        return core;
     }
 
 }

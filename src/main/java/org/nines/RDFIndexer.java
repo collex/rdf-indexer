@@ -108,14 +108,14 @@ public class RDFIndexer {
         this.solrClient = new SolrClient(this.config.solrBaseURL);
 
         try {
-            this.solrClient.validateCore( archiveToCore(config.archiveName) );
+            this.solrClient.validateCore( SolrClient.archiveToCore(config.archiveName) );
         } catch (IOException e) {
             this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
         }
 
         // if a purge was requested, do it first
         if (config.deleteAll) {
-            purgeArchive( archiveToCore(config.archiveName));
+            purgeArchive(  SolrClient.archiveToCore(config.archiveName));
         }
 
         // log text mode
@@ -251,19 +251,6 @@ public class RDFIndexer {
         return (this.solrXmlPayload.length() >= this.config.maxUploadSize);
     }
 
-    /**
-     * Generate a core name given the archive. The core name is of the format: archive_[name]
-     * 
-     * @param archive
-     * @return
-     */
-    private String archiveToCore(String archive) {
-        String core = archive.replaceAll(":", "_");
-        core = core.replaceAll(" ", "_");
-        core = core.replaceAll(",", "_");
-        return "archive_" + core;
-    }
-
     private void indexFile(File file) {
    
         HashMap<String, HashMap<String, ArrayList<String>>> objects;
@@ -300,7 +287,7 @@ public class RDFIndexer {
             ArrayList<String> objectArray = object.get("archive");
             if (objectArray != null) {
                 String objArchive = objectArray.get(0);
-                this.targetArchive = archiveToCore(objArchive);
+                this.targetArchive =  SolrClient.archiveToCore(objArchive);
                 if (!objArchive.equals(this.config.archiveName)) {
                     this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
                         + objArchive + " should be " + this.config.archiveName));

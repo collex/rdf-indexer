@@ -17,6 +17,8 @@ package org.nines;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.StringTokenizer;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.nines.RDFIndexerConfig.IndexMode;
@@ -399,7 +402,7 @@ public class NinesStatementHandler implements RDFHandler {
                             text = fetchContent(object);
                         } else if (config.indexMode == IndexMode.REINDEX) {
                             // in re-index mode, pull existing text from solr
-                            text = getFullText(doc.get("uri").get(0), httpClient);    
+                            text = getFullText( this.doc.get("uri").get(0) );    
                         } else {
                             // Must be text mode. Dont get any external text
                             text = "";
@@ -422,15 +425,32 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    private String getFullText(String uri, HttpClient httpclient) {
+    private String getFullText(String uri) {
 
+        String fullTextRoot = this.config.getFullTextRoot();
+        fullTextRoot = fullTextRoot +  SolrClient.safeCore( this.config.archiveName) + "/";
+        File root = new File(fullTextRoot);
+        if ( root.exists() == false ) {
+            this.errorReport.addError(
+                new IndexerError("", uri, "Missing full text source directory"));
+            return "";
+        }
+        
+        
+        String name = uri.replaceAll("/", "SL");
+        name = name.replace(":", "CL");
+        name = name.replace("?", "QU");
+        name = name.replace("=", "EQ");
+        name = name.replace("&", "AMP");
+        File textFile  = new File(fullTextRoot + name+".txt");
+        if ( textFile.exists() == false) {
+            this.errorReport.addError(
+                new IndexerError("", uri, "Missing full text file"));
+            return "";
+        }
+        
         try {
-            SolrClient solr = new SolrClient( this.config.solrBaseURL );
-            String fullText = solr.getFullText(uri, this.config.solrExistingIndex);
-            
-            String start = "<arr name=\"text\"><str>";
-            String stop = "</str></arr>";
-            fullText = trimBracketed(fullText, start, stop);
+            String fullText = IOUtils.toString( new FileReader(textFile) );
             
             fullText = replaceMatch(fullText, "&lt;", "<");
             fullText = replaceMatch(fullText, "&gt;", ">");
@@ -441,7 +461,7 @@ public class NinesStatementHandler implements RDFHandler {
             return fullText;
             
         } catch (IOException e) {
-            errorReport.addError(new IndexerError("", "", "Unable to get full text for "+uri
+            errorReport.addError(new IndexerError(textFile.toString(), uri, "Unable to read full text"
                 +": " +e.toString() ));
             return "";
         } 
@@ -834,17 +854,6 @@ public class NinesStatementHandler implements RDFHandler {
             }
         }
         return fullText;
-    }
-
-    private String trimBracketed(String fullText, String left, String right) {
-        int start = fullText.indexOf(left);
-        if (start == -1)
-            return "";
-        start += left.length();
-        int end = fullText.indexOf(right, start);
-        if (end == -1)
-            return "";
-        return fullText.substring(start, end);
     }
 
     private String removeTag(String fullText, String tag) {

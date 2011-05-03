@@ -55,4 +55,11 @@ public class RDFIndexerConfig {
   public final boolean isTestMode() {
       return this.indexMode.equals(IndexMode.TEST);
   }
+  
+  public String getFullTextRoot() {
+      String path = this.rdfSource.toString();
+      int pos = path.indexOf("/rdf/");
+      path = path.substring(0,pos) + "/fulltext/";
+      return path;
+  }
 }
