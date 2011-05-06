@@ -35,18 +35,6 @@ public class NinesStatementHandlerTest extends TestCase {
     errorReport = new ErrorReport(new File("test_data","test_report.txt"));
     sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
   }
-  public void testProblematicFullTextSource() {
-	File data = new File(System.getProperty("test.data.dir"),"test_data/problematic_full_text_source.html");
-
-	String text;
-		try {
-			text = readWholeFile(data);
-			String cleaned = sh.cleanText(text, true);
-			writeFile(data.getPath()+".txt", cleaned);
-		} catch (FileNotFoundException ex) {
-			assertTrue(false);
-		}
-  }
 
   public void testAddField() {
     HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();

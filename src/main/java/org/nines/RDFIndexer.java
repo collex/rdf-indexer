@@ -1,5 +1,5 @@
 /** 
- *  Copyright 2007 Applied Research in Patacriticism and the University of Virginia
+ *  Copyright 2011 Applied Research in Patacriticism and the University of Virginia
  * 
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ import org.apache.log4j.xml.DOMConfigurator;
 import org.jdom.Element;
 import org.jdom.output.Format;
 import org.jdom.output.XMLOutputter;
-import org.nines.RDFIndexerConfig.IndexMode;
+import org.nines.RDFIndexerConfig.Mode;
 
 public class RDFIndexer {
 
@@ -79,7 +79,7 @@ public class RDFIndexer {
         String logFileRelativePath = config.logRoot + "/";
 
         // config system based oncmdline flags
-        if (this.config.compare) {
+        if ( this.config.mode.equals(Mode.COMPARE )) {
             initCompareMode(logFileRelativePath + archiveName);
         } else {
             initIndexMode(logFileRelativePath + archiveName);
@@ -118,23 +118,34 @@ public class RDFIndexer {
             purgeArchive(  SolrClient.archiveToCore(config.archiveName));
         }
 
-        // log text mode
-        if ( this.config.indexMode.equals( IndexMode.FULL) ) {
-            this.log.info("Online: Indexing Full Text");
-        } else  if ( this.config.indexMode.equals( IndexMode.REINDEX) ) {
-            this.log.info("Offline: Not Indexing Full Text");
+        // log index mode
+        if ( this.config.mode.equals( Mode.SPIDER) ) {
+            this.log.info("Full Text Spider Mode");
+        } else  if ( this.config.mode.equals( Mode.INDEX) ) {
+            this.log.info("Index Mode");
         } else {
-            this.log.info("*** TEST MODE: Not committing documents to SOLR");
+            this.log.info("*** TEST MODE: Not committing changes to SOLR");
         }
 
         // do the indexing
+        if ( this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
+            doIndexing();
+        } else {
+            doSpidering();
+        }
+        
+        this.errorReport.close();
+        this.linkCollector.close();
+    }
+
+    private void doIndexing() {
         createGUID(this.config.rdfSource);
         Date start = new Date();
         log.info("Started indexing at " + start);
         System.out.println("Indexing "+config.rdfSource);
         indexDirectory(config.rdfSource);
         System.out.println("Indexing DONE");
-
+   
         // report indexing stats
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
@@ -146,8 +157,26 @@ public class RDFIndexer {
                 "Indexed " + numFiles + " files (" + numObjects + " objects) in %3.2f seconds.", durationSec));
         }
         this.log.info("Largest text field size: " + this.largestTextSize);
-        this.errorReport.close();
-        this.linkCollector.close();
+    }
+    
+
+    private void doSpidering() {
+        Date start = new Date();
+        log.info("Started full-text spider at " + start);
+        System.out.println("Full-text spider of "+config.rdfSource);
+        spiderDirectory(this.config.rdfSource);
+        System.out.println("DONE");
+   
+        // report indexing stats
+        Date end = new Date();
+        double durationSec = (end.getTime() - start.getTime()) / 1000.0;
+        if (durationSec >= 60) {
+            this.log.info(String.format(
+                "Spidered " + numFiles + " files (" + numObjects + " objects) in %3.2f minutes.", (durationSec / 60.0)));
+        } else {
+            this.log.info(String.format(
+                "Spidered " + numFiles + " files (" + numObjects + " objects) in %3.2f seconds.", durationSec));
+        }
     }
 
     private void initCompareMode(final String logFileRoot) {
@@ -211,7 +240,32 @@ public class RDFIndexer {
             this.dataFileQueue.add(dir);
         }
     }
+    
+    /**
+     * Run through all rdf files in the directory and harvest full text
+     * from remote sites.
+     * 
+     * @param rdfDir
+     */
+    private void spiderDirectory( final File rdfDir ) {
+        this.dataFileQueue = new LinkedList<File>();
+        recursivelyQueueFiles(rdfDir);
+        this.numFiles = this.dataFileQueue.size();
+        log.info("=> Spider text for " + rdfDir + " total files: " + this.numFiles);
+        RdfTextSpider spider = new RdfTextSpider( this.config, this.errorReport );
+        while (this.dataFileQueue.size() > 0) {
+            File rdfFile = this.dataFileQueue.remove();
+            spider.spider(rdfFile);
+            this.errorReport.flush();
+        }
+    }
 
+    /**
+     * run through all RDF files in the directory and write them
+     * to a solr archive.
+     * 
+     * @param rdfDir
+     */
     private void indexDirectory(File rdfDir) {
         this.dataFileQueue = new LinkedList<File>();
         recursivelyQueueFiles(rdfDir);
@@ -392,17 +446,13 @@ public class RDFIndexer {
     public static void main(String[] args) {
 
         // Option constants
-        final String logDir = "logDir";         // both: logging directory
+        final String logDir = "logDir";         // logging directory
         final String deleteFlag = "delete";     // delete an archive from solr
-        final String fullTextFlag = "fulltext"; // This goes to the website to get the full text.
-        final String force = "force";           // when in full text mode, set this to force a refresh
-        final String reindexFlag = "reindex";   // Get text from the current index instead external
-        final String compareFlag = "compare";   // Compare mode
-        final String ignoreFlag = "ignore";     // both: A list of fields to ignore
-        final String includeFlag = "include";   // both: A list of fields to include
+        final String mode = "mode";             // REQUIRED mode of operation: [TEST, SPIDER, INDEX, COMPARE]
+        final String ignoreFlag = "ignore";     // A list of fields to ignore
+        final String includeFlag = "include";   // A list of fields to include
         final String source = "source";         // index: REQUIRED path to archive
-        final String test = "test";             // index: Test mode, no post to solr
-        final String archive = "archive";       // both: REQUIRED name of archive
+        final String archive = "archive";       // REQUIRED name of archive
         final String pageSize = "pageSize";     // compare: max results per solr page
         final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
 
@@ -414,13 +464,10 @@ public class RDFIndexer {
         nameOpt.setRequired(true);
         options.addOption(nameOpt);
 
-        // MODES option group. Only one of fullTxt, reindex, test or compare
-        OptionGroup modeOpts = new OptionGroup();
-        modeOpts.addOption(new Option(fullTextFlag, false, "Retrieve full text from web"));
-        modeOpts.addOption(new Option(reindexFlag, false, "Retrieve full text from current index"));
-        modeOpts.addOption(new Option(test, false, "Test archive indexing - do not post to solr"));
-        modeOpts.addOption(new Option(compareFlag, false, "Compare archive with index"));
-        options.addOptionGroup(modeOpts);
+        // MODE
+        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, INDEX, COMPARE]");
+        modeOpt.setRequired(true);
+        options.addOption ( modeOpt );
 
         // include/exclude field group
         OptionGroup fieldOpts = new OptionGroup();
@@ -432,7 +479,6 @@ public class RDFIndexer {
 
         options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
-        options.addOption(force, false, "Force full text to be refreshed from external source");
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
 
@@ -444,17 +490,13 @@ public class RDFIndexer {
 
             // required params:
             config.archiveName = line.getOptionValue(archive);
-
-            // determine mode
-            if (line.hasOption(fullTextFlag)) {
-                config.indexMode = IndexMode.FULL;
-            } else if (line.hasOption(reindexFlag)) {
-                config.indexMode = IndexMode.REINDEX;
-            } else if (line.hasOption(test) ) {
-                config.indexMode = IndexMode.TEST;
+            String modeVal = line.getOptionValue(mode).toUpperCase();
+            config.mode = Mode.valueOf(modeVal);
+            if  ( config.mode == null ) {
+                throw new ParseException("Invalid mode "+modeVal);
             }
-
-            // source dir
+           
+            // optional params:
             if (line.hasOption(source)) {
                 config.rdfSource = new File(line.getOptionValue(source));
             }
@@ -467,11 +509,9 @@ public class RDFIndexer {
             if (line.hasOption(logDir)) {
                 config.logRoot = line.getOptionValue(logDir);
             }
-            config.refreshFullText = line.hasOption(force);
             config.deleteAll = line.hasOption(deleteFlag);
 
             // compare stuff
-            config.compare = line.hasOption(compareFlag);
             if (line.hasOption(includeFlag)) {
                 config.includeFields = line.getOptionValue(includeFlag);
             }
@@ -480,14 +520,13 @@ public class RDFIndexer {
             }
 
             // if we are indexing, make sure source is present
-            if (config.compare == false && config.rdfSource == null) {
+            if (config.mode.equals(Mode.COMPARE) == false && config.rdfSource == null) {
                 throw new ParseException("Missing required -source parameter");
             }
 
         } catch (ParseException exp) {
 
             System.out.println("Error parsing options: " + exp.getMessage());
-
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("rdf-idexer", options);
             System.exit(-1);

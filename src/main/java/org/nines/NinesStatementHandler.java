@@ -16,24 +16,17 @@
 package org.nines;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.StringTokenizer;
 
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
-import org.nines.RDFIndexerConfig.IndexMode;
+import org.nines.RDFIndexerConfig.Mode;
 import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.openrdf.model.impl.BNodeImpl;
@@ -52,7 +45,6 @@ public class NinesStatementHandler implements RDFHandler {
     private String filename;
     private RDFIndexerConfig config;
     private ErrorReport errorReport;
-    private HttpClient httpClient;
     private String documentURI;
     private long largestTextField = -1;
     private LinkCollector linkCollector;
@@ -60,7 +52,6 @@ public class NinesStatementHandler implements RDFHandler {
     public NinesStatementHandler(ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config) {
         this.errorReport = errorReport;
         this.config = config;
-        this.httpClient = new HttpClient();
         doc = new HashMap<String, ArrayList<String>>();
         documentURI = "";
         documents = new HashMap<String, HashMap<String, ArrayList<String>>>();
@@ -81,7 +72,8 @@ public class NinesStatementHandler implements RDFHandler {
             return;
 
         // start of a new document
-        if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate) && statement.getSubject() instanceof URIImpl ) {
+        if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate)
+            && statement.getSubject() instanceof URIImpl) {
             if (documents.get(subject) != null) {
                 errorReport.addError(new IndexerError(filename, subject, "Duplicate URI"));
                 log.info("*** Duplicate: " + subject);
@@ -98,7 +90,7 @@ public class NinesStatementHandler implements RDFHandler {
         if (predicate.startsWith("http://www.nines.org/schema#")) {
 
             errorReport.addError(new IndexerError(filename, documentURI, "NINES is no longer a valid attribute: "
-                    + predicate));
+                + predicate));
 
             return;
         }
@@ -106,42 +98,64 @@ public class NinesStatementHandler implements RDFHandler {
         if (predicate.startsWith("http://www.collex.org/schema#")) {
             String attribute = predicate.substring("http://www.collex.org/schema#".length());
             if (!(attribute.equals("archive") || attribute.equals("freeculture") || attribute.equals("source_xml")
-                    || attribute.equals("source_html") || attribute.equals("source_sgml")
-                    || attribute.equals("federation") || attribute.equals("ocr") || attribute.equals("genre")
-                    || attribute.equals("thumbnail") || attribute.equals("text") || attribute.equals("fulltext") || attribute
-                    .equals("image"))) {
+                || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
+                || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
+                || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image"))) {
 
                 errorReport.addError(new IndexerError(filename, documentURI, "Collex does not support this property: "
-                        + predicate));
+                    + predicate));
 
                 return;
             }
         }
 
         // parse RDF statements into fields, return when the statement has been handled
-        if (handleFederation(predicate, object)) return;
-        if (handleOcr(predicate, object)) return;
-        if (handleFullText(predicate, object)) return;
-        if (handleCollexSourceXml(predicate, object)) return;
-        if (handleCollexSourceHtml(predicate, object)) return;
-        if (handleCollexSourceSgml(predicate, object))return;
-        if (handleArchive(predicate, object)) return;
-        if (handleFreeCulture(predicate, object)) return;
-        if (handleTitle(predicate, object)) return;
-        if (handleAlternative(predicate, object)) return;
-        if (handleGenre(predicate, object)) return;
-        if (handleDate(subject, predicate, statement.getObject())) return;
-        if (handleDateLabel(subject, predicate, object)) return;
-        if (handleSource(predicate, object)) return;
-        if (handleThumbnail(predicate, object)) return;
-        if (handleImage(predicate, object)) return;
-        if (handleURL(predicate, object)) return;
-        if (handleText(predicate, object)) return;
-        if (handleRole(predicate, object)) return;
-        if (handlePerson(predicate, object)) return;
-        if (handleFormat(predicate, object)) return;
-        if (handleLanguage(predicate, object)) return;
-        if (handleGeospacial(predicate, object)) return;
+        if (handleFederation(predicate, object))
+            return;
+        if (handleOcr(predicate, object))
+            return;
+        if (handleFullText(predicate, object))
+            return;
+        if (handleCollexSourceXml(predicate, object))
+            return;
+        if (handleCollexSourceHtml(predicate, object))
+            return;
+        if (handleCollexSourceSgml(predicate, object))
+            return;
+        if (handleArchive(predicate, object))
+            return;
+        if (handleFreeCulture(predicate, object))
+            return;
+        if (handleTitle(predicate, object))
+            return;
+        if (handleAlternative(predicate, object))
+            return;
+        if (handleGenre(predicate, object))
+            return;
+        if (handleDate(subject, predicate, statement.getObject()))
+            return;
+        if (handleDateLabel(subject, predicate, object))
+            return;
+        if (handleSource(predicate, object))
+            return;
+        if (handleThumbnail(predicate, object))
+            return;
+        if (handleImage(predicate, object))
+            return;
+        if (handleURL(predicate, object))
+            return;
+        if (handleText(predicate, object))
+            return;
+        if (handleRole(predicate, object))
+            return;
+        if (handlePerson(predicate, object))
+            return;
+        if (handleFormat(predicate, object))
+            return;
+        if (handleLanguage(predicate, object))
+            return;
+        if (handleGeospacial(predicate, object))
+            return;
     }
 
     public boolean handleFederation(String predicate, String object) {
@@ -384,7 +398,7 @@ public class NinesStatementHandler implements RDFHandler {
         // first, check if this object is TEXT. If it is the predicate
         // will have the #text url below....
         if ("http://www.collex.org/schema#text".equals(predicate)) {
-   
+
             // Objects with external content will have some form of
             // http url as the content. Detect this and grab text.
             String text = object;
@@ -393,20 +407,15 @@ public class NinesStatementHandler implements RDFHandler {
 
                 // don't handle pdf links
                 if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
-                    errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: "
-                            + text));
+                    errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
                     text = "";
                 } else {
 
-                    if (config.indexMode.equals( IndexMode.FULL)) {
-                        // Scrape content from source site. Do not attempt
-                        // any corrections.
-                        text = getExternalText(object);
-                    } else if (config.indexMode == IndexMode.REINDEX) {
-                        // in re-index mode, pull existing text from solr
-                        text = getFullText( this.doc.get("uri").get(0) );    
+                    if (config.mode == Mode.INDEX) {
+                        // in re-index mode, pull existing text src directory
+                        text = getFullText(this.doc.get("uri").get(0));
                     } else {
-                        // Must be text mode. Dont get any external text
+                        // Must be test mode. Dont get any external text
                         text = "";
                     }
                 }
@@ -418,52 +427,50 @@ public class NinesStatementHandler implements RDFHandler {
                 this.largestTextField = Math.max(this.largestTextField, text.length());
                 addFieldEntry(doc, "text", text, false);
             }
-            
+
             return true;
         }
         return false;
     }
 
+    /**
+     * Read the full text for <code>uri</code> from the fulltext area of the solr sources.
+     * If any errors are encountered, log them and return an empty string
+     * 
+     * @param uri
+     * @return A string containing the full text - or an empty stringif errors occur.
+     */
     private String getFullText(String uri) {
 
         String fullTextRoot = this.config.getFullTextRoot();
-        fullTextRoot = fullTextRoot +  SolrClient.safeCore( this.config.archiveName) + "/";
+        fullTextRoot = fullTextRoot + SolrClient.safeCore(this.config.archiveName) + "/";
         File root = new File(fullTextRoot);
-        if ( root.exists() == false ) {
-            this.errorReport.addError(
-                new IndexerError("", uri, "Missing full text source directory"));
+        if (root.exists() == false) {
+            this.errorReport
+                .addError(new IndexerError("", uri, "Missing full text source directory " + root.toString()));
             return "";
         }
-        
-        
+
+        // convert URL into filename for text
         String name = uri.replaceAll("/", "SL");
         name = name.replace(":", "CL");
         name = name.replace("?", "QU");
         name = name.replace("=", "EQ");
         name = name.replace("&", "AMP");
-        File textFile  = new File(fullTextRoot + name+".txt");
-        if ( textFile.exists() == false) {
-            this.errorReport.addError(
-                new IndexerError("", uri, "Missing full text file"));
+        File textFile = new File(fullTextRoot + name + ".txt");
+        if (textFile.exists() == false) {
+            this.errorReport.addError(new IndexerError("", uri, "Missing full text file " + textFile.toString()));
             return "";
         }
-        
+
+        // read it!
         try {
-            String fullText = IOUtils.toString( new FileReader(textFile) );
-            
-            fullText = replaceMatch(fullText, "&lt;", "<");
-            fullText = replaceMatch(fullText, "&gt;", ">");
-            fullText = replaceMatch(fullText, "&amp;", "&");
-            fullText = replaceMatchOnce(fullText, "““", "“");
-            fullText = replaceMatchOnce(fullText, "――", "―");
-            fullText = stripUnknownUTF8(fullText);
-            return fullText;
-            
+            return IOUtils.toString(new FileReader(textFile));
         } catch (IOException e) {
-            errorReport.addError(new IndexerError(textFile.toString(), uri, "Unable to read full text"
-                +": " +e.toString() ));
+            errorReport.addError(new IndexerError(textFile.toString(), uri, "Unable to read full text" + ": "
+                + e.toString()));
             return "";
-        } 
+        }
     }
 
     public boolean handleRole(String predicate, String object) {
@@ -540,7 +547,7 @@ public class NinesStatementHandler implements RDFHandler {
 
         // if the field is a url, check to see if it is reachable
         if (config.collectLinks && value.trim().startsWith("http://") && value.trim().indexOf(" ") == -1
-                && !"uri".equals(name)) {
+            && !"uri".equals(name)) {
             linkCollector.addLink(documentURI, filename, value);
         }
 
@@ -555,7 +562,7 @@ public class NinesStatementHandler implements RDFHandler {
 
         // if the field is a url, check to see if it is reachable
         if (config.collectLinks && value.trim().startsWith("http://") && value.trim().indexOf(" ") == -1
-                && !"uri".equals(name)) {
+            && !"uri".equals(name)) {
             linkCollector.addLink(documentURI, filename, value);
         }
 
@@ -575,12 +582,10 @@ public class NinesStatementHandler implements RDFHandler {
         // Look for unknown character and warn
         int pos = value.indexOf("\ufffd");
         if (pos > -1) {
-            
-            String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
-            errorReport.addError(new IndexerError(filename, documentURI, 
-                    "Invalid UTF-8 character at position " + pos
-                    + " of field " + name 
-                    + "\n  Snippet: ["+snip+"]"));
+
+            String snip = value.substring(Math.max(0, pos - 25), Math.min(value.length(), pos + 25));
+            errorReport.addError(new IndexerError(filename, documentURI, "Invalid UTF-8 character at position " + pos
+                + " of field " + name + "\n  Snippet: [" + snip + "]"));
         }
 
         // make sure we add to array for already existing fields
@@ -594,7 +599,7 @@ public class NinesStatementHandler implements RDFHandler {
             map.put(name, values);
         }
     }
-    
+
     /**
      * Find any occurances of &# with a ; within 6 chars. Attempt to unescape them into a utf8 char. If this is not
      * possibe, flag it
@@ -619,11 +624,11 @@ public class NinesStatementHandler implements RDFHandler {
                         // dump the bad sequence
                         String bad = text.substring(pos, pos2 + 1);
                         text = text.replaceAll(bad, "[?]");
-                            errorReport.addError(new IndexerError(this.filename, this.documentURI,
-                                    "Replaced potentially invalid escape sequece [" + bad + "]"));
+                        errorReport.addError(new IndexerError(this.filename, this.documentURI,
+                            "Replaced potentially invalid escape sequece [" + bad + "]"));
 
-                            // skip the new [?]
-                            startPos = pos + 3;
+                        // skip the new [?]
+                        startPos = pos + 3;
 
                     } else {
 
@@ -708,146 +713,6 @@ public class NinesStatementHandler implements RDFHandler {
         return documents;
     }
 
-    private String getExternalText(String urlString) {
-
-        // use the URL to generate a path into the raw text area pf the 
-        // solr sources
-        URL url = null;
-        try {
-            url = new URL(urlString);
-        } catch (MalformedURLException e) {
-            this.errorReport.addError(
-                new IndexerError("", urlString, "Malformed URL"));
-            return "";
-        }
-        String rawRoot = this.config.getRawTextRoot();
-        rawRoot = rawRoot + SolrClient.safeCore( this.config.archiveName);
-        File urlFile = new File(rawRoot + "/"+ url.getFile());
-        
-        // when in refresh mode, blow away any prior text so we are
-        // forced to pull it from the external site
-        if ( this.config.refreshFullText ) {
-            urlFile.delete();
-        }
-        
-        // if this file already exists, just read it local
-        String content = "";
-        if ( urlFile.exists() ) {
-            try {
-                content = IOUtils.toString( new FileReader(urlFile) );
-            } catch (IOException e) {
-                this.errorReport.addError(
-                    new IndexerError(urlFile.toString(), urlString, "Unable to read raw text file: "+e.toString()));
-                return "";
-            }
-        } else {
-            // make sure all subdirs are present
-            if ( urlFile.getParentFile().exists() == false) {
-                if ( urlFile.getParentFile().mkdirs() == false ) {
-                    this.errorReport.addError(
-                        new IndexerError(urlFile.toString(), urlString, "Unable to create raw text file"));
-                    return "";
-                }
-            }
-            
-            // scrape the content from remote hosh and dump to local file
-            try {
-                content = scrapeExternalText(urlString);
-                Writer out = new OutputStreamWriter(new FileOutputStream(urlFile), "UTF-8");
-                out.write(content);
-                out.close();
-            } catch (IOException e) {
-                this.errorReport.addError(
-                    new IndexerError(urlFile.toString(), urlString, "Unable to create get external text: "+e.toString()));
-                return "";
-            } 
-        }
-        
-        // clean up the mess
-        content = cleanText(content, true);
-        content = content.replaceAll("&lt;", "<");
-        content = replaceMatch(content, "&lt;", "<");
-        content = replaceMatch(content, "&gt;", ">");
-        content = replaceMatch(content, "&amp;", "&");
-        content = stripUnknownUTF8( content );
-        return content;
-    }
-    
-    private String scrapeExternalText(String url) throws IOException {
-        GetMethod get = new GetMethod(url);
-        int result;
-        try {
-            result = httpClient.executeMethod(get);
-            if (result != 200) {
-                throw new IOException(result + " code returned for URL: " + url);
-            }
-            return IOUtils.toString( get.getResponseBodyAsStream(), "UTF-8" );
-        } catch (IOException e ) {
-            throw e; // just rethrow it
-        } finally {
-            get.releaseConnection();
-        }
-    }
-
-    private String stripUnknownUTF8(String value) {
-        // Look for unknown character and warn
-        int curPos= 0;
-        while ( true ) {
-            int pos = value.indexOf("\ufffd", curPos);
-            if (pos == -1) {
-                break;
-            }
-            curPos = pos+1;
-            
-            String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
-            errorReport.addError(new IndexerError(filename, documentURI, 
-                    "Invalid UTF-8 character at position " + pos
-                    + " of field text"
-                    + "\n  Snippet: ["+snip+"]"));
-                
-        }
-        return value.replaceAll("\ufffd", "");
-    }
-
-    public String cleanText(String fullText, Boolean removeHtml) {
-        // If the text contains markup, remove it.
-        // We may be passed plain text, or we may be passed html, so any strategy we use needs to work for both.
-        // We can assume that if it is plain text, it won't have stuff that looks like tags in it.
-        if (fullText == null)
-            return fullText;
-
-        if (removeHtml) {
-            // remove everything between <head>...</head>
-            fullText = removeTag(fullText, "head");
-
-            // remove everything between <script>..</script>
-            fullText = removeTag(fullText, "script");
-
-            // remove everything between <...>
-            fullText = removeBracketed(fullText, "<", ">");
-        }
-
-        // Get rid of non-unix line endings
-        fullText = fullText.replaceAll("\r", "");
-
-        // remove all "&..;" encoding
-        // fullText = fullText.replaceAll("\\&[a-z]{1,5}\\;", " ");
-
-        // Clean up the file a little bit -- there shouldn't be two spaces in a row or blank lines
-        fullText = fullText.replaceAll("&nbsp;", " ");
-        fullText = fullText.replaceAll("&#160;", " ");
-        fullText = fullText.replaceAll("\t", " ");
-        fullText = fullText.replaceAll(" +", " ");
-        fullText = fullText.replaceAll(" \n", "\n");
-        fullText = fullText.replaceAll("\n ", "\n");
-        fullText = fullText.replaceAll("\n+", "\n");
-
-        // if (fullText != null && fullText.indexOf("<") != -1) {
-        // return fullText.replaceAll("\\<.*?\\>", "");
-        // }
-        return fullText;
-    }
-
     public static ArrayList<String> enumerateYears(String startYear, String endYear) {
         int y1 = Integer.parseInt(startYear);
         int y2 = Integer.parseInt(endYear);
@@ -867,45 +732,7 @@ public class NinesStatementHandler implements RDFHandler {
     public void setFilename(String filename) {
         this.filename = filename;
     }
-
-    // Only replace the match once. For instance, if we are matching 00 and changing it to 0 and the string is 0000, it
-    // will output 00, but replaceMatch will output 0
-    private String replaceMatchOnce(String fullText, String match, String newText) {
-        int start = fullText.indexOf(match);
-        if (start != -1) {
-            fullText = fullText.substring(0, start) + newText
-                    + replaceMatchOnce(fullText.substring(start + match.length()), match, newText);
-        }
-        return fullText;
-    }
-
-    private String replaceMatch(String fullText, String match, String newText) {
-        int start = fullText.indexOf(match);
-        while (start != -1) {
-            fullText = fullText.substring(0, start) + newText + fullText.substring(start + match.length());
-            start = fullText.indexOf(match);
-        }
-        return fullText;
-    }
-
-    private String removeBracketed(String fullText, String left, String right) {
-        int start = fullText.indexOf(left);
-        while (start != -1) {
-            int end = fullText.indexOf(right, start);
-            if (end == -1) {
-                start = -1;
-            } else {
-                fullText = fullText.substring(0, start) + "\n" + fullText.substring(end + right.length());
-                start = fullText.indexOf(left);
-            }
-        }
-        return fullText;
-    }
-
-    private String removeTag(String fullText, String tag) {
-        return removeBracketed(fullText, "<" + tag, "</" + tag + ">");
-    }
-
+    
     public long getLargestTextSize() {
         return this.largestTextField;
     }

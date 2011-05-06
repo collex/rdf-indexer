@@ -26,11 +26,11 @@ import java.io.File;
 public class RDFIndexerConfig {
   
   // indexing mode
-  public enum IndexMode {
-    SKIP,       // Do not index
+  public enum Mode {
     TEST,       // Testing mode: ignore all ext text, dont post to solr
-    FULL,       // retrieve full text from web
-    REINDEX     // pull full text from existing index
+    SPIDER,     // retrieve full text from external source - no post to solr
+    INDEX,      // populate solr with rdf data Text will be pulled from the RDF or fulltext
+    COMPARE     // compare the new arcive with the main index
   };
 
   // general properties
@@ -39,22 +39,20 @@ public class RDFIndexerConfig {
   public String archiveName;
   public String solrBaseURL = "http://localhost:8983/solr";
   public String solrExistingIndex = "/resources";
+  public Mode mode = Mode.TEST;
   
   // indexing properties
   public boolean collectLinks = true;
   public boolean deleteAll = false;
-  public IndexMode indexMode = IndexMode.SKIP;
   public long maxUploadSize = 10000000; // 10m of characters
-  public boolean refreshFullText = false; 
   
   // comparison properties
-  public boolean compare = false;
   public String ignoreFields = "";
   public String includeFields = "*";
   public int pageSize = 500;
   
   public final boolean isTestMode() {
-      return this.indexMode.equals(IndexMode.TEST);
+      return this.mode.equals(Mode.TEST);
   }
   
   public String getFullTextRoot() {
