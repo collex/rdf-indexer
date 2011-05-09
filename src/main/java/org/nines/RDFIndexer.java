@@ -295,7 +295,7 @@ public class RDFIndexer {
             this.log.info("Spider text from file "+rdfFile.toString());
             spider.spider(rdfFile);
             try {
-                Thread.sleep(100);
+                Thread.sleep(10);
             } catch (InterruptedException e) {}
             this.errorReport.flush();
         }
