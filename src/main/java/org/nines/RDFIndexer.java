@@ -292,6 +292,9 @@ public class RDFIndexer {
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
             spider.spider(rdfFile);
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {}
             this.errorReport.flush();
         }
     }
