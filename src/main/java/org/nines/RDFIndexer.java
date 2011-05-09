@@ -163,10 +163,10 @@ public class RDFIndexer {
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
             this.log.info(String.format(
-                "Indexed " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+                "Cleaned " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
         } else {
             this.log.info(String.format(
-                "Indexed " + numFiles + " files in %3.2f seconds.", durationSec));
+                "Cleaned " + numFiles + " files in %3.2f seconds.", durationSec));
         }
     }
 
