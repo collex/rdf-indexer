@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.net.MalformedURLException;
-import java.net.URL;
 
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -121,19 +119,14 @@ public class RdfTextSpider implements RDFHandler {
      */
     private void getRawText(String urlString) {
 
-        // use the URL to generate a path into the 
-        // raw text area pf the solr sources
-        URL url = null;
-        try {
-            url = new URL(urlString);
-        } catch (MalformedURLException e) {
-            this.errorReport.addError(
-                new IndexerError("", urlString, "Malformed URL"));
-            return;
-        }
+        String rawFile = urlString.replaceAll("/", "SL");;
+        rawFile = rawFile.replace(":", "CL");
+        rawFile = rawFile.replace("?", "QU");
+        rawFile = rawFile.replace("=", "EQ");
+        rawFile = rawFile.replace("&", "AMP");
         String rawRoot = this.config.getRawTextRoot();
         rawRoot = rawRoot + SolrClient.safeCore( this.config.archiveName);
-        File urlFile = new File(rawRoot + "/"+ url.getFile());
+        File urlFile = new File(rawRoot + "/"+ rawFile );
         
         // scrape the content from remote host...
         String content = "";
