@@ -29,6 +29,7 @@ public class RDFIndexerConfig {
   public enum Mode {
     TEST,       // Testing mode: ignore all ext text, dont post to solr
     SPIDER,     // retrieve full text from external source - no post to solr
+    CLEAN,      // cleanup the raw sipdered text and move to fulltext
     INDEX,      // populate solr with rdf data Text will be pulled from the RDF or fulltext
     COMPARE     // compare the new arcive with the main index
   };

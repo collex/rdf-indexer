@@ -121,6 +121,8 @@ public class RDFIndexer {
         // log index mode
         if ( this.config.mode.equals( Mode.SPIDER) ) {
             this.log.info("Full Text Spider Mode");
+        } else  if ( this.config.mode.equals( Mode.CLEAN) ) {
+            this.log.info("Raw Text Cleanup Mode");
         } else  if ( this.config.mode.equals( Mode.INDEX) ) {
             this.log.info("Index Mode");
         } else {
@@ -130,12 +132,41 @@ public class RDFIndexer {
         // do the indexing
         if ( this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
             doIndexing();
-        } else {
+        } else if ( this.config.mode.equals(Mode.SPIDER) ) {
             doSpidering();
+        } else {
+            doRawTextCleanup();
         }
         
         this.errorReport.close();
         this.linkCollector.close();
+    }
+    
+    private void doRawTextCleanup() {
+        Date start = new Date();
+        log.info("Started raw text cleanup at " + start);
+        
+        this.dataFileQueue = new LinkedList<File>();
+        String rawPath =  this.config.getRawTextRoot() + SolrClient.safeCore(this.config.archiveName);
+        recursivelyQueueFiles( new File(rawPath), false);
+        this.numFiles = this.dataFileQueue.size();
+        
+        RawTextCleaner cleaner = new RawTextCleaner( this.config, this.errorReport );
+        while (this.dataFileQueue.size() > 0) {
+            File rdfFile = this.dataFileQueue.remove();
+            cleaner.clean( rdfFile );
+            this.errorReport.flush();
+        }
+        
+        Date end = new Date();
+        double durationSec = (end.getTime() - start.getTime()) / 1000.0;
+        if (durationSec >= 60) {
+            this.log.info(String.format(
+                "Indexed " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+        } else {
+            this.log.info(String.format(
+                "Indexed " + numFiles + " files in %3.2f seconds.", durationSec));
+        }
     }
 
     private void doIndexing() {
@@ -172,10 +203,10 @@ public class RDFIndexer {
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
             this.log.info(String.format(
-                "Spidered " + numFiles + " files (" + numObjects + " objects) in %3.2f minutes.", (durationSec / 60.0)));
+                "Spidered " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
         } else {
             this.log.info(String.format(
-                "Spidered " + numFiles + " files (" + numObjects + " objects) in %3.2f seconds.", durationSec));
+                "Spidered " + numFiles + " files in %3.2f seconds.", durationSec));
         }
     }
 
@@ -221,16 +252,21 @@ public class RDFIndexer {
         }
     }
 
-    private void recursivelyQueueFiles(File dir) {
+    private void recursivelyQueueFiles(final File dir, final boolean rdfMode) {
         if (dir.isDirectory()) {
             log.info("loading directory: " + dir.getPath());
 
             File fileList[] = dir.listFiles();
             for (File entry : fileList) {
                 if (entry.isDirectory() && !entry.getName().endsWith(".svn")) {
-                    recursivelyQueueFiles(entry);
+                    recursivelyQueueFiles(entry, rdfMode);
                 }
-                if (entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml")) {
+                
+                if ( rdfMode) {
+                    if (entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml")) {
+                        this.dataFileQueue.add(entry);
+                    }
+                } else {
                     this.dataFileQueue.add(entry);
                 }
             }
@@ -249,7 +285,7 @@ public class RDFIndexer {
      */
     private void spiderDirectory( final File rdfDir ) {
         this.dataFileQueue = new LinkedList<File>();
-        recursivelyQueueFiles(rdfDir);
+        recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Spider text for " + rdfDir + " total files: " + this.numFiles);
         RdfTextSpider spider = new RdfTextSpider( this.config, this.errorReport );
@@ -268,7 +304,7 @@ public class RDFIndexer {
      */
     private void indexDirectory(File rdfDir) {
         this.dataFileQueue = new LinkedList<File>();
-        recursivelyQueueFiles(rdfDir);
+        recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
         this.solrExecutorService = Executors.newFixedThreadPool( 2 );
@@ -448,7 +484,7 @@ public class RDFIndexer {
         // Option constants
         final String logDir = "logDir";         // logging directory
         final String deleteFlag = "delete";     // delete an archive from solr
-        final String mode = "mode";             // REQUIRED mode of operation: [TEST, SPIDER, INDEX, COMPARE]
+        final String mode = "mode";             // REQUIRED mode of operation: [TEST, SPIDER, CLEAN, INDEX, COMPARE]
         final String ignoreFlag = "ignore";     // A list of fields to ignore
         final String includeFlag = "include";   // A list of fields to include
         final String source = "source";         // index: REQUIRED path to archive
@@ -465,7 +501,7 @@ public class RDFIndexer {
         options.addOption(nameOpt);
 
         // MODE
-        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, INDEX, COMPARE]");
+        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, CLEAN, INDEX, COMPARE]");
         modeOpt.setRequired(true);
         options.addOption ( modeOpt );
 
