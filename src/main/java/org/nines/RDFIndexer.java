@@ -291,9 +291,10 @@ public class RDFIndexer {
         RdfTextSpider spider = new RdfTextSpider( this.config, this.errorReport );
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
+            this.log.info("Spider text from file "+rdfFile.toString());
             spider.spider(rdfFile);
             try {
-                Thread.sleep(250);
+                Thread.sleep(500);
             } catch (InterruptedException e) {}
             this.errorReport.flush();
         }
