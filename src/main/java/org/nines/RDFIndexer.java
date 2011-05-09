@@ -154,6 +154,7 @@ public class RDFIndexer {
         RawTextCleaner cleaner = new RawTextCleaner( this.config, this.errorReport );
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
+            this.log.info("Clean raw text from file "+rdfFile.toString());
             cleaner.clean( rdfFile );
             this.errorReport.flush();
         }
