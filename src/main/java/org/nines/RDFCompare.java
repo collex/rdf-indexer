@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +21,7 @@ import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
+import org.apache.log4j.xml.DOMConfigurator;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -64,6 +66,17 @@ public class RDFCompare {
      */
     public RDFCompare(RDFIndexerConfig config) {
         this.config = config;
+        String logFileRoot = this.config.getLogfileBaseName();
+        
+        String compareLog = logFileRoot + "_compare.log";
+        String skippedLog = logFileRoot + "_skipped.log";
+        String compareTxtLog = logFileRoot + "_compare_text.log";
+
+        System.setProperty("compare.log.file", compareLog);
+        System.setProperty("compare.text.log.file", compareTxtLog);
+        System.setProperty("skipped.log.file", skippedLog);
+        URL url = ClassLoader.getSystemResource("log4j-compare.xml");
+        DOMConfigurator.configure(url);
 
         // init logging
         this.log = Logger.getLogger("compare");

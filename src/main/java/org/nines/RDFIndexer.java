@@ -69,24 +69,7 @@ public class RDFIndexer {
     public RDFIndexer(RDFIndexerConfig config) {
 
         this.config = config;
-
-        // Use the SAX2-compliant Xerces parser:
-        System.setProperty("org.xml.sax.driver", "org.apache.xerces.parsers.SAXParser");
-
-        // get partial log filename
-        String archiveName = config.archiveName;
-        archiveName = archiveName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
-        String logFileRelativePath = config.logRoot + "/";
-
-        // config system based oncmdline flags
-        if ( this.config.mode.equals(Mode.COMPARE )) {
-            initCompareMode(logFileRelativePath + archiveName);
-        } else {
-            initIndexMode(logFileRelativePath + archiveName);
-        }
-    }
-
-    private void initIndexMode(final String logFileRoot) {
+        String logFileRoot = this.config.getLogfileBaseName();
 
         // setup logger
         String indexLog = logFileRoot + "_progress.log";
@@ -106,36 +89,47 @@ public class RDFIndexer {
 
         this.linkCollector = new LinkCollector(logFileRoot);
         this.solrClient = new SolrClient(this.config.solrBaseURL);
-
-        try {
-            this.solrClient.validateCore( SolrClient.archiveToCore(config.archiveName) );
-        } catch (IOException e) {
-            this.errorReport.addError(new IndexerError("Creating core", "", e.getMessage()));
-        }
-
-        // if a purge was requested, do it first
+    }
+    
+    /**
+     * Execute the configured indexing task
+     */
+    public void execute() {
+        
+        // if a purge was requested, it must be done FIRST
         if (config.deleteAll) {
-            purgeArchive(  SolrClient.archiveToCore(config.archiveName));
+            purgeArchive(  SolrClient.archiveToCore(config.archiveName) );
         }
-
-        // log index mode
-        if ( this.config.mode.equals( Mode.SPIDER) ) {
-            this.log.info("Full Text Spider Mode");
-        } else  if ( this.config.mode.equals( Mode.CLEAN) ) {
-            this.log.info("Raw Text Cleanup Mode");
-        } else  if ( this.config.mode.equals( Mode.INDEX) ) {
-            this.log.info("Index Mode");
-        } else {
-            this.log.info("*** TEST MODE: Not committing changes to SOLR");
-        }
-
-        // do the indexing
-        if ( this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
-            doIndexing();
-        } else if ( this.config.mode.equals(Mode.SPIDER) ) {
-            doSpidering();
-        } else {
-            doRawTextCleanup();
+                
+        // There is only something else to do if a MODE was configured
+        if ( this.config.mode.equals(Mode.NONE) == false ) {
+            
+            // first, ensure that core is valid and exists
+            try {
+                this.solrClient.validateCore( SolrClient.archiveToCore(this.config.archiveName) );
+            } catch (IOException e) {
+                this.errorReport.addError(new IndexerError("Validate core", "", e.getMessage()));
+            }
+            
+            // execute based on mode setting
+            if ( this.config.mode.equals( Mode.SPIDER) ) {
+                this.log.info("Full Text Spider Mode");
+            } else  if ( this.config.mode.equals( Mode.CLEAN) ) {
+                this.log.info("Raw Text Cleanup Mode");
+            } else  if ( this.config.mode.equals( Mode.INDEX) ) {
+                this.log.info("Index Mode");
+            } else {
+                this.log.info("*** TEST MODE: Not committing changes to SOLR");
+            }
+    
+            // do the indexing
+            if ( this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
+                doIndexing();
+            } else if ( this.config.mode.equals(Mode.SPIDER) ) {
+                doSpidering();
+            } else {
+                doRawTextCleanup();
+            }
         }
         
         this.errorReport.close();
@@ -209,22 +203,6 @@ public class RDFIndexer {
             this.log.info(String.format(
                 "Spidered " + numFiles + " files in %3.2f seconds.", durationSec));
         }
-    }
-
-    private void initCompareMode(final String logFileRoot) {
-
-        String compareLog = logFileRoot + "_compare.log";
-        String skippedLog = logFileRoot + "_skipped.log";
-        String compareTxtLog = logFileRoot + "_compare_text.log";
-
-        System.setProperty("compare.log.file", compareLog);
-        System.setProperty("compare.text.log.file", compareTxtLog);
-        System.setProperty("skipped.log.file", skippedLog);
-        URL url = ClassLoader.getSystemResource("log4j-compare.xml");
-        DOMConfigurator.configure(url);
-
-        RDFCompare rdfCompare = new RDFCompare(config);
-        rdfCompare.compareArchive();
     }
 
     private void purgeArchive(final String coreName) {
@@ -312,7 +290,7 @@ public class RDFIndexer {
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
-        this.solrExecutorService = Executors.newFixedThreadPool( 2 );
+        this.solrExecutorService = Executors.newFixedThreadPool( 1 );
 
         this.targetArchive = "";
         this.docCount = 0;
@@ -322,7 +300,7 @@ public class RDFIndexer {
             indexFile(rdfFile);
         }
         
-        if ( this.solrXmlPayload.length() > 0) {
+        if ( this.solrXmlPayload.length() > 0 && this.config.isTestMode() == false ) {
             this.solrExecutorService.execute( new SolrWorker(this.solrXmlPayload, this.targetArchive, this.docCount) );
         }
         
@@ -433,7 +411,7 @@ public class RDFIndexer {
 
             String field = entry.getKey();
             ArrayList<String> valList = entry.getValue();
-
+           
             for (String value : valList) {
                 Element f = new Element("field");
                 f.setAttribute("name", field);
@@ -461,6 +439,7 @@ public class RDFIndexer {
 
         private final String payload;
         private final String tgtArchive;
+       
         
         public SolrWorker( final StringBuilder data, final String tgtArchive, int docCnt ) {
             this.tgtArchive = tgtArchive;
@@ -507,7 +486,6 @@ public class RDFIndexer {
 
         // MODE
         Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, CLEAN, INDEX, COMPARE]");
-        modeOpt.setRequired(true);
         options.addOption ( modeOpt );
 
         // include/exclude field group
@@ -529,12 +507,15 @@ public class RDFIndexer {
         try {
             CommandLine line = parser.parse(options, args);
 
-            // required params:
+            // required param:
             config.archiveName = line.getOptionValue(archive);
-            String modeVal = line.getOptionValue(mode).toUpperCase();
-            config.mode = Mode.valueOf(modeVal);
-            if  ( config.mode == null ) {
-                throw new ParseException("Invalid mode "+modeVal);
+            
+            if ( line.hasOption(mode)) {
+                String modeVal = line.getOptionValue(mode).toUpperCase();
+                config.mode = Mode.valueOf(modeVal);
+                if  ( config.mode == null ) {
+                    throw new ParseException("Invalid mode "+modeVal);
+                }
             }
            
             // optional params:
@@ -572,10 +553,19 @@ public class RDFIndexer {
             formatter.printHelp("rdf-idexer", options);
             System.exit(-1);
         }
+        
+        // Use the SAX2-compliant Xerces parser:
+        System.setProperty("org.xml.sax.driver", "org.apache.xerces.parsers.SAXParser");
 
-        // Launch the indexer with the parsed config
+        // Launch the task
         try {
-            new RDFIndexer(config);
+            if (config.mode.equals(Mode.COMPARE)) {
+                RDFCompare task = new RDFCompare(config);
+                task.compareArchive();
+            } else {
+                RDFIndexer task = new RDFIndexer(config);
+                task.execute();
+            }
         } catch (Exception e) {
             Logger.getLogger(RDFIndexer.class.getName()).error("Unhandled exception: " + e.toString());
         }
