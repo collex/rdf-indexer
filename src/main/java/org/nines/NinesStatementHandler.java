@@ -35,8 +35,8 @@ import org.openrdf.model.impl.URIImpl;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 
-public class NinesStatementHandler implements RDFHandler {
-    public final static Logger log = Logger.getLogger(NinesStatementHandler.class.getName());
+final class NinesStatementHandler implements RDFHandler {
+    private final static Logger log = Logger.getLogger(NinesStatementHandler.class.getName());
 
     private HashMap<String, HashMap<String, ArrayList<String>>> documents;
     private String dateBNodeId;
@@ -158,7 +158,7 @@ public class NinesStatementHandler implements RDFHandler {
             return;
     }
 
-    public boolean handleFederation(String predicate, String object) {
+    private boolean handleFederation(String predicate, String object) {
         if ("http://www.collex.org/schema#federation".equals(predicate)) {
             if (object.equals("NINES") || object.equals("18thConnect"))
                 addField(doc, "federation", object);
@@ -169,7 +169,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleOcr(String predicate, String object) {
+    private boolean handleOcr(String predicate, String object) {
         if ("http://www.collex.org/schema#ocr".equals(predicate)) {
             if ("true".equalsIgnoreCase(object)) {
                 // only add a ocr field if it's true. No field set implies "F"alse
@@ -180,7 +180,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handlePerson(String predicate, String object) {
+    private boolean handlePerson(String predicate, String object) {
         if ("http://www.collex.org/schema#person".equals(predicate)) {
             addField(doc, "person", object);
             return true;
@@ -188,7 +188,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleFormat(String predicate, String object) {
+    private boolean handleFormat(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/format".equals(predicate)) {
             addField(doc, "format", object);
             return true;
@@ -196,7 +196,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleLanguage(String predicate, String object) {
+    private boolean handleLanguage(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/language".equals(predicate)) {
             addField(doc, "language", object);
             return true;
@@ -204,7 +204,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleGeospacial(String predicate, String object) {
+    private boolean handleGeospacial(String predicate, String object) {
         if ("http://www.collex.org/schema#geospacial".equals(predicate)) {
             addField(doc, "geospacial", object);
             return true;
@@ -212,7 +212,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleCollexSourceXml(String predicate, String object) {
+    private boolean handleCollexSourceXml(String predicate, String object) {
         if ("http://www.collex.org/schema#source_xml".equals(predicate)) {
             addField(doc, "source_xml", object);
             return true;
@@ -220,7 +220,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleCollexSourceHtml(String predicate, String object) {
+    private boolean handleCollexSourceHtml(String predicate, String object) {
         if ("http://www.collex.org/schema#source_html".equals(predicate)) {
             addField(doc, "source_html", object);
             return true;
@@ -228,7 +228,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleCollexSourceSgml(String predicate, String object) {
+    private boolean handleCollexSourceSgml(String predicate, String object) {
         if ("http://www.collex.org/schema#source_sgml".equals(predicate)) {
             addField(doc, "source_sgml", object);
             return true;
@@ -236,7 +236,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleArchive(String predicate, String object) {
+    private boolean handleArchive(String predicate, String object) {
         if ("http://www.collex.org/schema#archive".equals(predicate)) {
             addField(doc, "archive", object);
             return true;
@@ -244,19 +244,19 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleFreeCulture(String predicate, String object) {
+    private boolean handleFreeCulture(String predicate, String object) {
         if ("http://www.collex.org/schema#freeculture".equals(predicate)) {
             if ("false".equalsIgnoreCase(object)) {
-                setField(doc, "freeculture", "F"); // "F"alse
+                addFieldEntry(doc, "freeculture", "F", true); // "F"alse
             } else if ("true".equalsIgnoreCase(object)) {
-                setField(doc, "freeculture", "T"); // "T"rue
+                addFieldEntry(doc, "freeculture", "T", true); // "T"rue
             }
             return true;
         }
         return false;
     }
 
-    public boolean handleFullText(String predicate, String object) {
+    private boolean handleFullText(String predicate, String object) {
         if ("http://www.collex.org/schema#fulltext".equals(predicate)) {
             if ("false".equalsIgnoreCase(object)) {
                 // only add a fulltext field if its false. No field set implies "T"rue
@@ -267,7 +267,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleTitle(String predicate, String object) {
+    private boolean handleTitle(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/title".equals(predicate)) {
             addField(doc, "title", object);
             if (!title_sort_added) {
@@ -279,7 +279,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleAlternative(String predicate, String object) {
+    private boolean handleAlternative(String predicate, String object) {
         if ("http://purl.org/dc/terms/alternative".equals(predicate)) {
             addField(doc, "alternative", object);
             return true;
@@ -287,7 +287,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleGenre(String predicate, String object) {
+    private boolean handleGenre(String predicate, String object) {
         if ("http://www.collex.org/schema#genre".equals(predicate)) {
             // ignore deprecated genres for backward compatibility
             if (!"Primary".equals(object) && !"Secondary".equals(object)) {
@@ -298,7 +298,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleDate(String subject, String predicate, Value value) {
+    private boolean handleDate(String subject, String predicate, Value value) {
         if ("http://purl.org/dc/elements/1.1/date".equals(predicate)) {
             String object = value.stringValue().trim();
             if (value instanceof LiteralImpl) {
@@ -336,7 +336,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleDateLabel(String subject, String predicate, String object) {
+    private boolean handleDateLabel(String subject, String predicate, String object) {
         if (subject.equals(dateBNodeId)) {
             // if dateBNodeId matches, we assume we're under a <nines:date> and simply
             // look for <rdfs:label> and <rdf:value>
@@ -361,7 +361,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleSource(String predicate, String object) {
+    private boolean handleSource(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/source".equals(predicate)) {
             addField(doc, "source", object);
             return true;
@@ -369,7 +369,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleThumbnail(String predicate, String object) {
+    private boolean handleThumbnail(String predicate, String object) {
         if ("http://www.collex.org/schema#thumbnail".equals(predicate)) {
             addField(doc, "thumbnail", object);
             return true;
@@ -377,7 +377,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleImage(String predicate, String object) {
+    private boolean handleImage(String predicate, String object) {
         if ("http://www.collex.org/schema#image".equals(predicate)) {
             addField(doc, "image", object);
             return true;
@@ -385,7 +385,7 @@ public class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
-    public boolean handleURL(String predicate, String object) {
+    private boolean handleURL(String predicate, String object) {
         if ("http://www.w3.org/2000/01/rdf-schema#seeAlso".equals(predicate)) {
             addField(doc, "url", object);
             return true;
@@ -405,19 +405,12 @@ public class NinesStatementHandler implements RDFHandler {
             if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
                 addFieldEntry(doc, "text_url", text, false);
 
-                // don't handle pdf links
-                if (text.endsWith(".pdf") || text.endsWith(".PDF")) {
-                    errorReport.addError(new IndexerError(filename, documentURI, "PDF file ignored for now: " + text));
-                    text = "";
+                // only in index mode do we attempt to grab 
+                // full text from the full text folder
+                if (config.mode == Mode.INDEX) {
+                    text = getFullText(this.doc.get("uri").get(0));
                 } else {
-
-                    if (config.mode == Mode.INDEX) {
-                        // in re-index mode, pull existing text src directory
-                        text = getFullText(this.doc.get("uri").get(0));
-                    } else {
-                        // Must be test mode. Dont get any external text
-                        text = "";
-                    }
+                    text = "";
                 }
             }
 
@@ -432,7 +425,7 @@ public class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
-
+    
     /**
      * Read the full text for <code>uri</code> from the fulltext area of the solr sources.
      * If any errors are encountered, log them and return an empty string
@@ -473,7 +466,7 @@ public class NinesStatementHandler implements RDFHandler {
         }
     }
 
-    public boolean handleRole(String predicate, String object) {
+    private boolean handleRole(String predicate, String object) {
         if (predicate.startsWith("http://www.loc.gov/loc.terms/relators/")) {
             String role = predicate.substring("http://www.loc.gov/loc.terms/relators/".length());
             addField(doc, "role_" + role, object);
@@ -554,22 +547,7 @@ public class NinesStatementHandler implements RDFHandler {
         addFieldEntry(map, name, value, false);
     }
 
-    // this is like add, but if the field exists it replaces the value instead of creating a second one.
-    public void setField(HashMap<String, ArrayList<String>> map, String name, String value) {
-        // skip null fields
-        if (value == null || name == null)
-            return;
-
-        // if the field is a url, check to see if it is reachable
-        if (config.collectLinks && value.trim().startsWith("http://") && value.trim().indexOf(" ") == -1
-            && !"uri".equals(name)) {
-            linkCollector.addLink(documentURI, filename, value);
-        }
-
-        addFieldEntry(map, name, value, true);
-    }
-
-    public void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
+    private void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
 
         // clean everythign going in. No escape sequences and no whitespace
         String cleanValue = StringEscapeUtils.unescapeXml(value);
@@ -713,7 +691,7 @@ public class NinesStatementHandler implements RDFHandler {
         return documents;
     }
 
-    public static ArrayList<String> enumerateYears(String startYear, String endYear) {
+    private static ArrayList<String> enumerateYears(String startYear, String endYear) {
         int y1 = Integer.parseInt(startYear);
         int y2 = Integer.parseInt(endYear);
 

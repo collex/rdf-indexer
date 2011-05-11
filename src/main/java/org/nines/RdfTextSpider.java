@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -26,6 +27,8 @@ import java.io.Writer;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.io.IOUtils;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.util.PDFTextStripper;
 import org.openrdf.model.Statement;
 import org.openrdf.rio.ParseErrorListener;
 import org.openrdf.rio.RDFHandler;
@@ -41,7 +44,7 @@ import org.openrdf.rio.rdfxml.RDFXMLParser;
  * @author loufoster
  *
  */
-public class RdfTextSpider implements RDFHandler {
+final class RdfTextSpider implements RDFHandler {
 
     private ErrorReport errorReport;
     private RDFIndexerConfig config;
@@ -103,9 +106,6 @@ public class RdfTextSpider implements RDFHandler {
         
         // only care if it looks like a URL and is not a PDF
         if (object.startsWith("http://") ) {
-            if (object.endsWith(".pdf") || object.endsWith(".PDF")) {
-                return;
-            } 
             getRawText(object);  
         }
     }
@@ -131,7 +131,11 @@ public class RdfTextSpider implements RDFHandler {
         // scrape the content from remote host...
         String content = "";
         try {
-            content = scrapeExternalText(urlString);
+            if (urlString.endsWith(".pdf") || urlString.endsWith(".PDF")) {
+                content = scrapeExternalPDF(urlString);;
+            } else {
+                content = scrapeExternalText(urlString);
+            }
         } catch (IOException e) {
             this.errorReport.addError(
                 new IndexerError( "", urlString, "Unable to create get external text: "+e.toString()));
@@ -163,7 +167,12 @@ public class RdfTextSpider implements RDFHandler {
         }        
     }
     
-    private String scrapeExternalText(String url) throws IOException {
+    /**
+     * Extract the text from the specified URI
+     * @param uri
+     * @return
+     */
+    private String scrapeExternalText(final String url) throws IOException {
         GetMethod get = new GetMethod(url);
         int result;
         try {
@@ -178,6 +187,41 @@ public class RdfTextSpider implements RDFHandler {
             get.releaseConnection();
         }
     }
+    
+    /**
+     * Extract the text from the PDF specified by the URI
+     * @param uri
+     * @return
+     * @throws IOException 
+     */
+    private String scrapeExternalPDF( final String uri ) throws IOException {
+        InputStream is = null;
+        GetMethod get = new GetMethod(uri);;
+        PDDocument pdfDoc  = null;
+        try {
+            int result;
+            result = httpClient.executeMethod(get);
+            if (result != 200) {
+                throw new IOException(result + " code returned for URL: " + uri);
+            }
+            is = get.getResponseBodyAsStream();
+            pdfDoc = PDDocument.load(is);
+            PDFTextStripper pdfStrip = new PDFTextStripper();
+            return pdfStrip.getText( pdfDoc );
+            
+        } catch (IOException e ) {
+            throw e; // just rethrow it
+        } finally {
+            try{
+                get.releaseConnection();
+                IOUtils.closeQuietly(is);
+                if ( pdfDoc != null ) {
+                    pdfDoc.close();
+                }
+            } catch (Exception e) {}
+        }
+    }
+
 
     public void startRDF() throws RDFHandlerException {
         // NO-OP
