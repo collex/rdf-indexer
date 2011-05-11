@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.StringTokenizer;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.log4j.Logger;
 import org.nines.RDFIndexerConfig.Mode;
 import org.openrdf.model.Statement;
@@ -42,7 +41,7 @@ final class NinesStatementHandler implements RDFHandler {
     private String dateBNodeId;
     private HashMap<String, ArrayList<String>> doc;
     private Boolean title_sort_added = false;
-    private String filename;
+    private File file;
     private RDFIndexerConfig config;
     private ErrorReport errorReport;
     private String documentURI;
@@ -75,7 +74,7 @@ final class NinesStatementHandler implements RDFHandler {
         if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate)
             && statement.getSubject() instanceof URIImpl) {
             if (documents.get(subject) != null) {
-                errorReport.addError(new IndexerError(filename, subject, "Duplicate URI"));
+                errorReport.addError(new IndexerError(this.file.toString(), subject, "Duplicate URI"));
                 log.info("*** Duplicate: " + subject);
             }
             doc = new HashMap<String, ArrayList<String>>();
@@ -86,12 +85,10 @@ final class NinesStatementHandler implements RDFHandler {
             log.info("Parsing RDF for document: " + subject);
             errorReport.flush();
         }
+        
         // Check for any unsupported nines:* attributes and issue error if any exist
         if (predicate.startsWith("http://www.nines.org/schema#")) {
-
-            errorReport.addError(new IndexerError(filename, documentURI, "NINES is no longer a valid attribute: "
-                + predicate));
-
+            addError( "NINES is no longer a valid attribute: "+ predicate);
             return;
         }
 
@@ -102,9 +99,7 @@ final class NinesStatementHandler implements RDFHandler {
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
                 || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image"))) {
 
-                errorReport.addError(new IndexerError(filename, documentURI, "Collex does not support this property: "
-                    + predicate));
-
+                addError("Collex does not support this property: " + predicate );
                 return;
             }
         }
@@ -160,10 +155,11 @@ final class NinesStatementHandler implements RDFHandler {
 
     private boolean handleFederation(String predicate, String object) {
         if ("http://www.collex.org/schema#federation".equals(predicate)) {
-            if (object.equals("NINES") || object.equals("18thConnect"))
+            if (object.equals("NINES") || object.equals("18thConnect")) {
                 addField(doc, "federation", object);
-            else
-                errorReport.addError(new IndexerError(filename, documentURI, "Unknown federation: " + object));
+            } else {
+                addError("Unknown federation: " + object);
+            }
             return true;
         }
         return false;
@@ -313,7 +309,7 @@ final class NinesStatementHandler implements RDFHandler {
                     years = parseYears(object);
 
                     if (years.size() == 0) {
-                        errorReport.addError(new IndexerError(filename, documentURI, "Invalid date format: " + object));
+                        addError("Invalid date format: " + object);
                         return false;
                     }
 
@@ -323,7 +319,7 @@ final class NinesStatementHandler implements RDFHandler {
 
                     addField(doc, "date_label", object);
                 } catch (NumberFormatException e) {
-                    errorReport.addError(new IndexerError(filename, documentURI, "Invalid date format: " + object));
+                    addError( "Invalid date format: " + object);
                 }
             } else {
                 BNodeImpl bnode = (BNodeImpl) value;
@@ -353,7 +349,7 @@ final class NinesStatementHandler implements RDFHandler {
                         addField(doc, "year", year);
                     }
                 } catch (NumberFormatException e) {
-                    errorReport.addError(new IndexerError(filename, documentURI, "Invalid date format: " + object));
+                    addError("Invalid date format: " + object);
                 }
                 return true;
             }
@@ -400,25 +396,27 @@ final class NinesStatementHandler implements RDFHandler {
         if ("http://www.collex.org/schema#text".equals(predicate)) {
 
             // Objects with external content will have some form of
-            // http url as the content. Detect this and grab text.
+            // http url as the content.
             String text = object;
+            boolean externalText = false;
             if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
                 addFieldEntry(doc, "text_url", text, false);
 
                 // only in index mode do we attempt to grab 
                 // full text from the full text folder
                 if (config.mode == Mode.INDEX) {
+                    externalText = true;
                     text = getFullText(this.doc.get("uri").get(0));
                 } else {
                     text = "";
                 }
             }
 
-            // At this point, we have the text. Do some high-level cleanups
-            // and add it to the data hashmap
             if (text.length() > 0) {
                 this.largestTextField = Math.max(this.largestTextField, text.length());
-                addFieldEntry(doc, "text", text, false);
+                // NOTE: the !externalText signals to the add method that it
+                // should NOT perform any cleanup. Text goes in untouched.
+                addFieldEntry(doc, "text", text, false, !externalText);
             }
 
             return true;
@@ -541,87 +539,54 @@ final class NinesStatementHandler implements RDFHandler {
         // if the field is a url, check to see if it is reachable
         if (config.collectLinks && value.trim().startsWith("http://") && value.trim().indexOf(" ") == -1
             && !"uri".equals(name)) {
-            linkCollector.addLink(documentURI, filename, value);
+            linkCollector.addLink(documentURI, this.file.toString(), value);
         }
 
         addFieldEntry(map, name, value, false);
     }
-
+    
+    /**
+     * Add a CLEANED field entry. The entry will be normalize, escape sequences stripped
+     * and invalid utf-8 chars stripped
+     * @param map
+     * @param name
+     * @param value
+     * @param replace
+     */
     private void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, Boolean replace) {
+        addFieldEntry(map, name, value, replace, true);
+    }
 
-        // clean everythign going in. No escape sequences and no whitespace
-        String cleanValue = StringEscapeUtils.unescapeXml(value);
-        cleanValue = stripBadEscapeSequences(cleanValue);
-        cleanValue = cleanValue.replaceAll("\t", " ");
-        cleanValue = cleanValue.replaceAll("\n+", "\n");
-        cleanValue = cleanValue.replaceAll(" +", " ");
-        cleanValue = cleanValue.trim();
+    /**
+     * Add a new field entry and optionally clean the data
+     * @param map
+     * @param name
+     * @param value
+     * @param replace
+     * @param clean
+     */
+    private void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, boolean replace, boolean clean) {
 
-        // Look for unknown character and warn
-        int pos = value.indexOf("\ufffd");
-        if (pos > -1) {
-
-            String snip = value.substring(Math.max(0, pos - 25), Math.min(value.length(), pos + 25));
-            errorReport.addError(new IndexerError(filename, documentURI, "Invalid UTF-8 character at position " + pos
-                + " of field " + name + "\n  Snippet: [" + snip + "]"));
+        // clean everything going in? 
+        String data = value;
+        if ( clean ) {
+            data = TextUtils.stripEscapeSequences(data, this.errorReport, this.file, this.documentURI);
+            data = TextUtils.normalizeWhitespace(data);
+            data = TextUtils.stripUnknownUTF8(data, this.errorReport, this.file, this.documentURI);
         }
-
+       
         // make sure we add to array for already existing fields
         if (map.containsKey(name) && replace == false) {
             ArrayList<String> pastValues = map.get(name);
-            pastValues.add(cleanValue);
+            pastValues.add(data);
             map.put(name, pastValues);
         } else {
             ArrayList<String> values = new ArrayList<String>();
-            values.add(cleanValue);
+            values.add(data);
             map.put(name, values);
         }
     }
 
-    /**
-     * Find any occurances of &# with a ; within 6 chars. Attempt to unescape them into a utf8 char. If this is not
-     * possibe, flag it
-     * 
-     * @param text
-     * @return
-     */
-    protected String stripBadEscapeSequences(String text) {
-
-        int startPos = 0;
-        while (true) {
-            int pos = text.indexOf("&#", startPos);
-            if (pos == -1) {
-                break;
-            } else {
-                // look for a trainling ; to end the sequence
-                int pos2 = text.indexOf(";", pos);
-                if (pos2 > -1) {
-                    // this is likely an escape sequence
-                    if (pos2 <= pos + 6) {
-
-                        // dump the bad sequence
-                        String bad = text.substring(pos, pos2 + 1);
-                        text = text.replaceAll(bad, "[?]");
-                        errorReport.addError(new IndexerError(this.filename, this.documentURI,
-                            "Replaced potentially invalid escape sequece [" + bad + "]"));
-
-                        // skip the new [?]
-                        startPos = pos + 3;
-
-                    } else {
-
-                        // no close ; found. Just skip over the &#
-                        startPos = pos + 2;
-                    }
-
-                } else {
-                    // NO ; found - skip over the &#
-                    startPos = pos + 2;
-                }
-            }
-        }
-        return text;
-    }
 
     private String getFirstField(HashMap<String, ArrayList<String>> object, String field) {
         ArrayList<String> objectArray = object.get(field);
@@ -706,9 +671,13 @@ final class NinesStatementHandler implements RDFHandler {
 
         return years;
     }
+    
+    private void addError( final String message ) {
+        this.errorReport.addError(new IndexerError(this.file.toString(), this.documentURI, message));
+    }
 
-    public void setFilename(String filename) {
-        this.filename = filename;
+    public void setFile(final File file) {
+        this.file = file;
     }
     
     public long getLargestTextSize() {

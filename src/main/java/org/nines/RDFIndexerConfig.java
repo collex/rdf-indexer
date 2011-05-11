@@ -25,15 +25,15 @@ import java.io.File;
  */
 public class RDFIndexerConfig {
 
-    // indexing mode
+    // mode of operation
     public enum Mode {
-        NONE, // No mode.. do nothing. 
-        TEST, // Testing mode: ignore all ext text, dont post to solr
-        SPIDER, // retrieve full text from external source - no post to solr
-        CLEAN, // cleanup the raw sipdered text and move to fulltext
-        INDEX, // populate solr with rdf data Text will be pulled from the RDF or fulltext
-        COMPARE
-        // compare the new arcive with the main index
+        NONE,       // No mode.. do nothing. 
+        TEST,       // Testing mode: ignore all ext text, dont post to solr
+        SPIDER,     // retrieve full text from external source - no post to solr
+        CLEAN_RAW,  // cleanup the raw sipdered text and move to fulltext
+        CLEAN_FULL, // cleanup the fulltext 
+        INDEX,      // populate solr with rdf data Text will be pulled from the RDF or fulltext
+        COMPARE     // compare the new arcive with the main index
     };
 
     // general properties

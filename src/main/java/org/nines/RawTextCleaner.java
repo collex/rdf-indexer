@@ -10,7 +10,6 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringEscapeUtils;
 
 /**
  * Cleaner for Raw text files. It will clean out unused tags,
@@ -62,10 +61,9 @@ public class RawTextCleaner {
         }
         
         // clean it up as best as possible
-        content = stripUnknownUTF8(rawTextFile.getName(), content);
+        content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile);
+        content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
         content = cleanText( content );
-        content = StringEscapeUtils.unescapeXml(content);        
-        content = stripBadEscapeSequences(rawTextFile.getName(), content);
         
         // get the filename for the cleaned fulltext file
         String cleanedFile = this.config.getFullTextRoot() + SolrClient.safeCore(this.config.archiveName);
@@ -91,76 +89,6 @@ public class RawTextCleaner {
         } finally {
             IOUtils.closeQuietly(fw);
         }
-    }
-    
-    /**
-     * Remove unknown UTF-8 characters (0xFFFD) and log warnings for each
-     * @param value
-     * @return
-     */
-    private String stripUnknownUTF8( final String fileName, final String value) {
-        // Look for unknown character and warn
-        int curPos= 0;
-        while ( true ) {
-            int pos = value.indexOf("\ufffd", curPos);
-            if (pos == -1) {
-                break;
-            }
-            curPos = pos+1;
-            
-            String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
-            errorReport.addError(new IndexerError(fileName, "", 
-                    "Invalid UTF-8 character at position " + pos
-                    + " of field text"
-                    + "\n  Snippet: ["+snip+"]"));
-                
-        }
-        return value.replaceAll("\ufffd", "");
-    }
-    
-    /**
-     * Find any occurances of &# with a ; within 6 chars strip them out and flag as a potential error.
-     * Only call this on text that has been fully unescaped.
-     * 
-     * @param text
-     * @return
-     */
-    protected String stripBadEscapeSequences(final String fileName, String text) {
-
-        int startPos = 0;
-        while (true) {
-            int pos = text.indexOf("&#", startPos);
-            if (pos == -1) {
-                break;
-            } else {
-                // look for a trainling ; to end the sequence
-                int pos2 = text.indexOf(";", pos);
-                if (pos2 > -1) {
-                    // this is likely an escape sequence
-                    if (pos2 <= pos + 6) {
-
-                        // dump the bad sequence
-                        String bad = text.substring(pos, pos2 + 1);
-                        String snip = text.substring(Math.max(0, pos-25), Math.min(text.length(), pos+25));           
-                        text = text.replaceAll(bad, "");
-                            errorReport.addError(new IndexerError(fileName, "",
-                                    "Removed potentially invalid escape sequece [" + bad 
-                                    + "]\nSnippet: ["+snip+"]"));
-                            startPos = pos;
-
-                    } else {
-
-                        // no close ; found. Just skip over the &#
-                        startPos = pos + 2;
-                    }
-
-                } else {
-                    // NO ; found - skip over the &#
-                    startPos = pos + 2;
-                }
-            }
-        }
-        return text;
     }
     
     /**

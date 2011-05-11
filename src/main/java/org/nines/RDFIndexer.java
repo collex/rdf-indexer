@@ -79,7 +79,13 @@ public class RDFIndexer {
         this.log = Logger.getLogger(RDFIndexer.class.getName());
 
         // keep report file in the same folder as the log file.
-        File reportFile = new File(logFileRoot + "_error.log");
+        String logName;
+        if  ( this.config.mode.equals( Mode.INDEX) ) {
+            logName = logFileRoot + "_error.log";
+        } else {
+            logName = logFileRoot + "_" + this.config.mode.toString().toLowerCase()+"_error.log";
+        }
+        File reportFile = new File( logName ); 
         try {
             this.errorReport = new ErrorReport(reportFile);
         } catch (IOException e1) {
@@ -114,8 +120,10 @@ public class RDFIndexer {
             // execute based on mode setting
             if ( this.config.mode.equals( Mode.SPIDER) ) {
                 this.log.info("Full Text Spider Mode");
-            } else  if ( this.config.mode.equals( Mode.CLEAN) ) {
+            } else  if ( this.config.mode.equals( Mode.CLEAN_RAW) ) {
                 this.log.info("Raw Text Cleanup Mode");
+            } else  if ( this.config.mode.equals( Mode.CLEAN_FULL) ) {
+                this.log.info("Full Text Cleanup Mode");
             } else  if ( this.config.mode.equals( Mode.INDEX) ) {
                 this.log.info("Index Mode");
             } else {
@@ -127,13 +135,43 @@ public class RDFIndexer {
                 doIndexing();
             } else if ( this.config.mode.equals(Mode.SPIDER) ) {
                 doSpidering();
-            } else {
+            } else if ( this.config.mode.equals(Mode.CLEAN_RAW) ) {
                 doRawTextCleanup();
+            } else if ( this.config.mode.equals(Mode.CLEAN_FULL) ) {
+                doFullTextCleanup();
             }
         }
         
         this.errorReport.close();
         this.linkCollector.close();
+    }
+    
+    private void doFullTextCleanup() {
+        Date start = new Date();
+        this.log.info("Started raw text cleanup at " + start);
+        
+        this.dataFileQueue = new LinkedList<File>();
+        String fullPath =  this.config.getFullTextRoot() + SolrClient.safeCore(this.config.archiveName);
+        recursivelyQueueFiles( new File(fullPath), false);
+        int totalFiles = this.dataFileQueue.size();
+        
+        FullTextCleaner cleaner = new FullTextCleaner( this.errorReport );
+        while (this.dataFileQueue.size() > 0) {
+            File txtFile = this.dataFileQueue.remove();
+            this.log.info("Clean fill text from file "+txtFile.toString());
+            cleaner.clean( txtFile );
+            this.errorReport.flush();
+        }
+        
+        Date end = new Date();
+        double durationSec = (end.getTime() - start.getTime()) / 1000.0;
+        if (durationSec >= 60) {
+            this.log.info(String.format(
+                "Cleaned " + totalFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+        } else {
+            this.log.info(String.format(
+                "Cleaned " + totalFiles + " files in %3.2f seconds.", durationSec));
+        }    
     }
     
     private void doRawTextCleanup() {
@@ -372,9 +410,9 @@ public class RDFIndexer {
 
             // validate all other parts of object and generate error report
             try {
-                ArrayList<ErrorMessage> messages = ValidationUtility.validateObject(object);
-                for (ErrorMessage message : messages) {
-                    IndexerError e = new IndexerError(file.getName(), uri, message.getErrorMessage());
+                ArrayList<String> messages = ValidationUtility.validateObject(object);
+                for (String message : messages) {
+                    IndexerError e = new IndexerError(file.getName(), uri, message);
                     errorReport.addError(e);
                 }
             } catch (Exception valEx) {
@@ -485,7 +523,7 @@ public class RDFIndexer {
         options.addOption(nameOpt);
 
         // MODE
-        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, CLEAN, INDEX, COMPARE]");
+        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, CLEAN_RAW, CLEAN_FULL, INDEX, COMPARE]");
         options.addOption ( modeOpt );
 
         // include/exclude field group

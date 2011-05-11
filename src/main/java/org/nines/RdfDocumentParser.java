@@ -49,7 +49,7 @@ public class RdfDocumentParser {
         largestTextSize = 0;
         RDFXMLParser parser = new RDFXMLParser();
         NinesStatementHandler statementHandler = new NinesStatementHandler(errorReport, linkCollector, config);
-        statementHandler.setFilename(file.getName());
+        statementHandler.setFile(file);
 
         parser.setRDFHandler(statementHandler);
         parser.setParseErrorListener( new ParseListener(file, errorReport));
