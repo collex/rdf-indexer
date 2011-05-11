@@ -17,12 +17,17 @@ package org.nines;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.util.PDFTextStripper;
+import org.junit.Test;
 
 import junit.framework.TestCase;
 
@@ -36,6 +41,25 @@ public class NinesStatementHandlerTest extends TestCase {
     sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
   }
 
+  @Test
+  public void testPdfStrip()  {
+      try {
+        FileInputStream is = new FileInputStream( new File("test_data/sample.pdf") );
+        PDDocument pdfDoc = PDDocument.load(is);
+        assertEquals(2, pdfDoc.getNumberOfPages());
+        PDFTextStripper pdfStrip = new PDFTextStripper();
+        String text = pdfStrip.getText( pdfDoc );
+        
+        assertNotNull(text);
+        System.out.println(text);
+        
+    } catch (Exception e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    }
+  }
+  
+  
   public void testAddField() {
     HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
 
