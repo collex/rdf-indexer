@@ -80,7 +80,7 @@ public class RDFIndexer {
 
         // keep report file in the same folder as the log file.
         String logName;
-        if  ( this.config.mode.equals( Mode.INDEX) ) {
+        if  ( this.config.mode.equals( Mode.INDEX) || this.config.mode.equals(Mode.TEST) ) {
             logName = logFileRoot + "_error.log";
         } else {
             logName = logFileRoot + "_" + this.config.mode.toString().toLowerCase()+"_error.log";
@@ -244,7 +244,7 @@ public class RDFIndexer {
     }
 
     private void purgeArchive(final String coreName) {
-        log.info("DELETING ALL INDEX DATA FROM CORE: " + coreName);
+        log.info("Deleting all data from: " + coreName);
         try {
             this.solrClient.post("<delete><query>*:*</query></delete>", coreName);
             this.solrClient.post("<commit/>", coreName);
