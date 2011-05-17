@@ -78,7 +78,7 @@ public class FullTextCleaner {
         
         // special case for CALI
         if ( this.archiveName.equals("cali")) {
-            cleaned = stripJunk(content, "Search Text:", "fetching image...");
+            cleaned = stripJunk(cleaned, "Search Text:", "fetching image...");
         }
         
         // Look for unknown character and warn
