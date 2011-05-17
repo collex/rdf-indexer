@@ -406,7 +406,7 @@ final class NinesStatementHandler implements RDFHandler {
                 // full text from the full text folder
                 if (config.mode == Mode.INDEX) {
                     externalText = true;
-                    text = getFullText(this.doc.get("uri").get(0));
+                    text = getFullText( text );
                 } else {
                     text = "";
                 }
