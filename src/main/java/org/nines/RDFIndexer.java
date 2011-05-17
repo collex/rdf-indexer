@@ -160,6 +160,8 @@ public class RDFIndexer {
             File txtFile = this.dataFileQueue.remove();
             cleaner.clean( txtFile );         
             this.errorReport.flush();
+
+            break;
         }
         
         Date end = new Date();

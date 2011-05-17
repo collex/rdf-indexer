@@ -15,10 +15,8 @@
  **/
 package org.nines;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -27,7 +25,6 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.FileWriterWithEncoding;
 import org.apache.log4j.Logger;
 
 /**
@@ -74,16 +71,16 @@ public class FullTextCleaner {
             IOUtils.closeQuietly(is);
         }  
         
-        // special case for CALI
-        if ( this.archiveName.equals("cali")) {
-            this.log.info("   special text stripping for cali archive");
-            stripJunk(txtFile, "Search Text:", "fetching image...");
-        }
-        
         // clean it up
         String cleaned = TextUtils.stripEscapeSequences(content, this.errorReport, txtFile);
         cleaned = TextUtils.normalizeWhitespace(cleaned);
 
+        
+        // special case for CALI
+        if ( this.archiveName.equals("cali")) {
+            cleaned = stripJunk(content, "Search Text:", "fetching image...");
+        }
+        
         // Look for unknown character and warn
         int pos = cleaned.indexOf("\ufffd");
         if (pos > -1) {
@@ -106,40 +103,21 @@ public class FullTextCleaner {
         }
     }
     
-    private void stripJunk(File txtFile, String startWord, String stopWord) {
-        try {
-            FileReader fr = new FileReader( txtFile );
-            BufferedReader br = new BufferedReader(fr);
-            String line = "";
-            StringBuffer finalContent = new StringBuffer();
-            boolean skip = true;
-            while ( true) {
-                line = br.readLine();
-                if ( line == null ) {
-                    break;
-                } else {
-                    if ( line.equals(startWord) || line.equals(stopWord) ) {
-                        skip = !skip;
-                    } else {
-                        if ( skip == false ) {
-                            finalContent.append(line).append("\n");
-                        }
-                    }
+    private String stripJunk(String content, String startWord, String stopWord) {
+        String[] lines = content.split("\n");
+        StringBuffer finalContent = new StringBuffer();
+        boolean skip = true;
+        for ( int i=0; i<lines.length; i++) {
+
+            if ( lines[i].equals(startWord) || lines[i].equals(stopWord) ) {
+                skip = !skip;
+            } else {
+                if ( skip == false ) {
+                    finalContent.append(lines[i]).append("\n");
                 }
             }
-            br.close();
-            fr.close();
-            
-            FileWriterWithEncoding fw = new FileWriterWithEncoding(txtFile, "UTF-8");
-            fw.write(finalContent.toString());
-            fw.flush();
-            fw.close();
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            this.errorReport.addError( new IndexerError(
-                txtFile.toString(), "", "Failed stripping bad text from file: "+e.toString()) );
         }
         
+        return finalContent.toString().trim();
     }
 }
