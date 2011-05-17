@@ -28,6 +28,7 @@ import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.FileWriterWithEncoding;
+import org.apache.log4j.Logger;
 
 /**
  * Cleaner for full text files. It will fix escape sequences, strip bad 
@@ -41,10 +42,12 @@ public class FullTextCleaner {
     private CharsetDecoder decoder;
     private ErrorReport errorReport;
     private String archiveName;
+    private Logger log;
     
     public FullTextCleaner (String archiveName, ErrorReport errorReport) {
         this.errorReport = errorReport;
         this.archiveName = archiveName;
+        this.log = Logger.getLogger(FullTextCleaner.class.getName());
         
         Charset cs = Charset.availableCharsets().get("UTF-8");
         this.decoder = cs.newDecoder();
@@ -53,6 +56,9 @@ public class FullTextCleaner {
     }
     
     public void clean(File txtFile) {
+        
+        this.log.info("Clean full text from file "+txtFile.toString());
+        
         // Read the text from the file. Bail if this fails
         String content = null;
         InputStreamReader is = null;
@@ -70,6 +76,7 @@ public class FullTextCleaner {
         
         // special case for CALI
         if ( this.archiveName.equals("cali")) {
+            this.log.info("   special text stripping for cali archive");
             stripJunk(txtFile, "Search Text:", "fetching image...");
         }
         

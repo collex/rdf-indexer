@@ -158,7 +158,6 @@ public class RDFIndexer {
         FullTextCleaner cleaner = new FullTextCleaner( this.config.archiveName, this.errorReport );
         while (this.dataFileQueue.size() > 0) {
             File txtFile = this.dataFileQueue.remove();
-            this.log.info("Clean fill text from file "+txtFile.toString());
             cleaner.clean( txtFile );         
             this.errorReport.flush();
         }
