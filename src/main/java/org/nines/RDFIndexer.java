@@ -155,11 +155,11 @@ public class RDFIndexer {
         recursivelyQueueFiles( new File(fullPath), false);
         int totalFiles = this.dataFileQueue.size();
         
-        FullTextCleaner cleaner = new FullTextCleaner( this.errorReport );
+        FullTextCleaner cleaner = new FullTextCleaner( this.config.archiveName, this.errorReport );
         while (this.dataFileQueue.size() > 0) {
             File txtFile = this.dataFileQueue.remove();
             this.log.info("Clean fill text from file "+txtFile.toString());
-            cleaner.clean( txtFile );
+            cleaner.clean( txtFile );         
             this.errorReport.flush();
         }
         
@@ -173,7 +173,7 @@ public class RDFIndexer {
                 "Cleaned " + totalFiles + " files in %3.2f seconds.", durationSec));
         }    
     }
-    
+
     private void doRawTextCleanup() {
         Date start = new Date();
         log.info("Started raw text cleanup at " + start);

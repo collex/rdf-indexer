@@ -15,8 +15,10 @@
  **/
 package org.nines;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -25,6 +27,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.FileWriterWithEncoding;
 
 /**
  * Cleaner for full text files. It will fix escape sequences, strip bad 
@@ -37,9 +40,11 @@ import org.apache.commons.io.IOUtils;
 public class FullTextCleaner {
     private CharsetDecoder decoder;
     private ErrorReport errorReport;
+    private String archiveName;
     
-    public FullTextCleaner (ErrorReport errorReport) {
+    public FullTextCleaner (String archiveName, ErrorReport errorReport) {
         this.errorReport = errorReport;
+        this.archiveName = archiveName;
         
         Charset cs = Charset.availableCharsets().get("UTF-8");
         this.decoder = cs.newDecoder();
@@ -62,6 +67,11 @@ public class FullTextCleaner {
         } finally {
             IOUtils.closeQuietly(is);
         }  
+        
+        // special case for CALI
+        if ( this.archiveName.equals("cali")) {
+            stripJunk(txtFile, "Search Text:", "fetching image...");
+        }
         
         // clean it up
         String cleaned = TextUtils.stripEscapeSequences(content, this.errorReport, txtFile);
@@ -87,5 +97,42 @@ public class FullTextCleaner {
         } finally {
             IOUtils.closeQuietly(fw);
         }
+    }
+    
+    private void stripJunk(File txtFile, String startWord, String stopWord) {
+        try {
+            FileReader fr = new FileReader( txtFile );
+            BufferedReader br = new BufferedReader(fr);
+            String line = "";
+            StringBuffer finalContent = new StringBuffer();
+            boolean skip = true;
+            while ( true) {
+                line = br.readLine();
+                if ( line == null ) {
+                    break;
+                } else {
+                    if ( line.equals(startWord) || line.equals(stopWord) ) {
+                        skip = !skip;
+                    } else {
+                        if ( skip == false ) {
+                            finalContent.append(line).append("\n");
+                        }
+                    }
+                }
+            }
+            br.close();
+            fr.close();
+            
+            FileWriterWithEncoding fw = new FileWriterWithEncoding(txtFile, "UTF-8");
+            fw.write(finalContent.toString());
+            fw.flush();
+            fw.close();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            this.errorReport.addError( new IndexerError(
+                txtFile.toString(), "", "Failed stripping bad text from file: "+e.toString()) );
+        }
+        
     }
 }
