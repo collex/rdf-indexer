@@ -124,7 +124,8 @@ final class RdfTextSpider implements RDFHandler {
         rawFile = rawFile.replace("?", "QU");
         rawFile = rawFile.replace("=", "EQ");
         rawFile = rawFile.replace("&", "AMP");
-        String rawRoot = this.config.getRawTextRoot();
+        rawFile = rawFile + ".txt";
+        String rawRoot = findRawTextRoot();
         rawRoot = rawRoot + SolrClient.safeCore( this.config.archiveName);
         File urlFile = new File(rawRoot + "/"+ rawFile );
         
@@ -165,6 +166,18 @@ final class RdfTextSpider implements RDFHandler {
             this.errorReport.addError(
                 new IndexerError(urlFile.toString(), urlString, "Unable to create get external text: "+e.toString()));
         }        
+    }
+    
+    /**
+     * find the full path to the raw text root baseed on 
+     * the full path to the original rdf sources
+     * @return
+     */
+    private String findRawTextRoot() {
+        String path = this.config.sourceDir.toString();
+        int pos = path.indexOf("/rdf/");
+        path = path.substring(0, pos) + "/rawtext/";
+        return path;
     }
     
     /**

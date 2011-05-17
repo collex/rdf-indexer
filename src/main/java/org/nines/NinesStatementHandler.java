@@ -425,6 +425,19 @@ final class NinesStatementHandler implements RDFHandler {
     }
     
     /**
+     * find the full path to the full text root baseed on 
+     * the path to the original rdf sources
+     * @return
+     */
+    private String findFullTextRoot() {
+        String path = this.config.sourceDir.toString();
+        int pos = path.indexOf("/rdf/");
+        path = path.substring(0, pos) + "/fulltext/";
+        path += SolrClient.safeCore(this.config.archiveName) + "/";
+        return path;
+    }
+    
+    /**
      * Read the full text for <code>uri</code> from the fulltext area of the solr sources.
      * If any errors are encountered, log them and return an empty string
      * 
@@ -433,9 +446,8 @@ final class NinesStatementHandler implements RDFHandler {
      */
     private String getFullText(String uri) {
 
-        String fullTextRoot = this.config.getFullTextRoot();
-        fullTextRoot = fullTextRoot + SolrClient.safeCore(this.config.archiveName) + "/";
-        File root = new File(fullTextRoot);
+        String fullTextRoot = findFullTextRoot() ;
+        File root = new File( fullTextRoot );
         if (root.exists() == false) {
             this.errorReport
                 .addError(new IndexerError("", uri, "Missing full text source directory " + root.toString()));

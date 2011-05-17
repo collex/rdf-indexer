@@ -62,7 +62,7 @@ public class RDFIndexer {
 
     /**
      * 
-     * @param rdfSource
+     * @param sourceDir
      * @param archiveName
      * @param config
      */
@@ -151,26 +151,29 @@ public class RDFIndexer {
         this.log.info("Started raw text cleanup at " + start);
         
         this.dataFileQueue = new LinkedList<File>();
-        String fullPath =  this.config.getFullTextRoot() + SolrClient.safeCore(this.config.archiveName);
+        String fullPath =  this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
         recursivelyQueueFiles( new File(fullPath), false);
         int totalFiles = this.dataFileQueue.size();
         
-        FullTextCleaner cleaner = new FullTextCleaner( this.config.archiveName, this.errorReport );
+        FullTextCleaner cleaner = new FullTextCleaner( this.config.archiveName, this.errorReport, this.config.customCleanClass );
         while (this.dataFileQueue.size() > 0) {
             File txtFile = this.dataFileQueue.remove();
             cleaner.clean( txtFile );         
             this.errorReport.flush();
         }
         
+        String stats = "Cleaned " + totalFiles + 
+            " files (Total Size: " + cleaner.getOriginalLength()
+            + ", Cleaned Size: "+cleaner.getCleanedLength()
+            + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
+        
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            this.log.info(String.format(
-                "Cleaned " + totalFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+            this.log.info(String.format( "%s in %3.2f minutes.", stats, (durationSec / 60.0)));
         } else {
-            this.log.info(String.format(
-                "Cleaned " + totalFiles + " files in %3.2f seconds.", durationSec));
-        }    
+            this.log.info(String.format("%s in %3.2f seconds.", stats, durationSec));
+        }
     }
 
     private void doRawTextCleanup() {
@@ -178,35 +181,37 @@ public class RDFIndexer {
         log.info("Started raw text cleanup at " + start);
         
         this.dataFileQueue = new LinkedList<File>();
-        String rawPath =  this.config.getRawTextRoot() + SolrClient.safeCore(this.config.archiveName);
+        String rawPath =  this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
         recursivelyQueueFiles( new File(rawPath), false);
-        this.numFiles = this.dataFileQueue.size();
+        int totalFiles  = this.dataFileQueue.size();
         
         RawTextCleaner cleaner = new RawTextCleaner( this.config, this.errorReport );
         while (this.dataFileQueue.size() > 0) {
-            File rdfFile = this.dataFileQueue.remove();
-            this.log.info("Clean raw text from file "+rdfFile.toString());
-            cleaner.clean( rdfFile );
+            File rawFile = this.dataFileQueue.remove();
+            cleaner.clean( rawFile );
             this.errorReport.flush();
         }
+        
+        String stats = "Cleaned " + totalFiles + 
+            " files (Total Size: " + cleaner.getOriginalLength()
+            + ", Cleaned Size: "+cleaner.getCleanedLength()
+            + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
         
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            this.log.info(String.format(
-                "Cleaned " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+            this.log.info(String.format( "%s in %3.2f minutes.", stats, (durationSec / 60.0)));
         } else {
-            this.log.info(String.format(
-                "Cleaned " + numFiles + " files in %3.2f seconds.", durationSec));
+            this.log.info(String.format("%s in %3.2f seconds.", stats, durationSec));
         }
     }
 
     private void doIndexing() {
-        createGUID(this.config.rdfSource);
+        createGUID(this.config.sourceDir);
         Date start = new Date();
         log.info("Started indexing at " + start);
-        System.out.println("Indexing "+config.rdfSource);
-        indexDirectory(config.rdfSource);
+        System.out.println("Indexing "+config.sourceDir);
+        indexDirectory(config.sourceDir);
         System.out.println("Indexing DONE");
    
         // report indexing stats
@@ -226,8 +231,8 @@ public class RDFIndexer {
     private void doSpidering() {
         Date start = new Date();
         log.info("Started full-text spider at " + start);
-        System.out.println("Full-text spider of "+config.rdfSource);
-        spiderDirectory(this.config.rdfSource);
+        System.out.println("Full-text spider of "+config.sourceDir);
+        spiderDirectory(this.config.sourceDir);
         System.out.println("DONE");
    
         // report indexing stats
@@ -512,6 +517,7 @@ public class RDFIndexer {
         final String archive = "archive";       // REQUIRED name of archive
         final String pageSize = "pageSize";     // compare: max results per solr page
         final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
+        final String custom = "custom";         // flag to indicate customized clean
 
         // define the list of command line options
         Options options = new Options();
@@ -537,6 +543,8 @@ public class RDFIndexer {
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
+        
+        options.addOption(custom, true, "Customized clean class");
 
         // create parser and handle the options
         RDFIndexerConfig config = new RDFIndexerConfig();
@@ -557,7 +565,7 @@ public class RDFIndexer {
            
             // optional params:
             if (line.hasOption(source)) {
-                config.rdfSource = new File(line.getOptionValue(source));
+                config.sourceDir = new File(line.getOptionValue(source));
             }
             if (line.hasOption(maxSize)) {
                 config.maxUploadSize = Long.parseLong(line.getOptionValue(source));
@@ -579,8 +587,12 @@ public class RDFIndexer {
             }
 
             // if we are indexing, make sure source is present
-            if (config.mode.equals(Mode.COMPARE) == false && config.rdfSource == null) {
+            if (config.mode.equals(Mode.COMPARE) == false && config.sourceDir == null) {
                 throw new ParseException("Missing required -source parameter");
+            }
+            
+            if ( line.hasOption(custom )) {
+                config.customCleanClass =  line.getOptionValue(custom);
             }
 
         } catch (ParseException exp) {

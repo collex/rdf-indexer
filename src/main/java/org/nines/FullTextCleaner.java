@@ -40,11 +40,16 @@ public class FullTextCleaner {
     private ErrorReport errorReport;
     private String archiveName;
     private Logger log;
+    private String custom;
+    private long totalOrigChars = 0;
+    private long totalFilesChanged = 0;
+    private long totalCleanedChars = 0;
     
-    public FullTextCleaner (String archiveName, ErrorReport errorReport) {
+    public FullTextCleaner (String archiveName, ErrorReport errorReport, String custom) {
         this.errorReport = errorReport;
         this.archiveName = archiveName;
         this.log = Logger.getLogger(FullTextCleaner.class.getName());
+        this.custom = custom;
         
         Charset cs = Charset.availableCharsets().get("UTF-8");
         this.decoder = cs.newDecoder();
@@ -71,15 +76,13 @@ public class FullTextCleaner {
             IOUtils.closeQuietly(is);
         }  
         
+        // stats!
+        long startChars = content.length();;
+        this.totalOrigChars += startChars;
+        
         // clean it up
         String cleaned = TextUtils.stripEscapeSequences(content, this.errorReport, txtFile);
         cleaned = TextUtils.normalizeWhitespace(cleaned);
-
-        
-        // special case for CALI
-        if ( this.archiveName.equals("cali")) {
-            cleaned = stripJunk(cleaned, "Search Text:", "fetching image...");
-        }
         
         // Look for unknown character and warn
         int pos = cleaned.indexOf("\ufffd");
@@ -89,6 +92,26 @@ public class FullTextCleaner {
             errorReport.addError(new IndexerError(txtFile.toString(), "", "Invalid UTF-8 character at position " + pos
                 + "\n  Snippet: [" + snip + "]"));
         }
+        
+        if ( custom != null && custom.length() > 0) {
+            try {
+                @SuppressWarnings("rawtypes")
+                Class newClass  = Class.forName("org.nines.cleaner."+this.custom);
+                ICustomCleaner cleaner = (ICustomCleaner)newClass.newInstance();
+                cleaned = cleaner.clean(this.archiveName, cleaned);
+            } catch (Exception e) {
+                errorReport.addError(new IndexerError(txtFile.toString(), "", "Unable to run custom cleaner " 
+                    + this.custom +": " + e.toString()));
+            }
+        }
+        
+        // final stats
+        long endChars = content.length();
+        this.totalCleanedChars += ( startChars - endChars);
+        if ( endChars != startChars ) {
+            this.totalFilesChanged++;
+        }
+        this.log.info("  => Original length: "+startChars+", Cleaned length: "+endChars+", Delta:"+(startChars - endChars) );
         
         // write out the cleaned content over the existing content
         FileWriter fw = null;
@@ -103,21 +126,15 @@ public class FullTextCleaner {
         }
     }
     
-    private String stripJunk(String content, String startWord, String stopWord) {
-        String[] lines = content.split("\n");
-        StringBuffer finalContent = new StringBuffer();
-        boolean skip = true;
-        for ( int i=0; i<lines.length; i++) {
-
-            if ( lines[i].equals(startWord) || lines[i].equals(stopWord) ) {
-                skip = !skip;
-            } else {
-                if ( skip == false ) {
-                    finalContent.append(lines[i]).append("\n");
-                }
-            }
-        }
-        
-        return finalContent.toString().trim();
+    public long getTotalFilesChanged() {
+        return this.totalFilesChanged;
+    }
+    
+    public long getOriginalLength() {
+        return this.totalOrigChars;
+    }
+    
+    public long getCleanedLength() {
+        return this.totalCleanedChars;
     }
 }

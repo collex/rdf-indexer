@@ -10,6 +10,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Logger;
 
 /**
  * Cleaner for Raw text files. It will clean out unused tags,
@@ -25,11 +26,16 @@ public class RawTextCleaner {
     private CharsetDecoder decoder;
     private ErrorReport errorReport;    
     private RDFIndexerConfig config;
+    private Logger log;
+    private long totalOrigChars = 0;
+    private long totalFilesChanged = 0;
+    private long totalCleanedChars = 0;
     
     public RawTextCleaner( RDFIndexerConfig config, ErrorReport errorReport ) {
         this.errorReport = errorReport;
         this.config = config;
-        
+        this.log = Logger.getLogger(RawTextCleaner.class.getName());
+                
         Charset cs = Charset.availableCharsets().get("UTF-8");
         this.decoder = cs.newDecoder();
         this.decoder.onMalformedInput(CodingErrorAction.REPLACE);
@@ -45,6 +51,8 @@ public class RawTextCleaner {
      */
     public void clean( final File rawTextFile ) {
     
+        this.log.info("Clean raw text from file "+rawTextFile);
+        
         // Read the raw text from the file. Bail if this fails
         String content = null;
         InputStreamReader is = null;
@@ -53,21 +61,31 @@ public class RawTextCleaner {
             content =  IOUtils.toString(is);
         } catch ( Exception e ) {
             this.errorReport.addError( 
-                new IndexerError(rawTextFile.toString(), "", "Unable to read rw text file: " + e.toString()));
+                new IndexerError(rawTextFile.toString(), "", "Unable to read raw text file: " + e.toString()));
             return;
             
         } finally {
             IOUtils.closeQuietly(is);
         }
         
+        // stats!
+        long startChars = content.length();;
+        this.totalOrigChars += startChars;
+        
         // clean it up as best as possible
         content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile);
         content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
         content = cleanText( content );
         
+        long endChars = content.length();
+        this.totalCleanedChars += ( startChars - endChars);
+        if ( endChars != startChars ) {
+            this.totalFilesChanged++;
+        }
+        this.log.info("  => Original length: "+startChars+", Cleaned length: "+endChars+", Delta:"+(startChars - endChars) );
+        
         // get the filename for the cleaned fulltext file
-        String cleanedFile = this.config.getFullTextRoot() + SolrClient.safeCore(this.config.archiveName);
-        File out = new File(cleanedFile +"/" + rawTextFile.getName());
+        File out = toFullTextFile(rawTextFile);
         
         // Make sure that the directory structure exists
         if ( out.getParentFile().exists() == false) {
@@ -85,10 +103,28 @@ public class RawTextCleaner {
             fw.write(content);
         } catch (IOException e) {
             this.errorReport.addError( 
-                new IndexerError(cleanedFile.toString(), "", "Unable to write cleaned text file: " + e.toString()));
+                new IndexerError(out.toString(), "", "Unable to write cleaned text file: " + e.toString()));
         } finally {
             IOUtils.closeQuietly(fw);
         }
+    }
+    
+    private File toFullTextFile(File rawTextFile) {
+        String cleanedFile = this.config.sourceDir.toString().replace("rawtext", "fulltext") 
+            + "/" + SolrClient.safeCore(this.config.archiveName);
+        return new File(cleanedFile +"/" + rawTextFile.getName());   
+    }
+    
+    public long getTotalFilesChanged() {
+        return this.totalFilesChanged;
+    }
+    
+    public long getOriginalLength() {
+        return this.totalOrigChars;
+    }
+    
+    public long getCleanedLength() {
+        return this.totalCleanedChars;
     }
     
     /**

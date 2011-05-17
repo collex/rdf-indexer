@@ -38,11 +38,13 @@ public class RDFIndexerConfig {
 
     // general properties
     public String logRoot = ".";
-    public File rdfSource;
+    public File sourceDir;
     public String archiveName;
     public String solrBaseURL = "http://localhost:8983/solr";
     public String solrExistingIndex = "/resources";
     public Mode mode = Mode.NONE;
+    
+    public String customCleanClass = "";
 
     // indexing properties
     public boolean collectLinks = true;
@@ -56,30 +58,6 @@ public class RDFIndexerConfig {
 
     public final boolean isTestMode() {
         return this.mode.equals(Mode.TEST);
-    }
-
-    /**
-     * Get the fullpath to the full text folder in the solr sources
-     * This includes a trailing slash
-     * @return
-     */
-    public final String getFullTextRoot() {
-        String path = this.rdfSource.toString();
-        int pos = path.indexOf("/rdf/");
-        path = path.substring(0, pos) + "/fulltext/";
-        return path;
-    }
-
-    /**
-     * Get the fullpath to the raw text folder in the solr sources
-     * This includes a trailing slash
-     * @return
-     */
-    public final String getRawTextRoot() {
-        String path = this.rdfSource.toString();
-        int pos = path.indexOf("/rdf/");
-        path = path.substring(0, pos) + "/rawtext/";
-        return path;
     }
     
     /**
