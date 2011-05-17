@@ -163,7 +163,7 @@ public class RDFIndexer {
         }
         
         String stats = "Cleaned " + totalFiles + 
-            " files (Total Size: " + cleaner.getOriginalLength()
+            " files (Original Size: " + cleaner.getOriginalLength()
             + ", Cleaned Size: "+cleaner.getCleanedLength()
             + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
         
@@ -193,7 +193,7 @@ public class RDFIndexer {
         }
         
         String stats = "Cleaned " + totalFiles + 
-            " files (Total Size: " + cleaner.getOriginalLength()
+            " files (Original Size: " + cleaner.getOriginalLength()
             + ", Cleaned Size: "+cleaner.getCleanedLength()
             + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
         

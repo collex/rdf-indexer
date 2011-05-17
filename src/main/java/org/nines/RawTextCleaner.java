@@ -78,7 +78,7 @@ public class RawTextCleaner {
         content = cleanText( content );
         
         long endChars = content.length();
-        this.totalCleanedChars += ( startChars - endChars);
+        this.totalCleanedChars += endChars;
         if ( endChars != startChars ) {
             this.totalFilesChanged++;
         }

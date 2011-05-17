@@ -107,7 +107,7 @@ public class FullTextCleaner {
         
         // final stats
         long endChars = content.length();
-        this.totalCleanedChars += ( startChars - endChars);
+        this.totalCleanedChars += endChars;
         if ( endChars != startChars ) {
             this.totalFilesChanged++;
         }
