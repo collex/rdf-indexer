@@ -12,11 +12,18 @@ public class TextUtils {
      * @return
      */
     public static String normalizeWhitespace(final String srcText) {
-        String cleaned = srcText.replaceAll("\t", " ");
-        cleaned = cleaned.replaceAll("\n+", "\n");
-        cleaned = cleaned.replaceAll(" +", " ");
-        cleaned = cleaned.trim();    
-        return cleaned;
+        String[] lines = srcText.replaceAll("\n+", "\n").split("\n");
+        StringBuffer out = new StringBuffer();
+        for ( int i =0; i<lines.length; i++) {
+            String line = lines[i];
+            line = line.replaceAll("\t", " ");
+            line = line.replaceAll(" +", " ");
+            line =  lines[i].trim();
+            if ( line.length() > 0) {
+                out.append( line ).append("\n");
+            }
+        }  
+        return out.toString().trim();
     }
     
     /**

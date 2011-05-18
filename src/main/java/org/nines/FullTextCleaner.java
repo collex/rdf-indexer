@@ -17,9 +17,11 @@ package org.nines;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -114,15 +116,15 @@ public class FullTextCleaner {
         this.log.info("  => Original length: "+startChars+", Cleaned length: "+endChars+", Delta:"+(startChars - endChars) );
         
         // write out the cleaned content over the existing content
-        FileWriter fw = null;
+        Writer outWriter = null;
         try {
-            fw = new FileWriter(txtFile);
-            fw.write(cleaned);
+            outWriter = new OutputStreamWriter(new FileOutputStream(txtFile), "UTF-8");
+            outWriter.write( cleaned );
         } catch (IOException e) {
             this.errorReport.addError( 
-                new IndexerError( txtFile.toString(), "", "Unable to write cleaned text file: " + e.toString()));
+                new IndexerError(txtFile.toString(), "", "Unable to write cleaned text file: " + e.toString()));
         } finally {
-            IOUtils.closeQuietly(fw);
+            IOUtils.closeQuietly(outWriter);
         }
     }
     

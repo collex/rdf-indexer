@@ -2,9 +2,11 @@ package org.nines;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
@@ -73,9 +75,10 @@ public class RawTextCleaner {
         this.totalOrigChars += startChars;
         
         // clean it up as best as possible
-        content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile);
-        content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
         content = cleanText( content );
+        content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
+        content = TextUtils.normalizeWhitespace(content);
+        content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile); 
         
         long endChars = content.length();
         this.totalCleanedChars += endChars;
@@ -97,15 +100,15 @@ public class RawTextCleaner {
         }
         
         // dump the content
-        FileWriter fw = null;
+        Writer outWriter = null;
         try {
-            fw = new FileWriter(out);
-            fw.write(content);
+            outWriter = new OutputStreamWriter(new FileOutputStream(out), "UTF-8");
+            outWriter.write( content );
         } catch (IOException e) {
             this.errorReport.addError( 
                 new IndexerError(out.toString(), "", "Unable to write cleaned text file: " + e.toString()));
         } finally {
-            IOUtils.closeQuietly(fw);
+            IOUtils.closeQuietly(outWriter);
         }
     }
     
@@ -145,15 +148,6 @@ public class RawTextCleaner {
 
         // Get rid of non-unix line endings
         fullText = fullText.replaceAll("\r", "");
-
-        // Clean up the file a little bit -- there shouldn't be two spaces in a row or blank lines
-        fullText = fullText.replaceAll("&nbsp;", " ");
-        fullText = fullText.replaceAll("&#160;", " ");
-        fullText = fullText.replaceAll("\t", " ");
-        fullText = fullText.replaceAll(" +", " ");
-        fullText = fullText.replaceAll(" \n", "\n");
-        fullText = fullText.replaceAll("\n ", "\n");
-        fullText = fullText.replaceAll("\n+", "\n");
 
         return fullText;
     }
