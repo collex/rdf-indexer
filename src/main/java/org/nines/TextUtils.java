@@ -18,7 +18,7 @@ public class TextUtils {
             String line = lines[i];
             line = line.replaceAll("\t", " ");
             line = line.replaceAll(" +", " ");
-            line =  lines[i].trim();
+            line = line.trim();
             if ( line.length() > 0) {
                 out.append( line ).append("\n");
             }
