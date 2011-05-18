@@ -83,14 +83,14 @@ public class FullTextCleaner {
         this.totalOrigChars += startChars;
         
         // clean it up
-        String cleaned = TextUtils.stripEscapeSequences(content, this.errorReport, txtFile);
-        cleaned = TextUtils.normalizeWhitespace(cleaned);
+        content = TextUtils.stripEscapeSequences(content, this.errorReport, txtFile);
+        content = TextUtils.normalizeWhitespace(content);
         
         // Look for unknown character and warn
-        int pos = cleaned.indexOf("\ufffd");
+        int pos = content.indexOf("\ufffd");
         if (pos > -1) {
 
-            String snip = cleaned.substring(Math.max(0, pos - 25), Math.min(cleaned.length(), pos + 25));
+            String snip = content.substring(Math.max(0, pos - 25), Math.min(content.length(), pos + 25));
             errorReport.addError(new IndexerError(txtFile.toString(), "", "Invalid UTF-8 character at position " + pos
                 + "\n  Snippet: [" + snip + "]"));
         }
@@ -100,7 +100,7 @@ public class FullTextCleaner {
                 @SuppressWarnings("rawtypes")
                 Class newClass  = Class.forName("org.nines.cleaner."+this.custom);
                 ICustomCleaner cleaner = (ICustomCleaner)newClass.newInstance();
-                cleaned = cleaner.clean(this.archiveName, cleaned);
+                content = cleaner.clean(this.archiveName, content);
             } catch (Exception e) {
                 errorReport.addError(new IndexerError(txtFile.toString(), "", "Unable to run custom cleaner " 
                     + this.custom +": " + e.toString()));
@@ -119,7 +119,7 @@ public class FullTextCleaner {
         Writer outWriter = null;
         try {
             outWriter = new OutputStreamWriter(new FileOutputStream(txtFile), "UTF-8");
-            outWriter.write( cleaned );
+            outWriter.write( content );
         } catch (IOException e) {
             this.errorReport.addError( 
                 new IndexerError(txtFile.toString(), "", "Unable to write cleaned text file: " + e.toString()));
