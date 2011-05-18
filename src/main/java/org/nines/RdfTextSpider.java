@@ -159,7 +159,7 @@ final class RdfTextSpider implements RDFHandler {
             
         // dump the content to the file
         try {
-            Writer out = new OutputStreamWriter(new FileOutputStream(urlFile), "UTF-8");
+            Writer out = new OutputStreamWriter(new FileOutputStream(urlFile) );
             out.write(content);
             out.close();
         } catch (IOException e) {
@@ -193,7 +193,7 @@ final class RdfTextSpider implements RDFHandler {
             if (result != 200) {
                 throw new IOException(result + " code returned for URL: " + url);
             }
-            return IOUtils.toString( get.getResponseBodyAsStream(), "UTF-8" );
+            return IOUtils.toString( get.getResponseBodyAsStream() );
         } catch (IOException e ) {
             throw e; // just rethrow it
         } finally {

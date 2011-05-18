@@ -518,6 +518,7 @@ public class RDFIndexer {
         final String pageSize = "pageSize";     // compare: max results per solr page
         final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
         final String custom = "custom";         // flag to indicate customized clean
+        final String encoding = "encoding";     // set char set of raw source text for clea
 
         // define the list of command line options
         Options options = new Options();
@@ -544,6 +545,7 @@ public class RDFIndexer {
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
         
+        options.addOption(encoding, true, "Encoding of source raw text file for clean");
         options.addOption(custom, true, "Customized clean class");
 
         // create parser and handle the options
@@ -589,6 +591,10 @@ public class RDFIndexer {
             // if we are indexing, make sure source is present
             if (config.mode.equals(Mode.COMPARE) == false && config.sourceDir == null) {
                 throw new ParseException("Missing required -source parameter");
+            }
+            
+            if ( line.hasOption(encoding )) {
+                config.encoding =  line.getOptionValue(encoding);
             }
             
             if ( line.hasOption(custom )) {

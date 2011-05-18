@@ -38,7 +38,7 @@ public class RawTextCleaner {
         this.config = config;
         this.log = Logger.getLogger(RawTextCleaner.class.getName());
                 
-        Charset cs = Charset.availableCharsets().get("UTF-8");
+        Charset cs = Charset.availableCharsets().get( this.config.encoding );
         this.decoder = cs.newDecoder();
         this.decoder.onMalformedInput(CodingErrorAction.REPLACE);
         this.decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
