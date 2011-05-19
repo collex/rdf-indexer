@@ -1,5 +1,6 @@
 package org.nines;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -7,12 +8,16 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
+import org.mozilla.intl.chardet.nsDetector;
+import org.mozilla.intl.chardet.nsICharsetDetectionObserver;
 
 /**
  * Cleaner for Raw text files. It will clean out unused tags,
@@ -25,10 +30,10 @@ import org.apache.log4j.Logger;
  */
 public class RawTextCleaner {
 
-    private CharsetDecoder decoder;
     private ErrorReport errorReport;    
     private RDFIndexerConfig config;
     private Logger log;
+    private String fileEncoding;
     private long totalOrigChars = 0;
     private long totalFilesChanged = 0;
     private long totalCleanedChars = 0;
@@ -37,11 +42,6 @@ public class RawTextCleaner {
         this.errorReport = errorReport;
         this.config = config;
         this.log = Logger.getLogger(RawTextCleaner.class.getName());
-                
-        Charset cs = Charset.availableCharsets().get( this.config.encoding );
-        this.decoder = cs.newDecoder();
-        this.decoder.onMalformedInput(CodingErrorAction.REPLACE);
-        this.decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
     }
     
     /**
@@ -55,11 +55,24 @@ public class RawTextCleaner {
     
         this.log.info("Clean raw text from file "+rawTextFile);
         
-        // Read the raw text from the file. Bail if this fails
+        // get the filename for the cleaned fulltext file
+        File cleanTextFile = toFullTextFile(rawTextFile);
+        
+        // ensure that the file is UTF-8 encoded...
+        File srcFile = rawTextFile;
+        try {
+            srcFile = fixEncoding(rawTextFile, cleanTextFile);
+        } catch (IOException e) {
+            this.errorReport.addError( 
+                new IndexerError(rawTextFile.toString(), "", "Unable to convert raw text file encoding to UTF-8: " + e.toString()));
+            return;
+        }
+        
+        // ...now read the file
         String content = null;
         InputStreamReader is = null;
         try {
-            is = new InputStreamReader(new FileInputStream(rawTextFile), this.decoder);
+            is = new InputStreamReader(new FileInputStream(srcFile), "UTF-8");
             content =  IOUtils.toString(is);
         } catch ( Exception e ) {
             this.errorReport.addError( 
@@ -86,15 +99,12 @@ public class RawTextCleaner {
             this.totalFilesChanged++;
         }
         this.log.info("  => Original length: "+startChars+", Cleaned length: "+endChars+", Delta:"+(startChars - endChars) );
-        
-        // get the filename for the cleaned fulltext file
-        File out = toFullTextFile(rawTextFile);
-        
+                
         // Make sure that the directory structure exists
-        if ( out.getParentFile().exists() == false) {
-            if ( out.getParentFile().mkdirs() == false ) {
+        if ( cleanTextFile.getParentFile().exists() == false) {
+            if ( cleanTextFile.getParentFile().mkdirs() == false ) {
                 this.errorReport.addError(
-                    new IndexerError(out.toString(), "", "Unable to create full text directory tree"));
+                    new IndexerError(cleanTextFile.toString(), "", "Unable to create full text directory tree"));
                 return;
             }
         }
@@ -102,16 +112,68 @@ public class RawTextCleaner {
         // dump the content
         Writer outWriter = null;
         try {
-            outWriter = new OutputStreamWriter(new FileOutputStream(out), "UTF-8");
+            outWriter = new OutputStreamWriter(new FileOutputStream(cleanTextFile), "UTF-8");
             outWriter.write( content );
         } catch (IOException e) {
             this.errorReport.addError( 
-                new IndexerError(out.toString(), "", "Unable to write cleaned text file: " + e.toString()));
+                new IndexerError(cleanTextFile.toString(), "", "Unable to write cleaned text file: " + e.toString()));
         } finally {
             IOUtils.closeQuietly(outWriter);
         }
     }
     
+    private File fixEncoding(File rawTextFile, File cleanTextFile) throws IOException {
+        
+        // detect the encoding of the file....
+        nsDetector det = new nsDetector();
+        det.Init(new nsICharsetDetectionObserver() {
+            public void Notify(String charset) {
+                RawTextCleaner.this.fileEncoding = charset;
+            }
+        });
+
+        BufferedInputStream imp = new BufferedInputStream(new FileInputStream(rawTextFile));
+        byte[] buf = new byte[1024];
+        int len;
+        boolean done = false;
+        boolean isAscii = true;
+        while ((len = imp.read(buf, 0, buf.length)) != -1) {
+            if (isAscii) {
+                isAscii = det.isAscii(buf, len);
+            }
+            if (!isAscii && !done) {
+                done = det.DoIt(buf, len, false);
+            }
+        }
+        det.DataEnd();
+        imp.close();
+
+        // if it is not utf-8, attempt to convert it!
+        if (this.fileEncoding.equalsIgnoreCase("UTF-8") == false) {
+            this.log.info("  * Converting " + rawTextFile.toString() + " from " + this.fileEncoding + " to UTF-8");
+            
+            // read from original encoding into 16-bit unicode
+            String nonUtf8Txt = IOUtils.toString(new FileInputStream(rawTextFile), this.fileEncoding);
+            
+            // setup encoders to translate the data. IF bad chars
+            // are encountered, replace them with 0xFFFD (uunkown utf-8 symbol)
+            Charset utf8cs = Charset.availableCharsets().get("UTF-8");
+            CharsetEncoder utf8en = utf8cs.newEncoder();
+            utf8en.onMalformedInput(CodingErrorAction.REPLACE);
+            utf8en.onUnmappableCharacter(CodingErrorAction.REPLACE);
+            
+            // encode the 16-bit unicode to UTF-8 and write out the bytes
+            ByteBuffer utf8Buffer = utf8en.encode(CharBuffer.wrap(nonUtf8Txt));
+            FileOutputStream fos = new FileOutputStream(cleanTextFile);
+            fos.write(utf8Buffer.array());
+            fos.close();
+
+            return cleanTextFile;
+        }
+
+        return rawTextFile;
+    }
+
     private File toFullTextFile(File rawTextFile) {
         String cleanedFile = this.config.sourceDir.toString().replace("rawtext", "fulltext") 
             + "/" + SolrClient.safeCore(this.config.archiveName);
@@ -169,5 +231,4 @@ public class RawTextCleaner {
     private String removeTag(String fullText, String tag) {
         return removeBracketed(fullText, "<" + tag, "</" + tag + ">");
     }
-
 }

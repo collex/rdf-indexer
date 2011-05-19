@@ -2,7 +2,6 @@ package org.nines;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -140,7 +139,7 @@ public final class SolrClient {
         // read the result into an array of JSON objects
         try  {
             JsonParser parser = new JsonParser();
-            JsonElement parsed = parser.parse(new InputStreamReader(get.getResponseBodyAsStream()));
+            JsonElement parsed = parser.parse ( IOUtils.toString(get.getResponseBodyAsStream(), "UTF-8") );
             JsonObject data = parsed.getAsJsonObject();
             JsonObject re = data.get("response").getAsJsonObject();
             JsonElement de = re.get("docs");

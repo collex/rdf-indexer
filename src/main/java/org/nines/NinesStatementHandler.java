@@ -16,7 +16,7 @@
 package org.nines;
 
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -468,7 +468,7 @@ final class NinesStatementHandler implements RDFHandler {
 
         // read it!
         try {
-            return IOUtils.toString(new FileReader(textFile));
+            return IOUtils.toString( new FileInputStream(textFile), "UTF-8");
         } catch (IOException e) {
             errorReport.addError(new IndexerError(textFile.toString(), uri, "Unable to read full text" + ": "
                 + e.toString()));
