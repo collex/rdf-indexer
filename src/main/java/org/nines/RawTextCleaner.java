@@ -1,6 +1,5 @@
 package org.nines;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -16,8 +15,7 @@ import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
-import org.mozilla.intl.chardet.nsDetector;
-import org.mozilla.intl.chardet.nsICharsetDetectionObserver;
+import org.mozilla.universalchardet.UniversalDetector;
 
 /**
  * Cleaner for Raw text files. It will clean out unused tags,
@@ -28,7 +26,7 @@ import org.mozilla.intl.chardet.nsICharsetDetectionObserver;
  * @author loufoster
  *
  */
-public class RawTextCleaner {
+final class RawTextCleaner {
 
     private ErrorReport errorReport;    
     private RDFIndexerConfig config;
@@ -37,11 +35,13 @@ public class RawTextCleaner {
     private long totalOrigChars = 0;
     private long totalFilesChanged = 0;
     private long totalCleanedChars = 0;
+    private UniversalDetector detector = null;
     
     public RawTextCleaner( RDFIndexerConfig config, ErrorReport errorReport ) {
         this.errorReport = errorReport;
         this.config = config;
         this.log = Logger.getLogger(RawTextCleaner.class.getName());
+        this.detector = new UniversalDetector(null);
     }
     
     /**
@@ -124,29 +124,12 @@ public class RawTextCleaner {
     
     private File fixEncoding(File rawTextFile, File cleanTextFile) throws IOException {
         
-        // detect the encoding of the file....
-        nsDetector det = new nsDetector();
-        det.Init(new nsICharsetDetectionObserver() {
-            public void Notify(String charset) {
-                RawTextCleaner.this.fileEncoding = charset;
-            }
-        });
-
-        BufferedInputStream imp = new BufferedInputStream(new FileInputStream(rawTextFile));
-        byte[] buf = new byte[1024];
-        int len;
-        boolean done = false;
-        boolean isAscii = true;
-        while ((len = imp.read(buf, 0, buf.length)) != -1) {
-            if (isAscii) {
-                isAscii = det.isAscii(buf, len);
-            }
-            if (!isAscii && !done) {
-                done = det.DoIt(buf, len, false);
-            }
+        // detect the encoding of the file?
+        if ( this.config.encoding.equalsIgnoreCase("auto") ) {
+            this.fileEncoding = detectEncoding(rawTextFile);
+        } else {
+            this.fileEncoding = this.config.encoding;
         }
-        det.DataEnd();
-        imp.close();
 
         // if it is not utf-8, attempt to convert it!
         if (this.fileEncoding.equalsIgnoreCase("UTF-8") == false) {
@@ -172,6 +155,30 @@ public class RawTextCleaner {
         }
 
         return rawTextFile;
+    }
+    
+    private String detectEncoding(File testFile) throws IOException {
+        
+        // always start from a clean slate
+        this.detector.reset();
+        
+        // feed chunks of data to the detector until it is done
+        byte[] buf = new byte[4096];
+        FileInputStream fis = new FileInputStream(testFile);
+        int nread;
+        while ((nread = fis.read(buf)) > 0 && !this.detector.isDone()) {
+            this.detector.handleData(buf, 0, nread);
+        }
+        this.detector.dataEnd();
+
+        /// see what it thinks....
+        String encoding = detector.getDetectedCharset();
+        if (encoding == null) {
+            encoding = "UTF-8";
+            this.errorReport.addError(
+                new IndexerError(testFile.toString(), "", "Unable to detect encoding! Default to UTF-8."));
+        }         
+        return encoding;
     }
 
     private File toFullTextFile(File rawTextFile) {
@@ -210,6 +217,12 @@ public class RawTextCleaner {
 
         // Get rid of non-unix line endings
         fullText = fullText.replaceAll("\r", "");
+        
+        // Clean up the file a little bit 
+        fullText = fullText.replaceAll("&nbsp;", " ");
+        fullText = fullText.replaceAll("&#160;", " ");
+        fullText = fullText.replaceAll(" \n", "\n");
+        fullText = fullText.replaceAll("\n ", "\n");
 
         return fullText;
     }

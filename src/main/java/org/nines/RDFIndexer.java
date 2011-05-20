@@ -17,6 +17,8 @@ package org.nines;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
@@ -518,6 +520,7 @@ public class RDFIndexer {
         final String pageSize = "pageSize";     // compare: max results per solr page
         final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
         final String custom = "custom";         // flag to indicate customized clean
+        final String encoding = "encoding";     // set char set of raw source text for clea
 
         // define the list of command line options
         Options options = new Options();
@@ -544,6 +547,7 @@ public class RDFIndexer {
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
         
+        options.addOption(encoding, true, "Encoding of source raw text file for clean");
         options.addOption(custom, true, "Customized clean class");
 
         // create parser and handle the options
@@ -591,6 +595,10 @@ public class RDFIndexer {
                 throw new ParseException("Missing required -source parameter");
             }
             
+            if ( line.hasOption(encoding )) {
+                config.encoding =  line.getOptionValue(encoding);
+            }
+            
             if ( line.hasOption(custom )) {
                 config.customCleanClass =  line.getOptionValue(custom);
             }
@@ -617,6 +625,10 @@ public class RDFIndexer {
             }
         } catch (Exception e) {
             Logger.getLogger(RDFIndexer.class.getName()).error("Unhandled exception: " + e.toString());
+            StringWriter result = new StringWriter();
+            PrintWriter printWriter = new PrintWriter(result);
+            e.printStackTrace(printWriter);
+            Logger.getLogger(RDFIndexer.class.getName()).error(result.toString());    
         }
         System.exit(0);
     }

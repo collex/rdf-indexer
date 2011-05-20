@@ -7,7 +7,7 @@
     <groupId>org.nines</groupId>
     <artifactId>rdf-indexer</artifactId>
     <packaging>jar</packaging>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
     <name>RDF Indexer</name>
     <url>http://ww.performantsoftware.com</url>
 
@@ -38,6 +38,11 @@
             <name>Aduna OpenRDF Release Repo</name>
             <url>http://repo.aduna-software.org/maven2/releases/</url>
         </repository>
+        <repository>
+            <id>aperture</id>
+            <name>Aourceforge Aperture repo</name>
+            <url>http://aperture.sourceforge.net/maven</url>
+        </repository>
     </repositories>
 
     <!-- external library debendencies -->
@@ -45,7 +50,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>1.4</version>
+            <version>2.0.1</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -124,10 +129,15 @@
             <artifactId>pdfbox</artifactId>
             <version>1.5.0</version>
         </dependency>
-        <dependency>
+        <!-- <dependency>
             <groupId>net.sourceforge.jchardet</groupId>
             <artifactId>jchardet</artifactId>
             <version>1.0</version>
+        </dependency> -->
+        <dependency>
+            <groupId>net.sourceforge.juniversalchardet</groupId>
+            <artifactId>juniversalchardet</artifactId>
+            <version>1.0.3</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

@@ -43,6 +43,7 @@ public class RDFIndexerConfig {
     public String solrBaseURL = "http://localhost:8983/solr";
     public String solrExistingIndex = "/resources";
     public Mode mode = Mode.NONE;
+    public String encoding = "auto";
     
     public String customCleanClass = "";
 
