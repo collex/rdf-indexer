@@ -1,5 +1,6 @@
 package org.nines;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -15,6 +16,8 @@ import java.nio.charset.CodingErrorAction;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
+import org.mozilla.intl.chardet.nsDetector;
+import org.mozilla.intl.chardet.nsICharsetDetectionObserver;
 import org.mozilla.universalchardet.UniversalDetector;
 
 /**
@@ -124,19 +127,17 @@ final class RawTextCleaner {
     
     private File fixEncoding(File rawTextFile, File cleanTextFile) throws IOException {
         
-        // detect the encoding of the file?
-        if ( this.config.encoding.equalsIgnoreCase("auto") ) {
-            this.fileEncoding = detectEncoding(rawTextFile);
-        } else {
-            this.fileEncoding = this.config.encoding;
-        }
+        // Always attempt detect the encoding of the file.
+        // if this is unsuccessful, encoding will be set to
+        // the default specified  in the config
+        this.fileEncoding = detectEncoding(rawTextFile);
 
         // if it is not utf-8, attempt to convert it!
         if (this.fileEncoding.equalsIgnoreCase("UTF-8") == false) {
             this.log.info("  * Converting " + rawTextFile.toString() + " from " + this.fileEncoding + " to UTF-8");
             
             // read from original encoding into 16-bit unicode
-            String nonUtf8Txt = IOUtils.toString(new FileInputStream(rawTextFile), this.fileEncoding);
+            String nonUtf8Txt =  IOUtils.toString(new FileInputStream(rawTextFile), this.fileEncoding);
             
             // setup encoders to translate the data. IF bad chars
             // are encountered, replace them with 0xFFFD (uunkown utf-8 symbol)
@@ -159,10 +160,8 @@ final class RawTextCleaner {
     
     private String detectEncoding(File testFile) throws IOException {
         
-        // always start from a clean slate
-        this.detector.reset();
-        
         // feed chunks of data to the detector until it is done
+        this.detector.reset();
         byte[] buf = new byte[4096];
         FileInputStream fis = new FileInputStream(testFile);
         int nread;
@@ -174,11 +173,40 @@ final class RawTextCleaner {
         /// see what it thinks....
         String encoding = detector.getDetectedCharset();
         if (encoding == null) {
-            encoding = "UTF-8";
-            this.errorReport.addError(
-                new IndexerError(testFile.toString(), "", "Unable to detect encoding! Default to UTF-8."));
+            
+            // try an alternate detector
+            encoding =  alternateEncodeDetect(testFile);
+            if ( encoding == null ){
+                encoding = this.config.defaultEncoding;
+                this.log.info("  * Unable to detect encoding, default to: "+encoding);
+            }
         }         
+
         return encoding;
+    }
+    
+    private String alternateEncodeDetect(File testFile) throws IOException {
+
+        nsDetector det = new nsDetector();
+        DetectListener listener = new DetectListener();
+        det.Init( listener );
+
+        BufferedInputStream imp = new BufferedInputStream(new FileInputStream(testFile));
+        byte[] buf = new byte[1024];
+        int len;
+        boolean done = false;
+        boolean isAscii = true;
+        while ((len = imp.read(buf, 0, buf.length)) != -1) {
+            if (isAscii) {
+                isAscii = det.isAscii(buf, len);
+            }
+            if (!isAscii && !done) {
+                done = det.DoIt(buf, len, false);
+            }
+        }
+        det.DataEnd();
+        imp.close();
+        return listener.getEncoding();
     }
 
     private File toFullTextFile(File rawTextFile) {
@@ -243,5 +271,17 @@ final class RawTextCleaner {
 
     private String removeTag(String fullText, String tag) {
         return removeBracketed(fullText, "<" + tag, "</" + tag + ">");
+    }
+    
+    private static class DetectListener implements nsICharsetDetectionObserver {
+        private String encoding;
+        public String getEncoding() {
+            return this.encoding;
+        }
+        
+        public void Notify(String charset) {
+            this.encoding = charset;
+        }
+        
     }
 }

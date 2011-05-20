@@ -55,7 +55,7 @@ public class TextUtils {
             
             String snip = value.substring(Math.max(0, pos-25), Math.min(value.length(), pos+25));            
             errorReport.addError(new IndexerError(fileName, url, 
-                    "Invalid UTF-8 character at position " + pos
+                    "Removed invalid UTF-8 character at position " + pos
                     + " of field text"
                     + "\n  Snippet: ["+snip+"]"));
                 

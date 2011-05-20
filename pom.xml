@@ -129,11 +129,11 @@
             <artifactId>pdfbox</artifactId>
             <version>1.5.0</version>
         </dependency>
-        <!-- <dependency>
+        <dependency>
             <groupId>net.sourceforge.jchardet</groupId>
             <artifactId>jchardet</artifactId>
             <version>1.0</version>
-        </dependency> -->
+        </dependency>
         <dependency>
             <groupId>net.sourceforge.juniversalchardet</groupId>
             <artifactId>juniversalchardet</artifactId>

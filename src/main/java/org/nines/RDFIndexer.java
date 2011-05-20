@@ -596,7 +596,7 @@ public class RDFIndexer {
             }
             
             if ( line.hasOption(encoding )) {
-                config.encoding =  line.getOptionValue(encoding);
+                config.defaultEncoding =  line.getOptionValue(encoding);
             }
             
             if ( line.hasOption(custom )) {
