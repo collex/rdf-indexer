@@ -26,7 +26,6 @@ public class LocEphemeraCleaner implements ICustomCleaner {
                 skip = !skip;
             } else {
                 if ( skip == false ) {
-                    System.out.println("KEEP: "+line);
                     finalContent.append(lines[i]).append("\n");
                 }
             }
