@@ -90,6 +90,19 @@ final class RawTextCleaner {
         long startChars = content.length();;
         this.totalOrigChars += startChars;
         
+        if ( this.config.customCleanClass != null && this.config.customCleanClass.length() > 0) {
+            try {
+                String className = this.config.customCleanClass;
+                @SuppressWarnings("rawtypes")
+                Class newClass  = Class.forName("org.nines.cleaner."+className);
+                ICustomCleaner cleaner = (ICustomCleaner)newClass.newInstance();
+                content = cleaner.clean(this.config.archiveName, content);
+            } catch (Exception e) {
+                errorReport.addError(new IndexerError(rawTextFile.toString(), "", "Unable to run custom cleaner " 
+                    + this.config.customCleanClass +": " + e.toString()));
+            }
+        }
+        
         // clean it up as best as possible
         content = cleanText( content );
         content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
