@@ -90,6 +90,8 @@ final class RawTextCleaner {
         long startChars = content.length();;
         this.totalOrigChars += startChars;
         
+        content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile); 
+        
         if ( this.config.customCleanClass != null && this.config.customCleanClass.length() > 0) {
             try {
                 String className = this.config.customCleanClass;
@@ -103,11 +105,10 @@ final class RawTextCleaner {
             }
         }
         
-        // clean it up as best as possible
         content = cleanText( content );
         content = TextUtils.stripEscapeSequences(content, errorReport, rawTextFile); 
         content = TextUtils.normalizeWhitespace(content);
-        content = TextUtils.stripUnknownUTF8(content, this.errorReport, rawTextFile); 
+        
         
         long endChars = content.length();
         this.totalCleanedChars += endChars;
