@@ -16,12 +16,17 @@ public class LocEphemeraCleaner implements ICustomCleaner {
         String[] lines = content.split("\n");
         StringBuffer finalContent = new StringBuffer();
         boolean skip = true;
+        boolean foundStart = false;
         for ( int i=0; i<lines.length; i++) {
             String line = lines[i].trim().toLowerCase();
-            if ( line.contains(startWord) || line.contains(stopWord) ) {
+            if ( line.contains(startWord) && foundStart == false) { 
+                skip = !skip;
+                foundStart = true;
+            } else if ( line.contains(stopWord) ) {
                 skip = !skip;
             } else {
                 if ( skip == false ) {
+                    System.out.println("KEEP: "+line);
                     finalContent.append(lines[i]).append("\n");
                 }
             }
