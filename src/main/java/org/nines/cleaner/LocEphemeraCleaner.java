@@ -19,19 +19,48 @@ public class LocEphemeraCleaner implements ICustomCleaner {
         int startCnt = 0;
         boolean startDone = false;
         String line = "";
+        boolean inBrace = false;
         for ( int i=0; i<lines.length; i++) {
-            line = lines[i].trim().toLowerCase();
-            if ( line.contains(startWord) && startDone == false ) {
+            line = lines[i].trim();
+
+            if ( line.contains("{") && line.contains("}") ) {
+                while ( true ) {
+                    int p0 = line.indexOf("{");
+                    if ( p0 == -1 ) {
+                        break;
+                    } else {
+                        int p1 = line.indexOf("}");
+                        if (p1 > -1 ) {
+                            line = line.substring(0, p0) + line.substring(p1+1);
+                        } else {
+                            line = line.substring(0, p0);
+                        }
+                    }
+                }
+            } else if ( line.contains("{")) {
+                inBrace = true;
+                finalContent.append(line).append( line.substring(0, line.indexOf("{")));
+                continue;
+            } else if ( line.contains("}")) {
+                inBrace = false;
+                line = line.substring(line.indexOf("{"));
+            }
+            
+            if ( inBrace ) {
+                continue;
+            }
+            
+            if ( line.toLowerCase().contains(startWord) && startDone == false ) {
                 startCnt++;
                 if (startCnt == 2) {
                     skip = !skip;
                     startDone = true;
                 }
-            } else if ( line.contains(stopWord.toLowerCase()) ) {
+            } else if ( line.contains(stopWord) ) {
                 skip = !skip;
             } else {
                 if ( skip == false ) {
-                    finalContent.append(lines[i]).append("\n");
+                    finalContent.append(line).append("\n");
                 }
             }
         }
