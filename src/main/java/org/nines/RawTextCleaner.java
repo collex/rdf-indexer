@@ -276,7 +276,14 @@ final class RawTextCleaner {
             if (end == -1) {
                 start = -1;
             } else {
-                fullText = fullText.substring(0, start) + "\n" + fullText.substring(end + right.length());
+                String tag = fullText.substring(start+1, end);
+                String insertion = "\n";
+                if (tag.equals("i") || tag.equals("/i") || 
+                    tag.equals("b") || tag.equals("/b") || 
+                    tag.equals("em") || tag.equals("/em") ) {
+                    insertion = "";
+                }
+                fullText = fullText.substring(0, start) + insertion + fullText.substring(end + right.length());
                 start = fullText.indexOf(left);
             }
         }
