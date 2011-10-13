@@ -105,6 +105,28 @@ public class ValidationUtility {
             messages.add("must contain exactly one archive field");
         }
 
+        fields = object.get("title");
+        if (fields != null && fields.size() > 1) {
+            String f = "";
+            for (String s : fields) {
+                f += s + ";";
+            }
+            messages.add("must not contain more than one title field:" + f);
+            while (fields.size() > 1)
+            	fields.remove(1);
+        }
+
+        fields = object.get("url");
+        if (fields != null && fields.size() > 1) {
+            String f = "";
+            for (String s : fields) {
+                f += s + ";";
+            }
+            messages.add("must not contain more than one url field:" + f);
+            while (fields.size() > 1)
+            	fields.remove(1);
+        }
+
         Set<String> keys = object.keySet();
         boolean hasRole = false;
         for (String key : keys) {
