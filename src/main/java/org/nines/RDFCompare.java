@@ -49,8 +49,8 @@ public class RDFCompare {
     private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>(Arrays.asList("uri", "archive",
         "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url", "role_ART", "role_AUT",
         "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
-        "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "batch", "editor",
-        "text_url", "year", "type", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",
+        "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
+        "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",
         "source_sgml", "person", "format", "language", "geospacial", "text"));
 
     //  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
@@ -503,8 +503,8 @@ public class RDFCompare {
             // unindexed values later
             indexDoc.remove(key);
 
-            // don't compare batch or score
-            if (key.equals("batch") || key.equals("score")) {
+            // don't compare score
+            if (key.equals("score")) {
                 continue;
             }
 
