@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -50,7 +51,6 @@ public class RDFIndexer {
     private int numFiles = 0;
     private int numObjects = 0;
     private long largestTextSize = 0;
-    private String guid = "";
     private RDFIndexerConfig config;
     private Queue<File> dataFileQueue;
     private ErrorReport errorReport;
@@ -60,8 +60,11 @@ public class RDFIndexer {
     private StringBuilder solrXmlPayload;
     private int docCount = 0;
     private String targetArchive;
-    private SolrClient solrClient; 
-
+    private SolrClient solrClient;
+    private Date ts = new Date();
+    private SimpleDateFormat ts2 = new SimpleDateFormat("yyyy-MM-dd");
+    private String timeStamp = new String( ts2.format( ts ) );
+    
     /**
      * 
      * @param sourceDir
@@ -209,7 +212,6 @@ public class RDFIndexer {
     }
 
     private void doIndexing() {
-        createGUID(this.config.sourceDir);
         Date start = new Date();
         log.info("Started indexing at " + start);
         System.out.println("Indexing "+config.sourceDir);
@@ -257,21 +259,6 @@ public class RDFIndexer {
         } catch (IOException e) {
             errorReport.addError(new IndexerError("", "", "Unable to POST DELETE message to SOLR. "
                 + e.getLocalizedMessage()));
-        }
-    }
-
-    private void createGUID(File rdfSource) {
-        String path = rdfSource.getPath();
-        String file = path.substring(path.lastIndexOf('/') + 1);
-
-        try {
-            guid = file.substring(0, file.indexOf('.'));
-        } catch (StringIndexOutOfBoundsException e) {
-            /*
-             * In cases where the indexer is run manually against a directory that doesn't specify the GUID, create one
-             * automatically.
-             */
-            guid = java.util.UUID.randomUUID().toString();
         }
     }
 
@@ -464,11 +451,15 @@ public class RDFIndexer {
             }
         }
 
-        // tag the document with the batch id
+        // tag the document with the timestamp
         Element f = new Element("field");
-        f.setAttribute("name", "batch");
-        f.setText(guid);
+        f.setAttribute("name", "date_created");
+        f.setText(timeStamp);
         doc.addContent(f);
+        Element f2 = new Element("field");
+        f2.setAttribute("name", "date_updated");
+        f2.setText(timeStamp);
+        doc.addContent(f2);
 
         return doc;
     }
