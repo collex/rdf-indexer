@@ -102,13 +102,14 @@ public class RdfDocumentParser {
     }
 
     private static String validateContent(File file, ErrorReport errorReport) {
+        InputStreamReader is = null;
         try {
             Charset cs = Charset.availableCharsets().get("UTF-8");
             CharsetDecoder decoder = cs.newDecoder();
             decoder.onMalformedInput(CodingErrorAction.REPLACE);
             decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
             
-            InputStreamReader is = new InputStreamReader(new FileInputStream(file), decoder);
+            is = new InputStreamReader(new FileInputStream(file), decoder);
             String content = IOUtils.toString(is);
 
             // look for unescaped sequences and flag them as trouble
@@ -132,6 +133,8 @@ public class RdfDocumentParser {
             return content;
         } catch (IOException e) {
             errorReport.addError(new IndexerError(file.getName(), "", "Error validating content: " + e.getMessage()));
+        } finally {
+            IOUtils.closeQuietly(is);
         }
         return "";
     }
