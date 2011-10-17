@@ -467,12 +467,16 @@ final class NinesStatementHandler implements RDFHandler {
         }
 
         // read it!
+        FileInputStream is = null;
         try {
-            return IOUtils.toString( new FileInputStream(textFile), "UTF-8");
+            is = new FileInputStream(textFile);
+            return IOUtils.toString( is, "UTF-8");
         } catch (IOException e) {
             errorReport.addError(new IndexerError(textFile.toString(), uri, "Unable to read full text" + ": "
                 + e.toString()));
             return "";
+        } finally {
+            IOUtils.closeQuietly(is);
         }
     }
 
