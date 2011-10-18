@@ -503,8 +503,8 @@ public class RDFCompare {
             // unindexed values later
             indexDoc.remove(key);
 
-            // don't compare score
-            if (key.equals("score")) {
+            // don't compare score or indexing dates.
+            if (key.equals("score") || key.equals("date_updated") || key.equals("date_created")) {
                 continue;
             }
 
@@ -553,10 +553,12 @@ public class RDFCompare {
         for (Entry<String, JsonElement> entry : indexDoc.entrySet()) {
             String val = toSolrString(entry.getValue());
             String key = entry.getKey();
-            if (val.length() > 100) {
-                val = val.substring(0, 100);
-            }
-            addError(uri, "Key not reindexed: " + key + "=" + val, true);
+			if (isIgnoredOldField(key) == false) {
+            	if (val.length() > 100) {
+                	val = val.substring(0, 100);
+            	}
+            	addError(uri, "Key not reindexed: " + key + "=" + val, true);
+			}
         }
     }
 
@@ -705,8 +707,14 @@ public class RDFCompare {
      * @return
      */
     private boolean isIgnoredNewField(String key) {
-        if (key.equals("year_sort") || key.equals("has_full_text") || key.equals("freeculture") || key.equals("is_ocr")
-            || key.equals("author_sort")) {
+        if (key.equals("date_created") || key.equals("date_updated")) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isIgnoredOldField(String key) {
+        if (key.equals("batch")) {
             return true;
         }
         return false;

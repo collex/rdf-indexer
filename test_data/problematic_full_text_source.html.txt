@@ -9,17 +9,22 @@ collection
 Print View
 The Collected Letters of the Wordsworths. Electronic edition.
 All Collections
+&gt;
 The Collected Letters of the Wordsworths. Electronic edition.
+&gt;
 The Letters of William and Dorothy Wordsworth. Volume 4
+&gt;
 [text of letters (1821-8)]
+&gt;
 1826
+&gt;
 september
-251. w. w. to unknown correspondent
+&gt; 251. w. w. to unknown correspondent
 Collection volumes:
-hide main text
-show main text
-show this volume only
-show all volumes
+&lt;hide main text&gt;
+&lt;show main text&gt;
+&lt;show this volume only&gt;
+&lt;show all volumes&gt;
 Edition Information
 The Letters of William and Dorothy Wordsworth. Volume 1
 The Letters of William and Dorothy Wordsworth. Volume 2
@@ -85,8 +90,8 @@ The Letters of William and Dorothy Wordsworth. Volume 4
 1826
 September
 251. W. W. to UNKNOWN CORRESPONDENT
-hide table of contents
-show table of contents
+&lt;hide table of contents&gt;
+&lt;show table of contents&gt;
 previous
 next
 251. W. W. to UNKNOWN CORRESPONDENT
