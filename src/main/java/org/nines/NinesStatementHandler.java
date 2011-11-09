@@ -300,9 +300,9 @@ final class NinesStatementHandler implements RDFHandler {
             if (value instanceof LiteralImpl) {
                 // For backwards compatibility of simple <dc:date>, but also useful for cases where label and value are
                 // the same
-                //if (object.matches("^[0-9]{4}$")) {
-                //    addField(doc, "year", object.substring(0, 4));
-                //}
+                if (object.matches("^[0-9]{4}$")) {
+                    addField(doc, "year", object.substring(0, 4));
+                }
 
                 ArrayList<String> years = null;
                 try {
@@ -530,9 +530,9 @@ final class NinesStatementHandler implements RDFHandler {
                     String range = tokenizer.nextToken();
 
                     int commaPos = range.indexOf(',');
-if (commaPos == -1) {
-	commaPos = range.indexOf('-');
-}
+//if (commaPos == -1) {
+//	commaPos = range.indexOf('-');
+//}
                     String start, finish;
                     if (commaPos == -1) {
                         start = finish = range;
