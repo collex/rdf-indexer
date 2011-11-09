@@ -74,10 +74,10 @@ public class RDFIndexer {
     public RDFIndexer(RDFIndexerConfig config) {
 
         this.config = config;
-        String logFileRoot = this.config.getLogfileBaseName();
+        String logFileRoot = this.config.getLogfileBaseName("");
 
         // setup logger
-        String indexLog = logFileRoot + "_progress.log";
+        String indexLog = this.config.getLogfileBaseName("progress") + "_progress.log";
         System.setProperty("index.log.file", indexLog);
         URL url = ClassLoader.getSystemResource("log4j-index.xml");
         DOMConfigurator.configure(url);
@@ -98,7 +98,7 @@ public class RDFIndexer {
             return;
         }
 
-        this.linkCollector = new LinkCollector(logFileRoot);
+        this.linkCollector = new LinkCollector(this.config.getLogfileBaseName("links"));
         this.solrClient = new SolrClient(this.config.solrBaseURL);
     }
     
