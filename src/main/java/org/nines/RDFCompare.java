@@ -66,7 +66,7 @@ public class RDFCompare {
      */
     public RDFCompare(RDFIndexerConfig config) {
         this.config = config;
-        String logFileRoot = this.config.getLogfileBaseName();
+        String logFileRoot = this.config.getLogfileBaseName("");
         
         String compareLog = logFileRoot + "_compare.log";
         String skippedLog = logFileRoot + "_skipped.log";
