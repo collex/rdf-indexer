@@ -68,9 +68,11 @@ public class RDFIndexerConfig {
      * 
      * @return Full path and base name of logfile
      */
-    public final String getLogfileBaseName() {
+    public final String getLogfileBaseName(String subFolder) {
         String name = this.archiveName.replaceAll("/", "_").replaceAll(":", "_").replaceAll(" ", "_");
         String logFileRelativePath = this.logRoot + "/";
+		if (!subFolder.equals(""))
+			logFileRelativePath = logFileRelativePath + subFolder + "/";
         return logFileRelativePath + name;
     }
 }
