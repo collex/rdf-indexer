@@ -1,0 +1,39 @@
+=rdf-indexer
+
+A Java utility that converts RDF files into solr documents.
+
+== Capabilities
+
+This does the following:
+
+ * checks the syntax of the RDF files,
+ * downloads full text if required,
+ * cleans that text so that it is suitable for the index, and
+ * compares new and old indexes and reports differences.
+
+It is normally invoked from the Collex Catalog rake tasks. See them for a description of all
+the ways to use this utility.
+
+== Installation
+
+This is normally used as part of the Collex Catalog, so the compiled version is embedded in that.
+
+From the Collex Catalog home folder, do this: rake indexer:build.
+
+For that to work, the paths must be set up correctly in the Catalog's site.yml file.
+
+==Copyright
+
+Copyright 2011 Applied Research in Patacriticism and the University of Virginia
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+{Full License}[http://www.apache.org/licenses/LICENSE-2.0]
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
