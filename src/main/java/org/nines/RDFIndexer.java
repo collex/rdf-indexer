@@ -533,7 +533,7 @@ public class RDFIndexer {
             "Comma separated list of fields to include in compare. Default is all."));
         options.addOptionGroup(fieldOpts);
 
-        options.addOption(deleteFlag, false, "Delete ALL itemss from an existing archive");
+        options.addOption(deleteFlag, false, "Delete ALL items from an existing archive");
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");

@@ -151,6 +151,8 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleGeospacial(predicate, object))
             return;
+        if (handleProvenance(predicate, object))
+            return;
     }
 
     private boolean handleFederation(String predicate, String object) {
@@ -270,6 +272,14 @@ final class NinesStatementHandler implements RDFHandler {
                 addField(doc, "title_sort", object);
                 title_sort_added = true;
             }
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleProvenance(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/provenance".equals(predicate)) {
+            addField(doc, "provenance", object);
             return true;
         }
         return false;
