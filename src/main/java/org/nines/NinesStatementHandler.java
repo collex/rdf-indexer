@@ -97,7 +97,8 @@ final class NinesStatementHandler implements RDFHandler {
             if (!(attribute.equals("archive") || attribute.equals("freeculture") || attribute.equals("source_xml")
                 || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
-                || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image"))) {
+                || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image")
+                || attribute.equals("discipline"))) {
 
                 addError("Collex does not support this property: " + predicate );
                 return;
@@ -152,6 +153,8 @@ final class NinesStatementHandler implements RDFHandler {
         if (handleGeospacial(predicate, object))
             return;
         if (handleProvenance(predicate, object))
+            return;
+        if (handleDiscipline(predicate, object))
             return;
     }
 
@@ -284,6 +287,14 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
+
+    private boolean handleDiscipline(String predicate, String object) {
+            if ("http://purl.org/dc/elements/1.1/discipline".equals(predicate)) {
+                addField(doc, "discipline", object);
+                return true;
+            }
+            return false;
+        }
 
     private boolean handleAlternative(String predicate, String object) {
         if ("http://purl.org/dc/terms/alternative".equals(predicate)) {
@@ -452,7 +463,7 @@ final class NinesStatementHandler implements RDFHandler {
      * If any errors are encountered, log them and return an empty string
      * 
      * @param uri
-     * @return A string containing the full text - or an empty stringif errors occur.
+     * @return A string containing the full text - or an empty string if errors occur.
      */
     private String getFullText(String uri) {
 

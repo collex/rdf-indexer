@@ -369,7 +369,7 @@ public class RDFIndexer {
             return;
         }
 
-        // Log an error for no objects abd bail if size is zero
+        // Log an error for no objects and bail if size is zero
         if (objects == null || objects.size() == 0) {
             errorReport.addError(new IndexerError(file.getName(), "", "No objects in this file."));
             errorReport.flush();
