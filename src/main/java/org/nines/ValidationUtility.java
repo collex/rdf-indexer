@@ -15,6 +15,7 @@
  **/
 package org.nines;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,6 +43,12 @@ public class ValidationUtility {
     private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "collex:genre", "dc:date",
         "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso" };
 
+    private static final String[] ROLE_FIELDS = new String[] { "role_ART", "role_AUT", "role_EDT", "role_PBL", "role_CRE",
+       "role_EGR", "role_ETR", "role_TRL", "role_ARC", "role_BND", "role_BKD", "role_BKP", "role_CLL", "role_CTG", "role_COL",
+        "role_CLR", "role_CWT", "role_COM", "role_CMT", "role_CRE", "role_DUB", "role_FAC", "role_ILU", "role_ILL", "role_LTG",
+        "role_PRT", "role_POP", "role_PRM", "role_RPS", "role_RBR", "role_SCR", "role_SCL", "role_TYD", "role_TYG", "role_WDE",
+        "role_WDC", "role_OWN" };
+
     public static ArrayList<String> validateObject(HashMap<String, ArrayList<String>> object) {
         ArrayList<String> messages = new ArrayList<String>();
 
@@ -58,13 +65,12 @@ public class ValidationUtility {
 
         // look for all role_* keys in object, validate that they are in this list:
         //    ART, AUT, EDT, PBL, and TRL, also CRE, EGR, ETR
+        ArrayList<String> validRoles = new ArrayList<String>(Arrays.asList(ROLE_FIELDS));
 
         Set<String> keys = object.keySet();
         for (String key : keys) {
             if (key.startsWith("role_")
-                && !("role_ART".equals(key) || "role_AUT".equals(key) || "role_EDT".equals(key)
-                    || "role_PBL".equals(key) || "role_CRE".equals(key) || "role_EGR".equals(key)
-                    || "role_ETR".equals(key) || "role_TRL".equals(key))) {
+                &&  !validRoles.contains(key) ) {
                 messages.add("invalid role: " + key);
             }
         }
