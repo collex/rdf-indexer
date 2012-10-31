@@ -289,7 +289,7 @@ final class NinesStatementHandler implements RDFHandler {
     }
 
     private boolean handleDiscipline(String predicate, String object) {
-            if ("http://purl.org/dc/elements/1.1/discipline".equals(predicate)) {
+            if ("http://www.collex.org/schema#discipline".equals(predicate)) {
                 addField(doc, "discipline", object);
                 return true;
             }
