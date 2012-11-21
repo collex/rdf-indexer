@@ -156,6 +156,8 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleDiscipline(predicate, object))
             return;
+        if (handleSubject(predicate, object))
+            return;
     }
 
     private boolean handleFederation(String predicate, String object) {
@@ -296,6 +298,14 @@ final class NinesStatementHandler implements RDFHandler {
             return false;
         }
 
+    private boolean handleSubject(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/subject".equals(predicate)) {
+            addField(doc, "subject", object);
+            return true;
+        }
+        return false;
+    }
+
     private boolean handleAlternative(String predicate, String object) {
         if ("http://purl.org/dc/terms/alternative".equals(predicate)) {
             addField(doc, "alternative", object);
@@ -355,7 +365,7 @@ final class NinesStatementHandler implements RDFHandler {
 
     private boolean handleDateLabel(String subject, String predicate, String object) {
         if (subject.equals(dateBNodeId)) {
-            // if dateBNodeId matches, we assume we're under a <nines:date> and simply
+            // if dateBNodeId matches, we assume we're under a <collex:date> and simply
             // look for <rdfs:label> and <rdf:value>
 
             if ("http://www.w3.org/2000/01/rdf-schema#label".equals(predicate)) {
