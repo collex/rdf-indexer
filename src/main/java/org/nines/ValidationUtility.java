@@ -34,14 +34,21 @@ public class ValidationUtility {
         "Politics", "Religion", "Review", "Science", "Translation", "Travel", "Visual Art", "Citation", "Book History",
         "Family Life", "Folklore", "Humor", "Law", "Reference Works", "Sermon" };
 
+    // List of all valid disciplines
+    public static final String[] DISCIPLINE_LIST = new String [] {
+        "Anthropology", "Archaeology", "Architecture", "Art History", "Book History", "Classics and Ancient History",
+        "Film Studies", "Theater Studies", "Ethnic Studies", "Gender Studies", "Geography", "Philosophy", "History",
+        "Science", "Law", "Literature", "Musicology", "Math", "Religious Studies", "Manuscript Studies"
+    };
+
     // Fields that are required to be present in RDF
-    public static final String[] REQUIRED_FIELDS = new String[] { "archive", "title", "genre", "year", "freeculture",
-        "has_full_text", "is_ocr", "federation", "url" };
+    public static final String[] REQUIRED_FIELDS = new String[] { "archive", "title", "year", "genre",  "discipline", "freeculture",
+        "has_full_text", "is_ocr", "federation", "url"  };
 
     // Parallel to required fields - the actual tag name to be used
-    // Any change above must be reflected hereå
-    private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "collex:genre", "dc:date",
-        "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso" };
+    // Any change above must be reflected here
+    private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "dc:date", "collex:genre", "collex:discipline",
+        "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
 
     private static final String[] ROLE_FIELDS = new String[] { "role_ART", "role_AUT", "role_EDT", "role_PBL", "role_CRE",
        "role_EGR", "role_ETR", "role_TRL", "role_ARC", "role_BND", "role_BKD", "role_BKP", "role_CLL", "role_CTG", "role_COL",
@@ -54,6 +61,7 @@ public class ValidationUtility {
 
         messages.addAll(ValidationUtility.validateRequired(object));
         messages.addAll(ValidationUtility.validateGenre(object));
+        messages.addAll(ValidationUtility.validateDiscipline(object));
         messages.addAll(ValidationUtility.validateRole(object));
         messages.addAll(ValidationUtility.validateUri(object));
 
@@ -159,7 +167,7 @@ public class ValidationUtility {
                 // test 1: each genre is valid
                 for (String genre : valueList) {
                     if (!validateGenreInList(genre)) {
-                        messages.add(genre + " genre not approved by NINES");
+                        messages.add(genre + " genre not approved by ARC");
                     }
                 }
             }
@@ -178,6 +186,43 @@ public class ValidationUtility {
 
         return false;
     }
+
+    /**
+     * The genre must be in a constrained list.
+     */
+    public static ArrayList<String> validateDiscipline(HashMap<String, ArrayList<String>> object) {
+        ArrayList<String> messages = new ArrayList<String>();
+
+        for (Map.Entry<String, ArrayList<String>> entry : object.entrySet()) {
+
+            String key = entry.getKey();
+            ArrayList<String> valueList = entry.getValue();
+
+            if ("discipline".equals(key)) {
+                // test 1: each discipline is valid
+                for (String discipline : valueList) {
+                    if (!validateDisciplineInList(discipline)) {
+                        messages.add(discipline + " discipline not approved by ARC");
+                    }
+                }
+            }
+        }
+
+        return messages;
+    }
+
+
+
+    public static boolean validateDisciplineInList(String discipline) {
+
+            for (String aDisciplineList : DISCIPLINE_LIST) {
+                if (aDisciplineList.equals(discipline)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
     public static ArrayList<String> validateFreecultureElement(HashMap<String, ArrayList<String>> object) {
         ArrayList<String> messages = new ArrayList<String>();
