@@ -28,11 +28,13 @@ import org.jdom.Verifier;
 public class ValidationUtility {
 
     // List of all valid genres 
-    public static final String[] GENRE_LIST = new String[] { "Architecture", "Artifacts", "Bibliography", "Collection",
-        "Criticism", "Drama", "Education", "Ephemera", "Fiction", "History", "Leisure", "Letters", "Life Writing",
-        "Manuscript", "Music", "Nonfiction", "Paratext", "Periodical", "Philosophy", "Photograph", "Poetry",
-        "Politics", "Religion", "Review", "Science", "Translation", "Travel", "Visual Art", "Citation", "Book History",
-        "Family Life", "Folklore", "Humor", "Law", "Reference Works", "Sermon" };
+    public static final String[] GENRE_LIST = new String[] {
+        "Bibliography",  "Catalog",  "Citation",  "Collection",  "Correspondence",  "Criticism",  "Drama",  "Ephemera",
+        "Fiction",  "Historiography",  "Law",  "Life Writing",  "Liturgy",  "Music - Other",  "Musical Analysis",
+        "Musical Recording",  "Musical Score",  "Nonfiction",  "Paratext",  "Philosophy",  "Photograph",  "Poetry",
+        "Religion - Sermon",  "Religion - Liturgy",  "Religion - Other",  "Reference Works",  "Review",  "Scripture",
+        "Sermon",  "Translation",  "Travel Writing",  "Unspecified",  "Visual Art"
+    };
 
     // List of all valid disciplines
     public static final String[] DISCIPLINE_LIST = new String [] {
