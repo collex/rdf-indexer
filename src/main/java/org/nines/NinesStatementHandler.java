@@ -158,6 +158,8 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleSubject(predicate, object))
             return;
+        if (handleType(predicate, object))
+            return;
     }
 
     private boolean handleFederation(String predicate, String object) {
@@ -285,6 +287,14 @@ final class NinesStatementHandler implements RDFHandler {
     private boolean handleProvenance(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/provenance".equals(predicate)) {
             addField(doc, "provenance", object);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleType(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/type".equals(predicate)) {
+            addField(doc, "doc_type", object);
             return true;
         }
         return false;

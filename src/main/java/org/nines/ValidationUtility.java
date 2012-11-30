@@ -43,13 +43,19 @@ public class ValidationUtility {
         "Science", "Law", "Literature", "Musicology", "Math", "Religious Studies", "Manuscript Studies"
     };
 
+    // List of all valid disciplines
+    public static final String[] TYPE_LIST = new String [] {
+        "Codex",  "Collection",  "Drawing",  "Interactive Resource",  "Manuscript",  "Map",  "Moving Image",  "Periodical",
+        "Physical Object",  "Sheet",  "Sound",  "Still Image",  "Typescript"
+    };
+
     // Fields that are required to be present in RDF
-    public static final String[] REQUIRED_FIELDS = new String[] { "archive", "title", "year", "genre",  "discipline", "freeculture",
-        "has_full_text", "is_ocr", "federation", "url"  };
+    public static final String[] REQUIRED_FIELDS = new String[] { "archive", "title", "year", "doc_type", "genre",  "discipline",
+        "freeculture", "has_full_text", "is_ocr", "federation", "url"  };
 
     // Parallel to required fields - the actual tag name to be used
     // Any change above must be reflected here
-    private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "dc:date", "collex:genre", "collex:discipline",
+    private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "dc:date", "dc:type", "collex:genre", "collex:discipline",
         "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
 
     private static final String[] ROLE_FIELDS = new String[] { "role_ART", "role_AUT", "role_EDT", "role_PBL", "role_CRE",
@@ -65,6 +71,7 @@ public class ValidationUtility {
         messages.addAll(ValidationUtility.validateGenre(object));
         messages.addAll(ValidationUtility.validateDiscipline(object));
         messages.addAll(ValidationUtility.validateRole(object));
+        messages.addAll(ValidationUtility.validateType(object));
         messages.addAll(ValidationUtility.validateUri(object));
 
         return messages;
@@ -216,15 +223,46 @@ public class ValidationUtility {
 
 
     public static boolean validateDisciplineInList(String discipline) {
+        for (String aDisciplineList : DISCIPLINE_LIST) {
+            if (aDisciplineList.equals(discipline)) {
+                return true;
+            }
+        }
 
-            for (String aDisciplineList : DISCIPLINE_LIST) {
-                if (aDisciplineList.equals(discipline)) {
-                    return true;
+        return false;
+    }
+
+    /**
+     * The genre must be in a constrained list.
+     */
+    public static ArrayList<String> validateType(HashMap<String, ArrayList<String>> object) {
+        ArrayList<String> messages = new ArrayList<String>();
+        for (Map.Entry<String, ArrayList<String>> entry : object.entrySet()) {
+
+            String key = entry.getKey();
+            ArrayList<String> valueList = entry.getValue();
+
+            if ("doc_type".equals(key)) {
+                // test 1: each type is valid
+                for (String type : valueList) {
+                    if (!validateTypeInList(type)) {
+                        messages.add(type + " type not approved by ARC");
+                    }
                 }
             }
-
-            return false;
         }
+        return messages;
+    }
+
+    public static boolean validateTypeInList(String type) {
+        for (String aTypeList : TYPE_LIST) {
+            if (aTypeList.equals(type)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static ArrayList<String> validateFreecultureElement(HashMap<String, ArrayList<String>> object) {
         ArrayList<String> messages = new ArrayList<String>();
