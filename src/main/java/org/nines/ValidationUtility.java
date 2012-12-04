@@ -32,7 +32,7 @@ public class ValidationUtility {
         "Bibliography",  "Catalog",  "Citation",  "Collection",  "Correspondence",  "Criticism",  "Drama",  "Ephemera",
         "Fiction",  "Historiography",  "Law",  "Life Writing",  "Liturgy",  "Music - Other",  "Musical Analysis",
         "Musical Recording",  "Musical Score",  "Nonfiction",  "Paratext",  "Philosophy",  "Photograph",  "Poetry",
-        "Religion - Sermon",  "Religion - Liturgy",  "Religion - Other",  "Reference Works",  "Review",  "Scripture",
+        "Religion - Sermon",  "Religion - Liturgy",  "Religion - Other",  "Reference Works",  "Review", "Scripture",
         "Sermon",  "Translation",  "Travel Writing",  "Unspecified",  "Visual Art"
     };
 
@@ -46,7 +46,7 @@ public class ValidationUtility {
     // List of all valid disciplines
     public static final String[] TYPE_LIST = new String [] {
         "Codex",  "Collection",  "Drawing",  "Interactive Resource",  "Manuscript",  "Map",  "Moving Image",  "Periodical",
-        "Physical Object",  "Sheet",  "Sound",  "Still Image",  "Typescript"
+        "Physical Object", "Roll", "Sheet",  "Sound",  "Still Image",  "Typescript"
     };
 
     // Fields that are required to be present in RDF
