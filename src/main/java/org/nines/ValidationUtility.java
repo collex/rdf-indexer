@@ -32,7 +32,7 @@ public class ValidationUtility {
         "Bibliography",  "Catalog",  "Citation",  "Collection",  "Correspondence",  "Criticism",  "Drama",  "Ephemera",
         "Fiction",  "Historiography",  "Law",  "Life Writing",  "Liturgy",  "Music, Other",  "Musical Analysis",
         "Musical Recording",  "Musical Score",  "Nonfiction",  "Paratext",  "Philosophy",  "Photograph",  "Poetry",
-        "Religion, Other",  "Reference Works",  "Review", "Scripture",
+        "Religion", "Religion, Other",  "Reference Works",  "Review", "Scripture",
         "Sermon",  "Translation",  "Travel Writing",  "Unspecified",  "Visual Art"
     };
 
