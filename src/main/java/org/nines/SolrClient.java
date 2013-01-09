@@ -63,7 +63,7 @@ public final class SolrClient {
             if (exists <= 0) {
                 // The core doesn't exist: create it.
                 request = new GetMethod(this.baseUrl+"/admin/cores?action=CREATE&name=" 
-                    + core + "&instanceDir=.");
+                    + core + "&instanceDir=archives&dataDir=" + core);
                 execRequest( request );
                 this.log.info(">>>> Created core: " + core);
             }
