@@ -114,14 +114,14 @@ public final class SolrClient {
         GetMethod get = null;
 
         // never request the _version_ field
-        fields = fields.replace("_version_", "");
+        String filtered_fields = fields.replace("_version_", "");
         
         // build the request query string
         try {
             String a = URLEncoder.encode("\"" + archive + "\"", "UTF-8");
             String query = this.baseUrl + "/" + core + "/select/?q=archive:" + a;
             query = query + "&start=" + (page * pageSize) + "&rows=" + pageSize;
-            query = query + "&fl=" + fields;
+            query = query + "&fl=" + filtered_fields;
             query = query + "&sort=uri+asc";
             query = query + "&wt=json";
             get = new GetMethod(query);
