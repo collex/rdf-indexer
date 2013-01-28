@@ -525,6 +525,7 @@ final class NinesStatementHandler implements RDFHandler {
         if (predicate.startsWith("http://www.loc.gov/loc.terms/relators/")) {
             String role = predicate.substring("http://www.loc.gov/loc.terms/relators/".length());
             addField(doc, "role_" + role, object);
+            addField(doc, "role", "role_" + role);
             return true;
         }
         return false;
