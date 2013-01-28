@@ -112,6 +112,9 @@ public final class SolrClient {
 
         ArrayList<JsonObject> result = new ArrayList<JsonObject>();
         GetMethod get = null;
+
+        // never request the _version_ field
+        fields = fields.replace("_version_", "");
         
         // build the request query string
         try {
@@ -123,7 +126,7 @@ public final class SolrClient {
             query = query + "&wt=json";
             get = new GetMethod(query);
         } catch (UnsupportedEncodingException e) {
-            this.log.error("Unable to create solr requst query", e);
+            this.log.error("Unable to create solr request query", e);
             return result;
         }
 
