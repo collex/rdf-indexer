@@ -15,106 +15,78 @@
  **/
 package org.nines;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Scanner;
+
+import junit.framework.TestCase;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.util.PDFTextStripper;
 import org.junit.Test;
 
-import junit.framework.TestCase;
-
 public class NinesStatementHandlerTest extends TestCase {
-  private NinesStatementHandler sh;
-  private ErrorReport errorReport;
+    private NinesStatementHandler sh;
+    private ErrorReport errorReport;
 
-  protected void setUp() throws Exception {
-    super.setUp();
-    errorReport = new ErrorReport(new File("test_data","test_report.txt"));
-    sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
-  }
-
-  @Test
-  public void testPdfStrip()  {
-      try {
-        FileInputStream is = new FileInputStream( new File("test_data/sample.pdf") );
-        PDDocument pdfDoc = PDDocument.load(is);
-        assertEquals(2, pdfDoc.getNumberOfPages());
-        PDFTextStripper pdfStrip = new PDFTextStripper();
-        String text = pdfStrip.getText( pdfDoc );
-        
-        assertNotNull(text);
-        System.out.println(text);
-        
-    } catch (Exception e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+    protected void setUp() throws Exception {
+        super.setUp();
+        errorReport = new ErrorReport(new File("test_data", "test_report.txt"));
+        sh = new NinesStatementHandler(errorReport, new LinkCollector(), new RDFIndexerConfig());
     }
-  }
-  
-  
-  public void testAddField() {
-    HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
 
-    sh.addField(map, "Genre", "Poetry");
-    assertTrue(map.containsKey("Genre"));
-    ArrayList<String> values = map.get("Genre");
-    assertTrue(values.size() == 1);
+    @Test
+    public void testPdfStrip() {
+        try {
+            FileInputStream is = new FileInputStream(new File("test_data/sample.pdf"));
+            PDDocument pdfDoc = PDDocument.load(is);
+            assertEquals(2, pdfDoc.getNumberOfPages());
+            PDFTextStripper pdfStrip = new PDFTextStripper();
+            String text = pdfStrip.getText(pdfDoc);
 
-    sh.addField(map, "Genre", "Primary");
-    assertTrue(map.containsKey("Genre"));
-    values = map.get("Genre");
-    assertTrue(values.size() == 2);
-  }
+            assertNotNull(text);
+            System.out.println(text);
 
-  public void testYearParsing() {
-    ArrayList<String> years = NinesStatementHandler.parseYears("184u");
-    assertEquals(10, years.size());
-    assertEquals("1840", years.get(0));
-    assertEquals("1849", years.get(9));
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
 
-    years = NinesStatementHandler.parseYears("1862-12-25,1864-01-01 1875 1954-10");
-    assertEquals(5, years.size());
-    assertEquals("1862", years.get(0));
-    assertEquals("1954", years.get(4));
+    public void testAddField() {
+        HashMap<String, ArrayList<String>> map = new HashMap<String, ArrayList<String>>();
 
-    years = NinesStatementHandler.parseYears("  Uncertain  ");
-    assertEquals(1, years.size());
-    assertEquals("Uncertain", years.get(0));
-  }
+        sh.addField(map, "Genre", "Poetry");
+        assertTrue(map.containsKey("Genre"));
+        ArrayList<String> values = map.get("Genre");
+        assertTrue(values.size() == 1);
 
+        sh.addField(map, "Genre", "Primary");
+        assertTrue(map.containsKey("Genre"));
+        values = map.get("Genre");
+        assertTrue(values.size() == 2);
+    }
 
-  public void testUnknownYears() {
-    ArrayList<String> years = NinesStatementHandler.parseYears("unknown");
-    assertEquals(1, years.size());
-    assertEquals("Uncertain", years.get(0));
-  }
+    public void testYearParsing() {
+        ArrayList<String> years = NinesStatementHandler.parseYears("184u");
+        assertEquals(10, years.size());
+        assertEquals("1840", years.get(0));
+        assertEquals("1849", years.get(9));
 
-	private static String readWholeFile(File file) throws FileNotFoundException
-	{
-		 Scanner scanner = new Scanner(file);
-		 scanner.useDelimiter("\\Z");
-		 String wholeFile = scanner.next();
-		 scanner.close();
+        years = NinesStatementHandler.parseYears("1862-12-25,1864-01-01 1875 1954-10");
+        assertEquals(5, years.size());
+        assertEquals("1862", years.get(0));
+        assertEquals("1954", years.get(4));
 
-		 return wholeFile;
-	}
-	private static void writeFile(String fileName, String text) {
-		try {
-			BufferedWriter out = new BufferedWriter(new FileWriter(fileName));
-			out.write(text);
-			out.close();
-		}
-		catch (IOException e)
-		{
-			System.out.println("Exception ");
-		}
-	}
+        years = NinesStatementHandler.parseYears("  Uncertain  ");
+        assertEquals(1, years.size());
+        assertEquals("Uncertain", years.get(0));
+    }
+
+    public void testUnknownYears() {
+        ArrayList<String> years = NinesStatementHandler.parseYears("unknown");
+        assertEquals(1, years.size());
+        assertEquals("Uncertain", years.get(0));
+    }
 }

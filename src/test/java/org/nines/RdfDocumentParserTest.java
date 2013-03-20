@@ -23,37 +23,38 @@ import java.util.HashMap;
 import junit.framework.TestCase;
 
 public class RdfDocumentParserTest extends TestCase {
-  private ErrorReport errorReport;
-    
-  public void setUp() throws IOException  {
-    errorReport = new ErrorReport(new File("test_data","test_report.txt"));
-  }
+    private ErrorReport errorReport;
 
-  public void testBadNinesElement() throws IOException {
-      try {
-    parse("test_data/bad_nines_element.rdf");
-    assertEquals(3, errorReport.getErrorCount());
-      } catch (Exception e) {
-          e.printStackTrace();
-      }
-  }
+    public void setUp() throws IOException {
+        errorReport = new ErrorReport(new File("test_data", "test_report.txt"));
+    }
 
-  public void testInvalidXml() throws IOException {
-    parse("test_data/invalid_xml.rdf");
-    assertEquals(1, errorReport.getErrorCount());
-  }
+    public void testBadNinesElement() throws IOException {
+        try {
+            parse("test_data/bad_nines_element.rdf");
+            assertEquals(3, errorReport.getErrorCount());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-  public void testBadDate() throws IOException {
-    parse("test_data/bad_date.rdf");
-    assertEquals(3, errorReport.getErrorCount());
-  }
+    public void testInvalidXml() throws IOException {
+        parse("test_data/invalid_xml.rdf");
+        assertTrue(0 != errorReport.getErrorCount());
+    }
 
-  public void testRole() throws IOException {
-    parse("test_data/role_test.rdf");
-    assertEquals(7, errorReport.getErrorCount());
-  }
+    public void testBadDate() throws IOException {
+        parse("test_data/bad_date.rdf");
+        assertEquals(3, errorReport.getErrorCount());
+    }
 
-  private HashMap<String, HashMap<String,ArrayList<String>>> parse(String filename) throws IOException  {
-    return RdfDocumentParser.parse(new File(System.getProperty("test.data.dir"),filename), errorReport, new LinkCollector(), new RDFIndexerConfig() );
-  }
+    public void testRole() throws IOException {
+        parse("test_data/role_test.rdf");
+        assertEquals(7, errorReport.getErrorCount());
+    }
+
+    private HashMap<String, HashMap<String, ArrayList<String>>> parse(String filename) throws IOException {
+        return RdfDocumentParser.parse(new File(System.getProperty("test.data.dir"), filename), errorReport,
+            new LinkCollector(), new RDFIndexerConfig());
+    }
 }
