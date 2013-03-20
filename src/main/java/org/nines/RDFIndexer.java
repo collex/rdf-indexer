@@ -63,8 +63,8 @@ public class RDFIndexer {
     private SolrClient solrClient;
     private Date ts = new Date();
     private SimpleDateFormat ts2 = new SimpleDateFormat("yyyy-MM-dd");
-    private String timeStamp = new String( ts2.format( ts ) );
-    
+    private String timeStamp = new String(ts2.format(ts));
+
     /**
      * 
      * @param sourceDir
@@ -85,12 +85,12 @@ public class RDFIndexer {
 
         // keep report file in the same folder as the log file.
         String logName;
-        if  ( this.config.mode.equals( Mode.INDEX) || this.config.mode.equals(Mode.TEST) ) {
+        if (this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
             logName = logFileRoot + "_error.log";
         } else {
-            logName = logFileRoot + "_" + this.config.mode.toString().toLowerCase()+"_error.log";
+            logName = logFileRoot + "_" + this.config.mode.toString().toLowerCase() + "_error.log";
         }
-        File reportFile = new File( logName ); 
+        File reportFile = new File(logName);
         try {
             this.errorReport = new ErrorReport(reportFile);
         } catch (IOException e1) {
@@ -101,81 +101,81 @@ public class RDFIndexer {
         this.linkCollector = new LinkCollector(this.config.getLogfileBaseName("links"));
         this.solrClient = new SolrClient(this.config.solrBaseURL);
     }
-    
+
     /**
      * Execute the configured indexing task
      */
     public void execute() {
-        
+
         // if a purge was requested, it must be done FIRST
         if (config.deleteAll) {
-            purgeArchive(  SolrClient.archiveToCore(config.archiveName) );
+            purgeArchive(SolrClient.archiveToCore(config.archiveName));
         }
-                
+
         // There is only something else to do if a MODE was configured
-        if ( this.config.mode.equals(Mode.NONE) == false ) {
-            
+        if (this.config.mode.equals(Mode.NONE) == false) {
+
             // first, ensure that core is valid and exists
             try {
-                this.solrClient.validateCore( SolrClient.archiveToCore(this.config.archiveName) );
+                this.solrClient.validateCore(SolrClient.archiveToCore(this.config.archiveName));
             } catch (IOException e) {
                 this.errorReport.addError(new IndexerError("Validate core", "", e.getMessage()));
             }
-            
+
             // execute based on mode setting
-            if ( this.config.mode.equals( Mode.SPIDER) ) {
+            if (this.config.mode.equals(Mode.SPIDER)) {
                 this.log.info("Full Text Spider Mode");
-            } else  if ( this.config.mode.equals( Mode.CLEAN_RAW) ) {
+            } else if (this.config.mode.equals(Mode.CLEAN_RAW)) {
                 this.log.info("Raw Text Cleanup Mode");
-            } else  if ( this.config.mode.equals( Mode.CLEAN_FULL) ) {
+            } else if (this.config.mode.equals(Mode.CLEAN_FULL)) {
                 this.log.info("Full Text Cleanup Mode");
-            } else  if ( this.config.mode.equals( Mode.INDEX) ) {
+            } else if (this.config.mode.equals(Mode.INDEX)) {
                 this.log.info("Index Mode");
             } else {
                 this.log.info("*** TEST MODE: Not committing changes to SOLR");
             }
-    
+
             // do the indexing
-            if ( this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
+            if (this.config.mode.equals(Mode.INDEX) || this.config.mode.equals(Mode.TEST)) {
                 doIndexing();
-            } else if ( this.config.mode.equals(Mode.SPIDER) ) {
+            } else if (this.config.mode.equals(Mode.SPIDER)) {
                 doSpidering();
-            } else if ( this.config.mode.equals(Mode.CLEAN_RAW) ) {
+            } else if (this.config.mode.equals(Mode.CLEAN_RAW)) {
                 doRawTextCleanup();
-            } else if ( this.config.mode.equals(Mode.CLEAN_FULL) ) {
+            } else if (this.config.mode.equals(Mode.CLEAN_FULL)) {
                 doFullTextCleanup();
             }
         }
-        
+
         this.errorReport.close();
         this.linkCollector.close();
     }
-    
+
     private void doFullTextCleanup() {
         Date start = new Date();
         this.log.info("Started raw text cleanup at " + start);
-        
+
         this.dataFileQueue = new LinkedList<File>();
-        String fullPath =  this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
-        recursivelyQueueFiles( new File(fullPath), false);
+        String fullPath = this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
+        recursivelyQueueFiles(new File(fullPath), false);
         int totalFiles = this.dataFileQueue.size();
-        
-        FullTextCleaner cleaner = new FullTextCleaner( this.config.archiveName, this.errorReport, this.config.customCleanClass );
+
+        FullTextCleaner cleaner = new FullTextCleaner(this.config.archiveName, this.errorReport,
+            this.config.customCleanClass);
         while (this.dataFileQueue.size() > 0) {
             File txtFile = this.dataFileQueue.remove();
-            cleaner.clean( txtFile );         
+            cleaner.clean(txtFile);
             this.errorReport.flush();
         }
-        
-        String stats = "Cleaned " + totalFiles + 
-            " files (Original Size: " + cleaner.getOriginalLength()
-            + ", Cleaned Size: "+cleaner.getCleanedLength()
-            + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
-        
+
+        String stats = "Cleaned " + totalFiles + " files (Original Size: " + cleaner.getOriginalLength()
+            + ", Cleaned Size: " + cleaner.getCleanedLength() + ", Total Files Cleaned: "
+            + cleaner.getTotalFilesChanged() + ")";
+
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            this.log.info(String.format( "%s in %3.2f minutes.", stats, (durationSec / 60.0)));
+            this.log.info(String.format("%s in %3.2f minutes.", stats, (durationSec / 60.0)));
         } else {
             this.log.info(String.format("%s in %3.2f seconds.", stats, durationSec));
         }
@@ -184,28 +184,27 @@ public class RDFIndexer {
     private void doRawTextCleanup() {
         Date start = new Date();
         log.info("Started raw text cleanup at " + start);
-        
+
         this.dataFileQueue = new LinkedList<File>();
-        String rawPath =  this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
-        recursivelyQueueFiles( new File(rawPath), false);
-        int totalFiles  = this.dataFileQueue.size();
-        
-        RawTextCleaner cleaner = new RawTextCleaner( this.config, this.errorReport );
+        String rawPath = this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
+        recursivelyQueueFiles(new File(rawPath), false);
+        int totalFiles = this.dataFileQueue.size();
+
+        RawTextCleaner cleaner = new RawTextCleaner(this.config, this.errorReport);
         while (this.dataFileQueue.size() > 0) {
             File rawFile = this.dataFileQueue.remove();
-            cleaner.clean( rawFile );
+            cleaner.clean(rawFile);
             this.errorReport.flush();
         }
-        
-        String stats = "Cleaned " + totalFiles + 
-            " files (Original Size: " + cleaner.getOriginalLength()
-            + ", Cleaned Size: "+cleaner.getCleanedLength()
-            + ", Total Files Cleaned: " +cleaner.getTotalFilesChanged()+ ")";
-        
+
+        String stats = "Cleaned " + totalFiles + " files (Original Size: " + cleaner.getOriginalLength()
+            + ", Cleaned Size: " + cleaner.getCleanedLength() + ", Total Files Cleaned: "
+            + cleaner.getTotalFilesChanged() + ")";
+
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            this.log.info(String.format( "%s in %3.2f minutes.", stats, (durationSec / 60.0)));
+            this.log.info(String.format("%s in %3.2f minutes.", stats, (durationSec / 60.0)));
         } else {
             this.log.info(String.format("%s in %3.2f seconds.", stats, durationSec));
         }
@@ -214,10 +213,10 @@ public class RDFIndexer {
     private void doIndexing() {
         Date start = new Date();
         log.info("Started indexing at " + start);
-        System.out.println("Indexing "+config.sourceDir);
+        System.out.println("Indexing " + config.sourceDir);
         indexDirectory(config.sourceDir);
         System.out.println("Indexing DONE");
-   
+
         // report indexing stats
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
@@ -230,24 +229,21 @@ public class RDFIndexer {
         }
         this.log.info("Largest text field size: " + this.largestTextSize);
     }
-    
 
     private void doSpidering() {
         Date start = new Date();
         log.info("Started full-text spider at " + start);
-        System.out.println("Full-text spider of "+config.sourceDir);
+        System.out.println("Full-text spider of " + config.sourceDir);
         spiderDirectory(this.config.sourceDir);
         System.out.println("DONE");
-   
+
         // report indexing stats
         Date end = new Date();
         double durationSec = (end.getTime() - start.getTime()) / 1000.0;
         if (durationSec >= 60) {
-            this.log.info(String.format(
-                "Spidered " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
+            this.log.info(String.format("Spidered " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
         } else {
-            this.log.info(String.format(
-                "Spidered " + numFiles + " files in %3.2f seconds.", durationSec));
+            this.log.info(String.format("Spidered " + numFiles + " files in %3.2f seconds.", durationSec));
         }
     }
 
@@ -268,11 +264,11 @@ public class RDFIndexer {
 
             File fileList[] = dir.listFiles();
             for (File entry : fileList) {
-                if (entry.isDirectory() && !entry.getName().endsWith(".svn")) {
+                if (entry.isDirectory() && !entry.getName().endsWith(".svn") && !entry.getName().endsWith(".git")) {
                     recursivelyQueueFiles(entry, rdfMode);
                 }
-                
-                if ( rdfMode) {
+
+                if (rdfMode) {
                     if (entry.getName().endsWith(".rdf") || entry.getName().endsWith(".xml")) {
                         this.dataFileQueue.add(entry);
                     }
@@ -280,32 +276,32 @@ public class RDFIndexer {
                     this.dataFileQueue.add(entry);
                 }
             }
-        } else // a file was passed in, not a folder
-        {
+        } else { // a file was passed in, not a folder
             this.log.info("loading file: " + dir.getPath());
             this.dataFileQueue.add(dir);
         }
     }
-    
+
     /**
      * Run through all rdf files in the directory and harvest full text
      * from remote sites.
      * 
      * @param rdfDir
      */
-    private void spiderDirectory( final File rdfDir ) {
+    private void spiderDirectory(final File rdfDir) {
         this.dataFileQueue = new LinkedList<File>();
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Spider text for " + rdfDir + " total files: " + this.numFiles);
-        RdfTextSpider spider = new RdfTextSpider( this.config, this.errorReport );
+        RdfTextSpider spider = new RdfTextSpider(this.config, this.errorReport);
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
-            this.log.info("Spider text from file "+rdfFile.toString());
+            this.log.info("Spider text from file " + rdfFile.toString());
             spider.spider(rdfFile);
             try {
                 Thread.sleep(10);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
             this.errorReport.flush();
         }
     }
@@ -321,7 +317,7 @@ public class RDFIndexer {
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
-        this.solrExecutorService = Executors.newFixedThreadPool( 1 );
+        this.solrExecutorService = Executors.newFixedThreadPool(1);
 
         this.targetArchive = "";
         this.docCount = 0;
@@ -330,33 +326,34 @@ public class RDFIndexer {
             File rdfFile = this.dataFileQueue.remove();
             indexFile(rdfFile);
         }
-        
-        if ( this.solrXmlPayload.length() > 0 && this.config.isTestMode() == false ) {
-            this.solrExecutorService.execute( new SolrWorker(this.solrXmlPayload, this.targetArchive, this.docCount) );
+
+        if (this.solrXmlPayload.length() > 0 && this.config.isTestMode() == false) {
+            this.solrExecutorService.execute(new SolrWorker(this.solrXmlPayload, this.targetArchive, this.docCount));
         }
-        
+
         // signal shutdown and wait until it is comlete
         this.solrExecutorService.shutdown();
         try {
             this.solrExecutorService.awaitTermination(15, TimeUnit.MINUTES);
-        } catch (InterruptedException e) {}
-        
+        } catch (InterruptedException e) {
+        }
+
         // Now that all workers re finished, it is safe to commit
-        if ( this.config.isTestMode() == false  ) {
+        if (this.config.isTestMode() == false) {
             try {
                 this.solrClient.post("<commit/>", this.targetArchive);
             } catch (IOException e) {
-                this.log.error("Commit to SOLR FAILED: "+e.getMessage());
+                this.log.error("Commit to SOLR FAILED: " + e.getMessage());
             }
         }
     }
-    
+
     private boolean postThresholdMet() {
         return (this.solrXmlPayload.length() >= this.config.maxUploadSize);
     }
 
     private void indexFile(File file) {
-   
+
         HashMap<String, HashMap<String, ArrayList<String>>> objects;
 
         // Parse a file into a hashmap.
@@ -379,7 +376,6 @@ public class RDFIndexer {
         // save the largest text field size
         this.largestTextSize = Math.max(this.largestTextSize, RdfDocumentParser.getLargestTextSize());
 
-      
         XMLOutputter outputter = new XMLOutputter(Format.getRawFormat());
         for (Map.Entry<String, HashMap<String, ArrayList<String>>> entry : objects.entrySet()) {
 
@@ -391,7 +387,7 @@ public class RDFIndexer {
             ArrayList<String> objectArray = object.get("archive");
             if (objectArray != null) {
                 String objArchive = objectArray.get(0);
-                this.targetArchive =  SolrClient.archiveToCore(objArchive);
+                this.targetArchive = SolrClient.archiveToCore(objArchive);
                 if (!objArchive.equals(this.config.archiveName)) {
                     this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
                         + objArchive + " should be " + this.config.archiveName));
@@ -418,13 +414,14 @@ public class RDFIndexer {
             // turn this object into an XML solr docm then xml string. Add this to the curr payload
             Element document = convertObjectToSolrDOM(uri, object);
             String xmlString = outputter.outputString(document);
-            this.solrXmlPayload.append( xmlString );
+            this.solrXmlPayload.append(xmlString);
             this.docCount++;
-            
+
             // once threshold met, post the data to solr
-            if ( postThresholdMet() ) {
-                if ( this.config.isTestMode() == false ) {
-                    this.solrExecutorService.execute( new SolrWorker(this.solrXmlPayload, this.targetArchive, this.docCount) );
+            if (postThresholdMet()) {
+                if (this.config.isTestMode() == false) {
+                    this.solrExecutorService.execute(new SolrWorker(this.solrXmlPayload, this.targetArchive,
+                        this.docCount));
                 }
                 this.solrXmlPayload = new StringBuilder();
                 this.docCount = 0;
@@ -442,7 +439,7 @@ public class RDFIndexer {
 
             String field = entry.getKey();
             ArrayList<String> valList = entry.getValue();
-           
+
             for (String value : valList) {
                 Element f = new Element("field");
                 f.setAttribute("name", field);
@@ -474,20 +471,19 @@ public class RDFIndexer {
 
         private final String payload;
         private final String tgtArchive;
-       
-        
-        public SolrWorker( final StringBuilder data, final String tgtArchive, int docCnt ) {
+
+        public SolrWorker(final StringBuilder data, final String tgtArchive, int docCnt) {
             this.tgtArchive = tgtArchive;
             this.payload = "<add>" + data.toString() + "</add>";
-            
-            log.info("  posting: payload size " + this.payload.length() 
-                + " with " + docCnt + " documents to SOLR");
+
+            log.info("  posting: payload size " + this.payload.length() + " with " + docCnt + " documents to SOLR");
         }
+
         public void run() {
             try {
                 solrClient.post(this.payload, this.tgtArchive);
             } catch (IOException e) {
-                Logger.getLogger(RDFIndexer.class.getName()).error("Post to SOLR FAILED: "+e.getMessage());
+                Logger.getLogger(RDFIndexer.class.getName()).error("Post to SOLR FAILED: " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -501,17 +497,17 @@ public class RDFIndexer {
     public static void main(String[] args) {
 
         // Option constants
-        final String logDir = "logDir";         // logging directory
-        final String deleteFlag = "delete";     // delete an archive from solr
-        final String mode = "mode";             // REQUIRED mode of operation: [TEST, SPIDER, CLEAN, INDEX, COMPARE]
-        final String ignoreFlag = "ignore";     // A list of fields to ignore
-        final String includeFlag = "include";   // A list of fields to include
-        final String source = "source";         // index: REQUIRED path to archive
-        final String archive = "archive";       // REQUIRED name of archive
-        final String pageSize = "pageSize";     // compare: max results per solr page
-        final String maxSize = "maxSize";       // indexing: the max size of data to send to solr
-        final String custom = "custom";         // flag to indicate customized clean
-        final String encoding = "encoding";     // set char set of raw source text for clea
+        final String logDir = "logDir"; // logging directory
+        final String deleteFlag = "delete"; // delete an archive from solr
+        final String mode = "mode"; // REQUIRED mode of operation: [TEST, SPIDER, CLEAN, INDEX, COMPARE]
+        final String ignoreFlag = "ignore"; // A list of fields to ignore
+        final String includeFlag = "include"; // A list of fields to include
+        final String source = "source"; // index: REQUIRED path to archive
+        final String archive = "archive"; // REQUIRED name of archive
+        final String pageSize = "pageSize"; // compare: max results per solr page
+        final String maxSize = "maxSize"; // indexing: the max size of data to send to solr
+        final String custom = "custom"; // flag to indicate customized clean
+        final String encoding = "encoding"; // set char set of raw source text for clea
 
         // define the list of command line options
         Options options = new Options();
@@ -522,8 +518,9 @@ public class RDFIndexer {
         options.addOption(nameOpt);
 
         // MODE
-        Option modeOpt = new Option(mode, true, "Mode of operation [TEST, SPIDER, CLEAN_RAW, CLEAN_FULL, INDEX, COMPARE]");
-        options.addOption ( modeOpt );
+        Option modeOpt = new Option(mode, true,
+            "Mode of operation [TEST, SPIDER, CLEAN_RAW, CLEAN_FULL, INDEX, COMPARE]");
+        options.addOption(modeOpt);
 
         // include/exclude field group
         OptionGroup fieldOpts = new OptionGroup();
@@ -537,7 +534,7 @@ public class RDFIndexer {
         options.addOption(logDir, true, "Set the root directory for all indexer logs");
         options.addOption(pageSize, true,
             "Set max documents returned per solr page. Default = 500 for most, 1 for special cases");
-        
+
         options.addOption(encoding, true, "Encoding of source raw text file for clean");
         options.addOption(custom, true, "Customized clean class");
 
@@ -549,15 +546,15 @@ public class RDFIndexer {
 
             // required param:
             config.archiveName = line.getOptionValue(archive);
-            
-            if ( line.hasOption(mode)) {
+
+            if (line.hasOption(mode)) {
                 String modeVal = line.getOptionValue(mode).toUpperCase();
                 config.mode = Mode.valueOf(modeVal);
-                if  ( config.mode == null ) {
-                    throw new ParseException("Invalid mode "+modeVal);
+                if (config.mode == null) {
+                    throw new ParseException("Invalid mode " + modeVal);
                 }
             }
-           
+
             // optional params:
             if (line.hasOption(source)) {
                 config.sourceDir = new File(line.getOptionValue(source));
@@ -585,13 +582,13 @@ public class RDFIndexer {
             if (config.mode.equals(Mode.COMPARE) == false && config.sourceDir == null) {
                 throw new ParseException("Missing required -source parameter");
             }
-            
-            if ( line.hasOption(encoding )) {
-                config.defaultEncoding =  line.getOptionValue(encoding);
+
+            if (line.hasOption(encoding)) {
+                config.defaultEncoding = line.getOptionValue(encoding);
             }
-            
-            if ( line.hasOption(custom )) {
-                config.customCleanClass =  line.getOptionValue(custom);
+
+            if (line.hasOption(custom)) {
+                config.customCleanClass = line.getOptionValue(custom);
             }
 
         } catch (ParseException exp) {
@@ -601,7 +598,7 @@ public class RDFIndexer {
             formatter.printHelp("rdf-idexer", options);
             System.exit(-1);
         }
-        
+
         // Use the SAX2-compliant Xerces parser:
         System.setProperty("org.xml.sax.driver", "org.apache.xerces.parsers.SAXParser");
 
@@ -619,7 +616,7 @@ public class RDFIndexer {
             StringWriter result = new StringWriter();
             PrintWriter printWriter = new PrintWriter(result);
             e.printStackTrace(printWriter);
-            Logger.getLogger(RDFIndexer.class.getName()).error(result.toString());    
+            Logger.getLogger(RDFIndexer.class.getName()).error(result.toString());
         }
         System.exit(0);
     }
