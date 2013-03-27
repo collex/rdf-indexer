@@ -264,7 +264,11 @@ public class RDFIndexer {
 
             File fileList[] = dir.listFiles();
             for (File entry : fileList) {
-                if (entry.isDirectory() && !entry.getName().endsWith(".svn") && !entry.getName().endsWith(".git")) {
+                if ( entry.getName().endsWith(".svn") || entry.getName().endsWith(".git")) {
+                    log.info("Skipping source control directory");
+                    continue;
+                }
+                if (entry.isDirectory() ) {
                     recursivelyQueueFiles(entry, rdfMode);
                 }
 

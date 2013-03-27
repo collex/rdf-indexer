@@ -183,6 +183,7 @@ final class RawTextCleaner {
             this.detector.handleData(buf, 0, nread);
         }
         this.detector.dataEnd();
+        fis.close();
 
         /// see what it thinks....
         String encoding = detector.getDetectedCharset();

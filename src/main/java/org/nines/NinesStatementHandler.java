@@ -690,13 +690,9 @@ final class NinesStatementHandler implements RDFHandler {
                 addField(object, "author_sort", engraver);
 
             // add year_sort
-            String year_sort_field = getFirstField(object, "date_label");
-            if (year_sort_field.length() > 0)
+            String year_sort_field = getFirstField(object, "year");
+            if (year_sort_field.length() > 0) {
                 addField(object, "year_sort", year_sort_field);
-            else {
-                year_sort_field = getFirstField(object, "year");
-                if (year_sort_field.length() > 0)
-                    addField(object, "year_sort", year_sort_field);
             }
 
             // add fulltext and ocr indicators
