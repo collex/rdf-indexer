@@ -43,9 +43,9 @@ public class ValidationUtility {
         "Science", "Law", "Literature", "Musicology", "Math", "Religious Studies", "Manuscript Studies"
     };
 
-    // List of all valid disciplines
+    // List of all valid types
     public static final String[] TYPE_LIST = new String [] {
-        "Codex",  "Collection",  "Drawing",  "Interactive Resource",  "Manuscript",  "Map",  "Moving Image",  "Periodical",
+        "Codex",  "Collection",  "Drawing",  "Illustration", "Interactive Resource",  "Manuscript",  "Map",  "Moving Image",  "Periodical",
         "Physical Object", "Roll", "Sheet",  "Sound",  "Still Image",  "Typescript"
     };
 
