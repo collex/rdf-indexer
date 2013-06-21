@@ -101,7 +101,7 @@
             <version>1.0</version>
         </dependency>
         <dependency>
-            <groupId>net.sourceforge.juniversalchardet</groupId>
+		  <groupId>com.googlecode.juniversalchardet</groupId>
             <artifactId>juniversalchardet</artifactId>
             <version>1.0.3</version>
         </dependency>
