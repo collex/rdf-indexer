@@ -30,7 +30,7 @@ public class ValidationUtility {
     // List of all valid genres 
     public static final String[] GENRE_LIST = new String[] {
         "Bibliography",  "Catalog",  "Citation",  "Collection",  "Correspondence",  "Criticism",  "Drama",  "Ephemera",
-        "Fiction",  "Historiography",  "Law",  "Liturgy",  "Music, Other",  "Musical Analysis",
+        "Fiction",  "Historiography",  "Law",  "Life Writing", "Liturgy",  "Music, Other",  "Musical Analysis",
         "Musical Recording",  "Musical Score",  "Nonfiction",  "Paratext",  "Philosophy",  "Photograph",  "Poetry",
         "Religion", "Religion, Other",  "Reference Works",  "Review", "Scripture",
         "Sermon",  "Translation",  "Travel Writing",  "Unspecified",  "Visual Art"
