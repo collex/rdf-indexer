@@ -34,21 +34,6 @@ public class ValidationUtilityTest extends TestCase {
     assertFalse(ValidationUtility.validateGenreInList("asdf"));
   }
 
-  public void testFilterNonXMLCharacters() {
-	  char[] containsBadChar = new char[5];
-	  containsBadChar[0] = 'H';
-	  containsBadChar[1] = 'i';
-	  containsBadChar[2] = '!';
-	  containsBadChar[3] = 0x18;
-	  containsBadChar[4] = '&';
-	  
-	  String badString = new String(containsBadChar);  
-	  String goodString = ValidationUtility.filterNonXMLCharacters(badString);
-	  
-	  assertTrue( goodString.charAt(3) != 0x18 );
-	  assertTrue( goodString.compareTo("Hi!&") == 0 );
-  }
-
   public void testValidateRequired() {
     // "archive","title","agent","genre","date_label"
     HashMap<String, ArrayList<String>> testMap = new HashMap<String, ArrayList<String>>();

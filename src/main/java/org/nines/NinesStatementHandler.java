@@ -47,6 +47,7 @@ final class NinesStatementHandler implements RDFHandler {
     private String documentURI;
     private long largestTextField = -1;
     private LinkCollector linkCollector;
+    private boolean hasCorrectedText = false;
 
     public NinesStatementHandler(ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config) {
         this.errorReport = errorReport;
@@ -82,6 +83,7 @@ final class NinesStatementHandler implements RDFHandler {
             documents.put(subject, doc);
             title_sort_added = false;
             documentURI = subject;
+            this.hasCorrectedText = ( this.config.correctedTextMap.containsKey(this.documentURI));
             log.info("Parsing RDF for document: " + subject);
             errorReport.flush();
         }
@@ -263,9 +265,13 @@ final class NinesStatementHandler implements RDFHandler {
 
     private boolean handleFullText(String predicate, String object) {
         if ("http://www.collex.org/schema#fulltext".equals(predicate)) {
-            if ("false".equalsIgnoreCase(object)) {
-                // only add a fulltext field if its false. No field set implies "T"rue
-                addField(doc, "has_full_text", "F"); // "F"alse
+            if ( this.hasCorrectedText ) {
+                addField(doc, "has_full_text", "T"); 
+            } else {
+                if ("false".equalsIgnoreCase(object)) {
+                    // only add a fulltext field if its false. No field set implies "T"rue
+                    addField(doc, "has_full_text", "F"); // "F"alse
+                }
             }
             return true;
         }
@@ -436,20 +442,32 @@ final class NinesStatementHandler implements RDFHandler {
         // will have the #text url below....
         if ("http://www.collex.org/schema#text".equals(predicate)) {
 
-            // Objects with external content will have some form of
-            // http url as the content.
             String text = object;
             boolean externalText = false;
-            if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
-                addFieldEntry(doc, "text_url", text, false);
-
+            if ( this.hasCorrectedText ) {
                 // only in index mode do we attempt to grab 
-                // full text from the full text folder
+                // corrected text from the full text folder
                 if (config.mode == Mode.INDEX) {
                     externalText = true;
-                    text = getFullText( text );
+                    text = getCorrectedText();
                 } else {
                     text = "";
+                }
+                
+            } else {
+                // Objects with external content will have some form of
+                // http url as the content.
+                if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
+                    addFieldEntry(doc, "text_url", text, false);
+    
+                    // only in index mode do we attempt to grab 
+                    // full text from the full text folder
+                    if (config.mode == Mode.INDEX) {
+                        externalText = true;
+                        text = getFullText( text );
+                    } else {
+                        text = "";
+                    }
                 }
             }
 
@@ -476,6 +494,30 @@ final class NinesStatementHandler implements RDFHandler {
         path = path.substring(0, pos) + "/fulltext/";
         path += SolrClient.safeCore(this.config.archiveName) + "/";
         return path;
+    }
+    
+    /**
+     * Get the corrected text for the current document
+     * @return
+     */
+    private String getCorrectedText() {
+        String fName = this.config.correctedTextMap.get(this.documentURI);
+        File corrTxtFile = new File( this.config.correctedTextDir, fName);
+        if (corrTxtFile.exists() == false) {
+            this.errorReport.addError(new IndexerError("", this.documentURI, "Missing corrected text file " + corrTxtFile.toString()));
+            return "";
+        }
+        FileInputStream is = null;
+        try {
+            is = new FileInputStream(corrTxtFile);
+            return IOUtils.toString( is, "UTF-8");
+        } catch (IOException e) {
+            errorReport.addError(new IndexerError(corrTxtFile.toString(), this.documentURI, "Unable to read corrected text" + ": "
+                + e.toString()));
+            return "";
+        } finally {
+            IOUtils.closeQuietly(is);
+        }
     }
     
     /**

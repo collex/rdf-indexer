@@ -17,6 +17,8 @@
 package org.nines;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Configuration for the RDFFileIndexer
@@ -44,8 +46,11 @@ public class RDFIndexerConfig {
     public String solrExistingIndex = "/resources";
     public Mode mode = Mode.NONE;
     public String defaultEncoding = "UTF-8";
-    
     public String customCleanClass = "";
+    
+    // corrected text map: URI -> filename
+    public Map<String,String> correctedTextMap =  new HashMap<String,String>();
+    public File correctedTextDir = null;
 
     // indexing properties
     public boolean collectLinks = true;

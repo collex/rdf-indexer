@@ -161,17 +161,17 @@ public final class SolrClient {
     }
     
     /**
-     * Post the XML payload to the specified SOLR archive
+     * Post the JSON payload to the specified SOLR archive
      * 
      * @param xml
      * @param archive
      * @throws IOException
      */
-    public void post(String xml, String archive) throws IOException {
+    public void postJSON(String json, String archive) throws IOException {
 
-        PostMethod post = new PostMethod(this.baseUrl + "/" + archive + "/update");
-        post.setRequestEntity(new StringRequestEntity(xml, "text/xml", "utf-8"));
-        post.setRequestHeader("Content-type", "text/xml; charset=utf-8");
+        PostMethod post = new PostMethod(this.baseUrl + "/" + archive + "/update/json");
+        post.setRequestEntity(new StringRequestEntity(json, "application/json", "utf-8"));
+        post.setRequestHeader("Content-type", "application/json; charset=utf-8");
 
         // Execute request
         try {

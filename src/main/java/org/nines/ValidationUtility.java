@@ -21,9 +21,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.jdom.Element;
-import org.jdom.IllegalDataException;
-import org.jdom.Verifier;
+//import org.jdom.Element;
+//import org.jdom.IllegalDataException;
+//import org.jdom.Verifier;
 
 public class ValidationUtility {
 
@@ -282,28 +282,4 @@ public class ValidationUtility {
         else
             return false;
     }
-
-    public static void populateTextField(Element field, String text) {
-        // first, try it without sanitizing, only sanitize if there is a problem with the text.
-        try {
-            field.setText(text);
-        } catch (IllegalDataException e) {
-            field.setText(filterNonXMLCharacters(text));
-        }
-    }
-
-    public static String filterNonXMLCharacters(String text) {
-        char[] outputString = new char[text.length()];
-
-        int j = 0;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (Verifier.isXMLCharacter(c)) {
-                outputString[j++] = c;
-            }
-        }
-
-        return String.copyValueOf(outputString, 0, j);
-    }
-
 }
