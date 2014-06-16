@@ -48,6 +48,7 @@ public class RDFCompare {
     // all of the solr instance fields. Text is the last field
     private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>(Arrays.asList("uri", "archive",
         "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url", "role_ART", "role_AUT",
+		"role_BRD","role_CNG","role_CND","role_DRT","role_IVR","role_IVE","role_OWN","role_FMO","role_PRF","role_PRO","role_PRN",
         "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
         "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
         "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",

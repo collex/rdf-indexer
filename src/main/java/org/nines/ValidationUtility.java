@@ -59,6 +59,7 @@ public class ValidationUtility {
         "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
 
     private static final String[] ROLE_FIELDS = new String[] { "role_ART", "role_AUT", "role_EDT", "role_PBL", "role_CRE",
+		"role_BRD","role_CNG","role_CND","role_DRT","role_IVR","role_IVE","role_OWN","role_FMO","role_PRF","role_PRO","role_PRN",
        "role_EGR", "role_ETR", "role_TRL", "role_ARC", "role_BND", "role_BKD", "role_BKP", "role_CLL", "role_CTG", "role_COL",
         "role_CLR", "role_CWT", "role_COM", "role_CMT", "role_CRE", "role_DUB", "role_FAC", "role_ILU", "role_ILL", "role_LTG",
         "role_PRT", "role_POP", "role_PRM", "role_RPS", "role_RBR", "role_SCR", "role_SCL", "role_TYD", "role_TYG", "role_WDE",
