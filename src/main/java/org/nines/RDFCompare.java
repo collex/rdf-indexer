@@ -52,6 +52,7 @@ public class RDFCompare {
         "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
         "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
         "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",
+        "hasPart", "isPartOf",
         "source_sgml", "person", "format", "language", "geospacial", "text"));
 
     //  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(

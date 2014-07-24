@@ -162,6 +162,10 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleType(predicate, object))
             return;
+        if (handleHasPart(predicate, object))
+            return;
+        if (handleIsPartOf(predicate, object))
+            return;
     }
 
     private boolean handleFederation(String predicate, String object) {
@@ -431,6 +435,22 @@ final class NinesStatementHandler implements RDFHandler {
     private boolean handleURL(String predicate, String object) {
         if ("http://www.w3.org/2000/01/rdf-schema#seeAlso".equals(predicate)) {
             addField(doc, "url", object);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleHasPart(String predicate, String object) {
+        if ("http://purl.org/dc/terms/hasPart".equals(predicate)) {
+            addField(doc, "hasPart", object);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleIsPartOf(String predicate, String object) {
+        if ("http://purl.org/dc/terms/isPartOf".equals(predicate)) {
+            addField(doc, "isPartOf", object);
             return true;
         }
         return false;
