@@ -28,6 +28,11 @@
             <name>Lou Foster</name>
             <email>lou@performantsoftware.com</email>
         </developer>
+        <developer>
+            <id>dave</id>
+            <name>Dave Goldstein</name>
+            <email>dave@performantsoftware.com</email>
+        </developer>
     </developers>
 
     <!-- additional maven repos to search -->
