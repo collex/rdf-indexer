@@ -335,7 +335,9 @@ public class RDFIndexer {
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
-        this.solrExecutorService = Executors.newFixedThreadPool(1);
+        if( this.config.isTestMode() == false ) {
+            this.solrExecutorService = Executors.newFixedThreadPool(1);
+        }
 
         this.targetArchive = "";
         this.docCount = 0;
@@ -343,25 +345,26 @@ public class RDFIndexer {
             File rdfFile = this.dataFileQueue.remove();
             indexFile(rdfFile);
         }
-        
-        if ( this.jsonPayload.size() > 0 && this.config.isTestMode() == false) {
-            this.solrExecutorService.execute(new SolrWorker(this.jsonPayload.toString(), this.targetArchive, this.docCount));
-        }
 
-        // signal shutdown and wait until it is comlete
-        this.solrExecutorService.shutdown();
-        try {
-            this.solrExecutorService.awaitTermination(15, TimeUnit.MINUTES);
-        } catch (InterruptedException e) {
-        }
-
-        // Now that all workers re finished, it is safe to commit
         if (this.config.isTestMode() == false) {
-            try {
-                this.solrClient.postJSON("{\"commit\": {}}", this.targetArchive);
-            } catch (IOException e) {
-                this.log.error("Commit to SOLR FAILED: " + e.getMessage());
-            }
+           if ( this.jsonPayload.size() > 0 ) {
+              this.solrExecutorService.execute(new SolrWorker(this.jsonPayload.toString(), this.targetArchive, this.docCount));
+           }
+
+           // signal shutdown and wait until it is complete
+           this.solrExecutorService.shutdown();
+           try {
+            this.solrExecutorService.awaitTermination(15, TimeUnit.MINUTES);
+           } catch (InterruptedException e) {
+               // do nothing...
+           }
+
+           // Now that all workers re finished, it is safe to commit
+           try {
+              this.solrClient.postJSON("{\"commit\": {}}", this.targetArchive);
+           } catch (IOException e) {
+              this.log.error("Commit to SOLR FAILED: " + e.getMessage());
+           }
         }
     }
 
