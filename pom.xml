@@ -166,7 +166,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>org.nines.RDFIndexer</mainClass>
+                            <mainClass>org.nines.Main</mainClass>
                             <packageName>org.nines</packageName>
                         </manifest>
                     </archive>
