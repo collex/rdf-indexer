@@ -16,9 +16,10 @@
 
 package org.nines;
 
+import org.apache.commons.lang.StringUtils;
+
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Configuration for the RDFFileIndexer
@@ -65,7 +66,18 @@ public class RDFIndexerConfig {
     public final boolean isTestMode() {
         return this.mode.equals(Mode.TEST);
     }
-    
+
+    // all of the solr instance fields. Text is the last field
+    private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>( Arrays.asList( "uri", "archive",
+            "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url", "role_ART", "role_AUT",
+            "role_BRD", "role_CNG", "role_CND", "role_DRT", "role_IVR", "role_IVE", "role_OWN", "role_FMO", "role_PRF", "role_PRO", "role_PRN",
+            "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
+            "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
+            "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",
+            "hasPart", "isPartOf",
+            "source_sgml", "person", "format", "language", "geospacial", "text" ));
+
+
     /**
      * Gets the path and partial name of the logfile. The partial name
      * just includes the cleaned arhive name. To this must be appended
@@ -80,4 +92,54 @@ public class RDFIndexerConfig {
 			logFileRelativePath = logFileRelativePath + subFolder + "/";
         return logFileRelativePath + name;
     }
+
+    /**
+     * Look at the compare config and generate a field list
+     * suitable for submission to Solr:
+     * @return List in the form: field1+field2+...
+     */
+    public final String getFieldList( ) {
+
+        // if the ignored list has anything assume all fields and skip requested
+        if (ignoreFields.trim().length() > 0) {
+            List<String> ignored = new ArrayList<String>(Arrays.asList(ignoreFields.split(",")));
+            List<String> fl = new ArrayList<String>(ALL_FIELDS);
+            for (String ignore : ignored) {
+                fl.remove(ignore);
+            }
+            return StringUtils.join( fl.iterator(), "+" );
+        }
+
+        // all fields?
+        if (includeFields.equals("*")) {
+            return "*";
+        }
+
+        // just some
+        List<String> included = new ArrayList<String>(Arrays.asList(includeFields.split(",")));
+        if (included.contains("uri") == false) {
+            included.add("uri");
+        }
+
+        return StringUtils.join(included.iterator(), "+");
+    }
+
+    /**
+     * Generate a clean core name from an archive
+     */
+    public final String coreName( ) {
+        return( coreName( archiveName ) );
+    }
+
+    public final String coreName( final String archive ) {
+        return "archive_" + safeArchive( archive );
+    }
+
+    public static final String safeArchive( String archive ) {
+        archive = archive.replaceAll(":", "_");
+        archive = archive.replaceAll(" ", "_");
+        archive = archive.replaceAll(",", "_");
+        return( archive );
+    }
+
 }

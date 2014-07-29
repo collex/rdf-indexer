@@ -52,7 +52,6 @@ final class RawTextCleaner {
      * Errors will be added to the <code>errorReport</code>
      * 
      * @param rawTextFile
-     * @param errorReport
      */
     public void clean( final File rawTextFile ) {
     
@@ -226,7 +225,7 @@ final class RawTextCleaner {
 
     private File toFullTextFile(File rawTextFile) {
         String cleanedFile = this.config.sourceDir.toString().replace("rawtext", "fulltext") 
-            + "/" + SolrClient.safeCore(this.config.archiveName);
+            + "/" + config.safeArchive(this.config.archiveName);
         return new File(cleanedFile +"/" + rawTextFile.getName());   
     }
     

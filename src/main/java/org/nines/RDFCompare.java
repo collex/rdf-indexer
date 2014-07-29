@@ -45,16 +45,6 @@ public class RDFCompare {
     private int txtErrorCount = 0;
     private SolrClient solrClient;
 
-    // all of the solr instance fields. Text is the last field
-    private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>(Arrays.asList("uri", "archive",
-        "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url", "role_ART", "role_AUT",
-		"role_BRD","role_CNG","role_CND","role_DRT","role_IVR","role_IVE","role_OWN","role_FMO","role_PRF","role_PRO","role_PRN",
-        "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
-        "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
-        "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort", "year_sort", "source_html",
-        "hasPart", "isPartOf",
-        "source_sgml", "person", "format", "language", "geospacial", "text"));
-
     //  private static final ArrayList<String> LARGE_TEXT_ARCHIVES = new ArrayList<String>( Arrays.asList(
     //      "PQCh-EAF", "amdeveryday", "amdecj", "oldBailey" ));
 
@@ -105,7 +95,10 @@ public class RDFCompare {
         this.log.info("Started compare at " + start);
         logInfo("====== Scanning archive \"" + config.archiveName + "\" ====== ");
 
-        String fl = getFieldList();
+        // get the list of fields and determine if we are to include text
+        String fl = config.getFieldList( );
+        if( fl.contains( "text" ) == true ) includesText = true;
+        if( fl.equals( "*" ) == true ) includesText = true;
 
         // Start at beginning of list and return 500 hits at a time
         int page = 0;
@@ -114,7 +107,7 @@ public class RDFCompare {
         HashMap<String, JsonObject> indexHash = new HashMap<String, JsonObject>();
         Set<String> indexUris = new HashSet<String>();
         Set<String> archiveUris = new HashSet<String>();
-        String reindexCore = archiveToCoreName(this.config.archiveName);
+        String reindexCore = config.coreName( );
 
         // When fieldlist includes test, and the archive is one that contains
         // large text fields, limit page size to 1
@@ -161,7 +154,7 @@ public class RDFCompare {
 
             // get hits from archive, tally totals and check for end
             if ( archiveDone == false ) {
-                pageHits = this.solrClient.getResultsPage(reindexCore, config.archiveName, page, size, fl);
+                pageHits = this.solrClient.getResultsPage( reindexCore, config.archiveName, page, size, fl, null, null );
                 if (pageHits.size() < size) {
                     archiveDone = true;
                 }
@@ -250,7 +243,7 @@ public class RDFCompare {
 
             // get index docs
             if ( indexDone == false) {
-                pageHits = this.solrClient.getResultsPage( "resources", config.archiveName, page, size, fl);
+                pageHits = this.solrClient.getResultsPage( "resources", config.archiveName, page, size, fl, null, null );
                 if (pageHits.size() < size) {
                     indexDone = true;
                 }
@@ -363,7 +356,7 @@ public class RDFCompare {
      * all old. Show a skipped count (skipped is a doc in the original index, but not 
      * the archive 
      * @param indexUris Set uf URIs from the main index
-     * @param archiveDocs List of SolrDocuments in the index
+     * @param archiveUris List of SolrDocuments in the index
      */
     private void doSkippedTest(Set<String> indexUris, Set<String> archiveUris) {
 
@@ -390,41 +383,8 @@ public class RDFCompare {
     }
 
     /**
-     * Look at the compare config and generate a field list
-     * suitable for submission to Solr: 
-     * @return List in the form: field1+field2+...
-     */
-    private String getFieldList() {
-
-        // if the ignored list has anything assume all fields and skip requested
-        if (this.config.ignoreFields.trim().length() > 0) {
-            List<String> ignored = new ArrayList<String>(Arrays.asList(this.config.ignoreFields.split(",")));
-            List<String> fl = new ArrayList<String>(ALL_FIELDS);
-            for (String ignore : ignored) {
-                fl.remove(ignore);
-            }
-            this.includesText = fl.contains("text");
-            return StringUtils.join(fl.iterator(), "+");
-        }
-
-        // all fields?
-        if (config.includeFields.equals("*")) {
-            this.includesText = true;
-            return "*";
-        }
-
-        // just some
-        List<String> included = new ArrayList<String>(Arrays.asList(this.config.includeFields.split(",")));
-        this.includesText = included.contains("text");
-        if (included.contains("uri") == false) {
-            included.add("uri");
-        }
-        return StringUtils.join(included.iterator(), "+");
-    }
-
-    /**
      * Scan thru each document in the archive and find differences 
-     * @param indexDocs List of all original docs in the index
+     * @param indexHash List of all original docs in the index
      * @param archiveDocs List of docs in the reindexed archive
      * @throws Exception
      */
@@ -566,7 +526,7 @@ public class RDFCompare {
 
     /**
      * Convert an Entry contaning solr data to a string
-     * @param data
+     * @param obj
      * @return The string data represented by the object
      */
     private final String toSolrString(final JsonElement obj) {
@@ -744,7 +704,6 @@ public class RDFCompare {
 
     /**
      * Ensure that all required fields are present and contain data
-     * @param uri URI of the document
      * @param doc Document XML data
      * @throws Exception
      */
@@ -797,14 +756,5 @@ public class RDFCompare {
             System.out.println(msg);
         }
 
-    }
-
-    /**
-     * Generate a clean core name from an archive
-     * @param archive
-     * @return
-     */
-    private final String archiveToCoreName(final String archive) {
-        return "archive_" + archive.replace(":", "_").replace(" ", "_").replace(",", "_");
     }
 }

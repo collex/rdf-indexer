@@ -512,7 +512,7 @@ final class NinesStatementHandler implements RDFHandler {
         String path = this.config.sourceDir.toString();
         int pos = path.indexOf("/rdf/");
         path = path.substring(0, pos) + "/fulltext/";
-        path += SolrClient.safeCore(this.config.archiveName) + "/";
+        path += config.safeArchive(this.config.archiveName) + "/";
         return path;
     }
     

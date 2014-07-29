@@ -29,8 +29,8 @@ public final class SolrClient {
     private String baseUrl;
     private Logger log;
     
-    private static final int SOLR_REQUEST_NUM_RETRIES = 5; 
-    private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000; 
+    private static final int SOLR_REQUEST_NUM_RETRIES = 5;
+    private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000;
     public static final int HTTP_CLIENT_TIMEOUT = 2 * 60 * 1000; 
     
     public SolrClient(final String baseUrl) {
@@ -50,7 +50,7 @@ public final class SolrClient {
     
     /**
      * Check if core exists. Create it if it does not
-     * @param name
+     * @param core
      */
     public void validateCore( final String core ) throws IOException {
 
@@ -86,12 +86,12 @@ public final class SolrClient {
             if (responseCode != 200) {
                 try {
                     Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
-                    log.info(">>>> SOLR request "+request.getQueryString()+" FAILED : " 
+                    log.info(">>>> SOLR request "+request.getURI( ).toString( )+" FAILED : "
                         + responseCode + " (retrying...)");
                 } catch (InterruptedException e) {}
             } else {
                 if (solrRequestNumRetries != SOLR_REQUEST_NUM_RETRIES) {
-                    log.info(">>>> SOLR request "+request.getQueryString()+":  (succeeded!)");
+                    log.info(">>>> SOLR request "+request.getURI( ).toString( )+":  (succeeded!)");
                 }
             }
             solrRequestNumRetries--;
@@ -108,10 +108,10 @@ public final class SolrClient {
     }
     
     public final List<JsonObject> getResultsPage( final String core, final String archive,
-        final int page, final int pageSize, final String fields)  {
+        final int page, final int pageSize, final String fields, final List<String> andConstraints, final List<String> orConstraints )  {
 
         ArrayList<JsonObject> result = new ArrayList<JsonObject>();
-        GetMethod get = null;
+        GetMethod get;
 
         // never request the _version_ field
         String filtered_fields = fields.replace("_version_", "");
@@ -120,10 +120,35 @@ public final class SolrClient {
         try {
             String a = URLEncoder.encode("\"" + archive + "\"", "UTF-8");
             String query = this.baseUrl + "/" + core + "/select/?q=archive:" + a;
-            query = query + "&start=" + (page * pageSize) + "&rows=" + pageSize;
-            query = query + "&fl=" + filtered_fields;
-            query = query + "&sort=uri+asc";
-            query = query + "&wt=json";
+            query += "&start=" + (page * pageSize) + "&rows=" + pageSize;
+            query += "&fl=" + filtered_fields;
+            query += "&sort=uri+asc";
+            query += "&wt=json";
+
+            // add the constraints as necessary...
+            String constraints = "";
+            boolean first = true;
+            if( andConstraints != null && andConstraints.isEmpty( ) == false ) {
+
+                for( String constraint : andConstraints ) {
+                    String [] tokens = constraint.split( "=", 2 );
+                    if( first == false ) constraints += "+AND+";
+                    constraints += tokens[ 0 ] + URLEncoder.encode( ":", "UTF-8" ) + tokens[ 1 ];
+                    first = false;
+                }
+            } else if( orConstraints != null && orConstraints.isEmpty( ) == false ) {
+               for( String constraint : orConstraints ) {
+                  String [] tokens = constraint.split( "=", 2 );
+                  if( first == false ) constraints += "+OR+";
+                  constraints += tokens[ 0 ] + URLEncoder.encode( ":", "UTF-8" ) + tokens[ 1 ];
+                  first = false;
+               }
+            }
+
+            if( constraints.isEmpty( ) == false ) query += "&fq=" + constraints;
+
+            //System.out.println("*** SOLR QUERY: " + query );
+
             get = new GetMethod(query);
         } catch (UnsupportedEncodingException e) {
             this.log.error("Unable to create solr request query", e);
@@ -163,7 +188,7 @@ public final class SolrClient {
     /**
      * Post the JSON payload to the specified SOLR archive
      * 
-     * @param xml
+     * @param json
      * @param archive
      * @throws IOException
      */
@@ -191,28 +216,13 @@ public final class SolrClient {
             post.releaseConnection();
         }
     }
-    
-    /**
-     * Generate a core name given the archive. The core name is of the format: archive_[name]
-     * 
-     * @param archive
-     * @return
-     */
-    public static final String archiveToCore(String archive) {
-        return "archive_" + safeCore(archive);
-    }
-    
-    /**
-     * Generate a safe core name
-     * 
-     * @param archive
-     * @return
-     */
-    public static final String safeCore(String archive) {
-        String core = archive.replaceAll(":", "_");
-        core = core.replaceAll(" ", "_");
-        core = core.replaceAll(",", "_");
-        return core;
+
+    public void commit( String archive ) {
+        try {
+            postJSON("{\"commit\": {}}", archive );
+        } catch (IOException e) {
+            this.log.error("Commit to SOLR FAILED: " + e.getMessage());
+        }
     }
 
 }

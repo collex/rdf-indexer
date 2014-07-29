@@ -124,7 +124,7 @@ final class RdfTextSpider implements RDFHandler {
         rawFile = rawFile.replace("&", "AMP");
         rawFile = rawFile + ".txt";
         String rawRoot = findRawTextRoot();
-        rawRoot = rawRoot + SolrClient.safeCore( this.config.archiveName);
+        rawRoot += config.safeArchive( this.config.archiveName );
         File urlFile = new File(rawRoot + "/"+ rawFile );
         
         // scrape the content from remote host...
@@ -178,7 +178,7 @@ final class RdfTextSpider implements RDFHandler {
     
     /**
      * Extract the text from the specified URI
-     * @param uri
+     * @param url
      * @return
      */
     private byte[] scrapeExternalText(final String url) throws IOException {

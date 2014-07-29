@@ -17,14 +17,11 @@ package org.nines;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -57,10 +54,13 @@ public class RDFIndexer {
     private SimpleDateFormat ts2 = new SimpleDateFormat("yyyy-MM-dd");
     private String timeStamp = new String(ts2.format(ts));
 
+    // special field names
+    private final String isPartOf = "isPartOf";
+    private final String hasPart = "hasPart";
+
     /**
      * 
-     * @param sourceDir
-     * @param archiveName
+     * @param config
      * @param config
      */
     public RDFIndexer(RDFIndexerConfig config) {
@@ -101,30 +101,30 @@ public class RDFIndexer {
 
         // if a purge was requested, it must be done FIRST
         if (config.deleteAll) {
-            purgeArchive(SolrClient.archiveToCore(config.archiveName));
+            purgeArchive( config.coreName() );
         }
 
         // There is only something else to do if a MODE was configured
-        if (this.config.mode.equals(Mode.NONE) == false) {
+        if (config.mode.equals(Mode.NONE) == false) {
 
             // first, ensure that core is valid and exists
             try {
-                this.solrClient.validateCore(SolrClient.archiveToCore(this.config.archiveName));
+                this.solrClient.validateCore( config.coreName( ) );
             } catch (IOException e) {
                 this.errorReport.addError(new IndexerError("Validate core", "", e.getMessage()));
             }
 
             // execute based on mode setting
-            if (this.config.mode.equals(Mode.SPIDER)) {
+            if (config.mode.equals(Mode.SPIDER)) {
                 this.log.info("Full Text Spider Mode");
                 doSpidering();
-            } else if (this.config.mode.equals(Mode.CLEAN_RAW)) {
+            } else if (config.mode.equals(Mode.CLEAN_RAW)) {
                 this.log.info("Raw Text Cleanup Mode");
                 doRawTextCleanup();
-            } else if (this.config.mode.equals(Mode.CLEAN_FULL)) {
+            } else if (config.mode.equals(Mode.CLEAN_FULL)) {
                 this.log.info("Full Text Cleanup Mode");
                 doFullTextCleanup();
-            } else if (this.config.mode.equals(Mode.INDEX)) {
+            } else if (config.mode.equals(Mode.INDEX)) {
                 this.log.info("Index Mode");
                 doIndexing();
             } else {
@@ -142,12 +142,12 @@ public class RDFIndexer {
         this.log.info("Started raw text cleanup at " + start);
 
         this.dataFileQueue = new LinkedList<File>();
-        String fullPath = this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
+        String fullPath = config.sourceDir.toString() + "/" + config.safeArchive( config.archiveName );
         recursivelyQueueFiles(new File(fullPath), false);
         int totalFiles = this.dataFileQueue.size();
 
-        FullTextCleaner cleaner = new FullTextCleaner(this.config.archiveName, this.errorReport,
-            this.config.customCleanClass);
+        FullTextCleaner cleaner = new FullTextCleaner(config.archiveName, this.errorReport,
+            config.customCleanClass);
         while (this.dataFileQueue.size() > 0) {
             File txtFile = this.dataFileQueue.remove();
             cleaner.clean(txtFile);
@@ -172,11 +172,11 @@ public class RDFIndexer {
         log.info("Started raw text cleanup at " + start);
 
         this.dataFileQueue = new LinkedList<File>();
-        String rawPath = this.config.sourceDir.toString() + "/" + SolrClient.safeCore(this.config.archiveName);
+        String rawPath = config.sourceDir.toString() + "/" + config.safeArchive( config.archiveName );
         recursivelyQueueFiles(new File(rawPath), false);
         int totalFiles = this.dataFileQueue.size();
 
-        RawTextCleaner cleaner = new RawTextCleaner(this.config, this.errorReport);
+        RawTextCleaner cleaner = new RawTextCleaner(config, this.errorReport);
         while (this.dataFileQueue.size() > 0) {
             File rawFile = this.dataFileQueue.remove();
             cleaner.clean(rawFile);
@@ -202,10 +202,10 @@ public class RDFIndexer {
      * @return
      */
     private String findCorrectedTextRoot() {
-        String path = this.config.sourceDir.toString();
+        String path = config.sourceDir.toString();
         int pos = path.indexOf("/rdf/");
         path = path.substring(0, pos) + "/correctedtext/";
-        path += SolrClient.safeCore(this.config.archiveName) + "/";
+        path += config.safeArchive( config.archiveName ) + "/";
         return path;
     }
 
@@ -233,7 +233,7 @@ public class RDFIndexer {
         Date start = new Date();
         log.info("Started full-text spider at " + start);
         System.out.println("Full-text spider of " + config.sourceDir);
-        spiderDirectory(this.config.sourceDir);
+        spiderDirectory( config.sourceDir);
         System.out.println("DONE");
 
         // report indexing stats
@@ -295,7 +295,7 @@ public class RDFIndexer {
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Spider text for " + rdfDir + " total files: " + this.numFiles);
-        RdfTextSpider spider = new RdfTextSpider(this.config, this.errorReport);
+        RdfTextSpider spider = new RdfTextSpider( config, this.errorReport);
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
             this.log.info("Spider text from file " + rdfFile.toString());
@@ -316,15 +316,15 @@ public class RDFIndexer {
      */
     private void indexDirectory(File rdfDir) {
         // see if corrected texts exist. 
-        this.config.correctedTextDir = new File(  findCorrectedTextRoot() );
-        if ( this.config.correctedTextDir .exists() ) {
+        config.correctedTextDir = new File(  findCorrectedTextRoot() );
+        if ( config.correctedTextDir .exists() ) {
             // it does; grab a list of filenames that have corrected text and cache them.
             // The file names are URIs with ugly characters replaces. Rules... 
             // '/' is replaced by _S_ and ':' by _C_
             // Undo this and save a list of corrected doc URIs
-            for (File entry : this.config.correctedTextDir .listFiles()) {
+            for (File entry : config.correctedTextDir .listFiles()) {
                 if ( entry.getName().endsWith(".txt")) {
-                    this.config.correctedTextMap.put(
+                    config.correctedTextMap.put(
                         entry.getName().replaceAll("_C_", ":").replaceAll("_S_", "\\/").replaceAll(".txt",""),                        
                         entry.getName() );
                 }
@@ -335,8 +335,8 @@ public class RDFIndexer {
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
         log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
-        if( this.config.isTestMode() == false ) {
-            this.solrExecutorService = Executors.newFixedThreadPool(1);
+        if( config.isTestMode() == false ) {
+            newWorkerPool( 1 );
         }
 
         this.targetArchive = "";
@@ -346,24 +346,38 @@ public class RDFIndexer {
             indexFile(rdfFile);
         }
 
-        if (this.config.isTestMode() == false) {
-           if ( this.jsonPayload.size() > 0 ) {
-              this.solrExecutorService.execute(new SolrWorker(this.jsonPayload.toString(), this.targetArchive, this.docCount));
+        if( config.isTestMode( ) == false ) {
+
+           // if any remaining data
+           if ( this.jsonPayload.size( ) > 0 ) {
+              postJson( );
            }
 
-           // signal shutdown and wait until it is complete
-           this.solrExecutorService.shutdown();
-           try {
-            this.solrExecutorService.awaitTermination(15, TimeUnit.MINUTES);
-           } catch (InterruptedException e) {
-               // do nothing...
-           }
+           // wait for all the workers to complete and commit the changes
+           shutdownWorkerPool( );
+           this.solrClient.commit( config.coreName() );
 
-           // Now that all workers re finished, it is safe to commit
-           try {
-              this.solrClient.postJSON("{\"commit\": {}}", this.targetArchive);
-           } catch (IOException e) {
-              this.log.error("Commit to SOLR FAILED: " + e.getMessage());
+           // if we actually processed any documents, get a list of any that contain isPartOf or hasPart references
+           if( this.numObjects != 0 ) {
+               List<JsonObject> docsToUpdate = docsToUpdate( );
+               if( docsToUpdate.isEmpty( ) == false ) {
+                   log.info( "Located " + docsToUpdate.size() + " documents with references to resolve (isPartOf, hasPart)" );
+                   newWorkerPool( 1 );
+
+                   for( JsonObject json : docsToUpdate ) {
+                      log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
+                      updateReferences( json );
+                   }
+
+                   // if any remaining data
+                   if ( this.jsonPayload.size( ) > 0 ) {
+                      postJson( );
+                   }
+
+                   // wait for all the workers to complete and commit the changes
+                   shutdownWorkerPool( );
+                   this.solrClient.commit( config.coreName() );
+               }
            }
         }
     }
@@ -376,7 +390,7 @@ public class RDFIndexer {
         // Key is object URI, Value is a set of key-value pairs
         // that describe the object
         try {
-            objects = RdfDocumentParser.parse(file, this.errorReport, this.linkCollector, this.config);
+            objects = RdfDocumentParser.parse(file, this.errorReport, this.linkCollector, config);
         } catch (IOException e) {
             this.errorReport.addError(new IndexerError(file.getName(), "", e.getMessage()));
             return;
@@ -398,14 +412,14 @@ public class RDFIndexer {
             String uri = entry.getKey();
             HashMap<String, ArrayList<String>> object = entry.getValue();
 
-            // Validate archive and push objects intop new archive map
+            // Validate archive and push objects into new archive map
             ArrayList<String> objectArray = object.get("archive");
             if (objectArray != null) {
                 String objArchive = objectArray.get(0);
-                this.targetArchive = SolrClient.archiveToCore(objArchive);
-                if (!objArchive.equals(this.config.archiveName)) {
+                this.targetArchive = config.coreName( objArchive );
+                if (!objArchive.equals( config.archiveName)) {
                     this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
-                        + objArchive + " should be " + this.config.archiveName));
+                        + objArchive + " should be " + config.archiveName));
                 }
             } else {
                 this.errorReport.addError(new IndexerError(file.getName(), uri,
@@ -432,19 +446,122 @@ public class RDFIndexer {
             this.docCount++;
 
             // once threshold met, post the data to solr
-            if ( this.jsonPayload.toString().length() >= this.config.maxUploadSize ) {
-                if (this.config.isTestMode() == false) {
-                    this.solrExecutorService.execute(new SolrWorker(this.jsonPayload.toString(), this.targetArchive,
-                        this.docCount));
+            if ( this.jsonPayload.toString().length() >= config.maxUploadSize ) {
+                if( config.isTestMode( ) == false ) {
+                    postJson( );
                 }
-                //this.solrXmlPayload = new StringBuilder();
-                this.jsonPayload = new JsonArray();
-                this.docCount = 0;
             }
         }
 
         this.numObjects += objects.size();
         this.errorReport.flush();
+    }
+
+    //
+    // get a list of the documents that have isPartOf or hasPart fields that need to be resolved
+    //
+    private List<JsonObject> docsToUpdate( ) {
+
+        int page = 0;
+        int size = config.pageSize;
+        String fl = config.getFieldList( );
+        String coreName = config.coreName( );
+        List<String> orList = new ArrayList<String>(  );
+        orList.add( isPartOf + "=*" );
+        orList.add( hasPart + "=*" );
+        List<JsonObject> docs = new ArrayList<JsonObject>( );
+        boolean done = false;
+
+        while( done == false ) {
+           List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
+           docs.addAll( results );
+
+           // are there potentially more results?
+           if( results.size( ) == size ) {
+               page++;
+           } else {
+               done = true;
+           }
+        }
+
+        return( docs );
+    }
+
+    //
+    // resolve the isPartOf or hasPart references for the specified document
+    //
+    private void updateReferences( final JsonObject json ) {
+
+        String fl = config.getFieldList( );
+        String coreName = config.coreName( );
+        boolean updated = false;
+
+        try {
+            if( json.has( isPartOf ) == true ) {
+                JsonArray refs = json.getAsJsonArray( isPartOf );
+                JsonArray objs = new JsonArray( );
+                for( int ix = 0; ix < refs.size(); ix++ ) {
+                    List<String> andList = new ArrayList<String>();
+                    andList.add( "uri=" + URLEncoder.encode( "\"" + refs.get( ix ).getAsString( ) + "\"", "UTF-8" ) );
+                    List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
+                    if( results.size() == 1 ) {
+                        objs.add( removeExcessFields( results.get( 0 ) ) );
+                    }
+                }
+                if( objs.size( ) != 0 ) {
+                    //System.out.println( "*** URI: " + json.get( "uri" ) );
+                    //System.out.println( "*** REMOVING: " + json.getAsJsonArray( isPartOf ).toString( ) );
+                    //System.out.println( "*** REPLACING: " + objs.toString( ) );
+                    json.remove( isPartOf );
+                    json.addProperty( isPartOf, objs.toString( ) );
+                    updated = true;
+                }
+            }
+
+            if( json.has( hasPart ) == true ) {
+                JsonArray refs = json.getAsJsonArray( hasPart );
+                JsonArray objs = new JsonArray( );
+                for( int ix = 0; ix < refs.size(); ix++ ) {
+                    List<String> andList = new ArrayList<String>();
+                    andList.add( "uri=" + URLEncoder.encode( "\"" + refs.get( ix ).getAsString( ) + "\"", "UTF-8" ) );
+                    List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
+                    if( results.size() == 1 ) {
+                        objs.add( removeExcessFields( results.get( 0 ) ) );
+                    }
+                }
+                if( objs.size( ) != 0 ) {
+                    //System.out.println( "*** URI: " + json.get( "uri" ) );
+                    //System.out.println( "*** REMOVING: " + json.getAsJsonArray( hasPart ).toString( ) );
+                    //System.out.println( "*** REPLACING: " + objs.toString( ) );
+                    json.remove( hasPart );
+                    json.addProperty( hasPart, objs.toString( ) );
+                    updated = true;
+                }
+            }
+
+            if( updated == true ) {
+                this.jsonPayload.add( json );
+                this.docCount++;
+
+                // once threshold met, post the data to solr
+                if ( this.jsonPayload.toString().length( ) >= config.maxUploadSize ) {
+                    postJson( );
+                }
+            }
+        } catch( UnsupportedEncodingException ex ) {
+            // should never happen
+        }
+    }
+
+    //
+    // remove the fields we do not want for reference documents
+    //
+    private JsonObject removeExcessFields( JsonObject json ) {
+        json.remove( isPartOf );
+        json.remove( hasPart );
+        json.remove( "_version_" );
+
+        return( json );
     }
 
     private JsonElement docToJson(String documentName, HashMap<String, ArrayList<String>> fields) {
@@ -453,6 +570,28 @@ public class RDFIndexer {
         obj.addProperty("date_created", this.timeStamp);
         obj.addProperty("date_updated", this.timeStamp);
         return obj;
+    }
+
+    private void newWorkerPool( int poolsize ) {
+        this.solrExecutorService = Executors.newFixedThreadPool( poolsize );
+    }
+
+    private void shutdownWorkerPool( ) {
+
+        // signal shutdown and wait until it is complete
+        this.solrExecutorService.shutdown( );
+        try {
+            this.solrExecutorService.awaitTermination( 15, TimeUnit.MINUTES );
+        } catch (InterruptedException e) {
+            // do nothing...
+        }
+    }
+
+    // async post JSON to SOLR using the worker pool
+    private void postJson( ) {
+        this.solrExecutorService.execute( new SolrWorker( this.jsonPayload.toString( ), this.targetArchive, this.docCount ) );
+        this.jsonPayload = new JsonArray();
+        this.docCount = 0;
     }
 
     /**
@@ -470,7 +609,7 @@ public class RDFIndexer {
             this.tgtArchive = tgtArchive;
             this.payload = json;
 
-            log.info("  posting: payload size " + this.payload.length() + " with " + docCnt + " documents to SOLR");
+            log.info("  posting: payload size " + this.payload.length( ) + " with " + docCnt + " documents to SOLR archive " + tgtArchive );
         }
 
         public void run() {
