@@ -44,7 +44,6 @@ public class RDFIndexerConfig {
     public File sourceDir;
     public String archiveName;
     public String solrBaseURL = "http://localhost:8983/solr";
-    public String solrExistingIndex = "/resources";
     public Mode mode = Mode.NONE;
     public String defaultEncoding = "UTF-8";
     public String customCleanClass = "";
