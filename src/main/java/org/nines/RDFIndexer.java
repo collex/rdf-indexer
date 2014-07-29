@@ -357,27 +357,9 @@ public class RDFIndexer {
            shutdownWorkerPool( );
            this.solrClient.commit( config.coreName() );
 
-           // if we actually processed any documents, get a list of any that contain isPartOf or hasPart references
+           // if we actually processed any documents, process any isPartOf or hasPart references
            if( this.numObjects != 0 ) {
-               List<JsonObject> docsToUpdate = docsToUpdate( );
-               if( docsToUpdate.isEmpty( ) == false ) {
-                   log.info( "Located " + docsToUpdate.size() + " documents with references to resolve (isPartOf, hasPart)" );
-                   newWorkerPool( 1 );
-
-                   for( JsonObject json : docsToUpdate ) {
-                      log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
-                      updateReferences( json );
-                   }
-
-                   // if any remaining data
-                   if ( this.jsonPayload.size( ) > 0 ) {
-                      postJson( );
-                   }
-
-                   // wait for all the workers to complete and commit the changes
-                   shutdownWorkerPool( );
-                   this.solrClient.commit( config.coreName() );
-               }
+               updateReferenceFields( );
            }
         }
     }
@@ -458,9 +440,9 @@ public class RDFIndexer {
     }
 
     //
-    // get a list of the documents that have isPartOf or hasPart fields that need to be resolved
+    // update the references for any isPartOf or hasPart fields
     //
-    private List<JsonObject> docsToUpdate( ) {
+    private void updateReferenceFields( ) {
 
         int page = 0;
         int size = config.pageSize;
@@ -469,12 +451,17 @@ public class RDFIndexer {
         List<String> orList = new ArrayList<String>(  );
         orList.add( isPartOf + "=*" );
         orList.add( hasPart + "=*" );
-        List<JsonObject> docs = new ArrayList<JsonObject>( );
         boolean done = false;
+
+        newWorkerPool( 1 );
 
         while( done == false ) {
            List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
-           docs.addAll( results );
+
+           for( JsonObject json : results ) {
+              log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
+              updateDocumentReferences( json );
+           }
 
            // are there potentially more results?
            if( results.size( ) == size ) {
@@ -484,13 +471,20 @@ public class RDFIndexer {
            }
         }
 
-        return( docs );
+        // if any remaining data
+        if ( this.jsonPayload.size( ) > 0 ) {
+            postJson( );
+        }
+
+        // wait for all the workers to complete and commit the changes
+        shutdownWorkerPool( );
+        this.solrClient.commit( config.coreName() );
     }
 
     //
     // resolve the isPartOf or hasPart references for the specified document
     //
-    private void updateReferences( final JsonObject json ) {
+    private void updateDocumentReferences( final JsonObject json ) {
 
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
