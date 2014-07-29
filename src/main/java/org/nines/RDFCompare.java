@@ -466,7 +466,7 @@ public class RDFCompare {
             indexDoc.remove(key);
 
             // don't compare score or indexing dates.
-            if (key.equals("score") || key.equals("date_updated") || key.equals("date_created")) {
+            if (key.equals("score") || key.equals("date_updated") || key.equals("date_created") || key.equals("_version_") ) {
                 continue;
             }
 
