@@ -629,6 +629,9 @@ final class NinesStatementHandler implements RDFHandler {
                 }
             } else {
 
+                // deal with embedded whitespace in ranges
+                value = value.replace( ", ", "," ).replace( " ,", "," );
+
                 // 1862-12-25,1863-01-01 1875 1954-10
                 StringTokenizer tokenizer = new StringTokenizer(value);
                 while (tokenizer.hasMoreTokens()) {
