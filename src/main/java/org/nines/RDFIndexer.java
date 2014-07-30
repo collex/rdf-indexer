@@ -488,6 +488,8 @@ public class RDFIndexer {
 
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
+        String uri = json.get( "uri" ).getAsString( );
+
         boolean updated = false;
 
         try {
@@ -500,15 +502,21 @@ public class RDFIndexer {
                     List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
                     if( results.size() == 1 ) {
                         objs.add( removeExcessFields( results.get( 0 ) ) );
+                    } else {
+                        // reference to a non-existent object, note in the error log
+                        IndexerError e = new IndexerError( "", uri, "Cannot resolve isPartOf reference (" + refs.get( ix ).getAsString( ) +
+                                                           ") for document " + uri );
+                        errorReport.addError( e );
                     }
                 }
+
+                // remove the field; we may replace it with resolved data
+                json.remove( isPartOf );
+                updated = true;
+
+                // did we resolve any of the references
                 if( objs.size( ) != 0 ) {
-                    //System.out.println( "*** URI: " + json.get( "uri" ) );
-                    //System.out.println( "*** REMOVING: " + json.getAsJsonArray( isPartOf ).toString( ) );
-                    //System.out.println( "*** REPLACING: " + objs.toString( ) );
-                    json.remove( isPartOf );
                     json.addProperty( isPartOf, objs.toString( ) );
-                    updated = true;
                 }
             }
 
@@ -521,15 +529,20 @@ public class RDFIndexer {
                     List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
                     if( results.size() == 1 ) {
                         objs.add( removeExcessFields( results.get( 0 ) ) );
+                    } else {
+                        // reference to a non-existent object, note in the error log
+                        IndexerError e = new IndexerError( "", uri, "Cannot resolve hasPart reference (" + refs.get( ix ).getAsString( ) +
+                                ") for document " + uri );
+                        errorReport.addError( e );
                     }
                 }
+
+                // remove the field; we may replace it with resolved data
+                json.remove( hasPart );
+                updated = true;
+
                 if( objs.size( ) != 0 ) {
-                    //System.out.println( "*** URI: " + json.get( "uri" ) );
-                    //System.out.println( "*** REMOVING: " + json.getAsJsonArray( hasPart ).toString( ) );
-                    //System.out.println( "*** REPLACING: " + objs.toString( ) );
-                    json.remove( hasPart );
                     json.addProperty( hasPart, objs.toString( ) );
-                    updated = true;
                 }
             }
 
