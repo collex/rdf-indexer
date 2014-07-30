@@ -614,9 +614,9 @@ final class NinesStatementHandler implements RDFHandler {
                     factor *= 10;
 
                 // start looking for 'u', decreasing factor as we go
-                for (i = startPos; i < value.length(); i++) {
+                for (i = startPos; i < numLength; i++) {
                     if (yearChars[i] == 'u') {
-                        int padSize = value.length() - i;
+                        int padSize = numLength - i;
                         String formatStr = "%0" + padSize + "d";
                         // iterate over each year
                         for (int j = 0; j < factor; j++) {
@@ -628,6 +628,7 @@ final class NinesStatementHandler implements RDFHandler {
                     factor = factor / 10;
                 }
             } else {
+
                 // 1862-12-25,1863-01-01 1875 1954-10
                 StringTokenizer tokenizer = new StringTokenizer(value);
                 while (tokenizer.hasMoreTokens()) {
