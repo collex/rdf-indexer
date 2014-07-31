@@ -18,6 +18,7 @@ package org.nines;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -598,65 +599,39 @@ final class NinesStatementHandler implements RDFHandler {
 
         if ("unknown".equalsIgnoreCase(value.trim()) || "uncertain".equalsIgnoreCase(value.trim())) {
             years.add("Uncertain");
-        } else {
-
-            // expand 184u to 1840-1849
-            if (value.indexOf('u') != -1) {
-                char[] yearChars = value.toCharArray();
-                int numLength = value.length();
-                int i, factor = 1, startPos = 0;
-
-                if (numLength > 4)
-                    numLength = 4;
-
-                // increase factor according to size of number
-                for (i = 0; i < numLength; i++)
-                    factor *= 10;
-
-                // start looking for 'u', decreasing factor as we go
-                for (i = startPos; i < numLength; i++) {
-                    if (yearChars[i] == 'u') {
-                        int padSize = numLength - i;
-                        String formatStr = "%0" + padSize + "d";
-                        // iterate over each year
-                        for (int j = 0; j < factor; j++) {
-                            years.add(value.substring(0, i) + String.format(formatStr, j));
-                        }
-                        // once one 'u' char is found, we are done
-                        break;
-                    }
-                    factor = factor / 10;
-                }
-            } else {
-
-                // deal with embedded whitespace in ranges
-                value = value.replace( ", ", "," ).replace( " ,", "," );
-
-                // 1862-12-25,1863-01-01 1875 1954-10
-                StringTokenizer tokenizer = new StringTokenizer(value);
-                while (tokenizer.hasMoreTokens()) {
-                    String range = tokenizer.nextToken();
-
-                    int commaPos = range.indexOf(',');
-//if (commaPos == -1) {
-//	commaPos = range.indexOf('-');
-//}
-                    String start, finish;
-                    if (commaPos == -1) {
-                        start = finish = range;
-                    } else {
-                        start = range.substring(0, commaPos);
-                        finish = range.substring(commaPos + 1);
-                    }
-                    if (start.length() >= 4 && finish.length() >= 4) {
-                        years.addAll(enumerateYears(start.substring(0, 4), finish.substring(0, 4)));
-                    }
-                }
-
-            }
+            return( years );
         }
 
-        return years;
+        // deal with embedded whitespace in ranges
+        value = value.replace( ", ", "," ).replace( " ,", "," );
+
+        StringTokenizer tokenizer = new StringTokenizer(value);
+        while (tokenizer.hasMoreTokens()) {
+            String token = tokenizer.nextToken();
+            int range = token.indexOf(',');
+            int wild = token.indexOf('u');
+
+            // ranges containing wildcards are forbidden
+            if( range != -1 && wild != -1 ) {
+                years.clear( );
+                return( years );
+            }
+
+            if( range != -1 ) {
+                parseYearRange( years, token );
+            } else if( wild != -1 ) {
+                parseYearWild( years, token );
+            } else {
+                if( token.length() >= 4 ) {
+                    years.add( token.substring( 0, 4 ) );
+                } else {
+                    // invalid date, less than 4 characters
+                    years.clear( );
+                    return( years );
+                }
+            }
+        }
+        return( years );
     }
 
     public void addField(HashMap<String, ArrayList<String>> map, String name, String value) {
@@ -778,6 +753,53 @@ final class NinesStatementHandler implements RDFHandler {
                 addField(object, "freeculture", "T");
         }
         return documents;
+    }
+
+    private static void parseYearWild( List<String> years, final String date ) {
+
+        // expand 184u to 1840-1849
+        char[] yearChars = date.toCharArray();
+        int numLength = date.length();
+        int i, factor = 1, startPos = 0;
+
+        if (numLength > 4) numLength = 4;
+
+        // increase factor according to size of number
+        for (i = 0; i < numLength; i++) factor *= 10;
+
+        // start looking for 'u', decreasing factor as we go
+        for (i = startPos; i < numLength; i++) {
+            if (yearChars[i] == 'u') {
+                int padSize = numLength - i;
+                String formatStr = "%0" + padSize + "d";
+                // iterate over each year
+                for (int j = 0; j < factor; j++) {
+                    years.add(date.substring(0, i) + String.format(formatStr, j));
+                }
+                // once one 'u' char is found, we are done
+                break;
+            }
+            factor = factor / 10;
+        }
+    }
+
+    private static void parseYearRange( List<String> years, final String range ) {
+
+        String [] tokens = range.split( "," );
+        if( tokens.length != 2 ) {
+            // more than 1 range delimiter
+            years.clear( );
+            return;
+        }
+
+        String start = tokens[ 0 ];
+        String finish = tokens[ 1 ];
+        if (start.length() >= 4 && finish.length() >= 4) {
+            years.addAll( enumerateYears(start.substring(0, 4), finish.substring(0, 4)));
+        } else {
+            years.clear( );
+            return;
+        }
     }
 
     private static ArrayList<String> enumerateYears(String startYear, String endYear) {
