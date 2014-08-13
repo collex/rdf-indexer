@@ -566,6 +566,7 @@ public class RDFIndexer {
     private JsonObject removeExcessFields( JsonObject json ) {
         json.remove( isPartOf );
         json.remove( hasPart );
+        json.remove( "text" );
         json.remove( "_version_" );
 
         return( json );
