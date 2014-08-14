@@ -516,6 +516,7 @@ public class RDFIndexer {
 
                 // did we resolve any of the references
                 if( objs.size( ) != 0 ) {
+                    log.info( "UPDATING isPartOf: " + objs.toString( ) );
                     json.addProperty( isPartOf, objs.toString( ) );
                 }
             }
@@ -542,6 +543,7 @@ public class RDFIndexer {
                 updated = true;
 
                 if( objs.size( ) != 0 ) {
+                    log.info( "UPDATING hasPart: " + objs.toString( ) );
                     json.addProperty( hasPart, objs.toString( ) );
                 }
             }
@@ -568,6 +570,11 @@ public class RDFIndexer {
         json.remove( hasPart );
         json.remove( "text" );
         json.remove( "_version_" );
+
+        //for( Map.Entry m : json.entrySet( ) ) {
+        //   System.out.println( "REF field: " + m.getKey( ) );
+        //}
+        //System.out.println( "==========" );
 
         return( json );
     }
