@@ -48,6 +48,7 @@ public class RDFIndexer {
     private ExecutorService solrExecutorService;
     private JsonArray jsonPayload = new JsonArray();
     private int docCount = 0;
+    private int postCount = 0;
     private String targetArchive;
     private SolrClient solrClient;
     private Date ts = new Date();
@@ -355,6 +356,7 @@ public class RDFIndexer {
 
            // wait for all the workers to complete and commit the changes
            shutdownWorkerPool( );
+           log.info("  committing to SOLR archive " + config.coreName() );
            this.solrClient.commit( config.coreName() );
 
            // if we actually processed any documents, process any isPartOf or hasPart references
@@ -478,6 +480,7 @@ public class RDFIndexer {
 
         // wait for all the workers to complete and commit the changes
         shutdownWorkerPool( );
+        log.info("  committing to SOLR archive " + config.coreName() );
         this.solrClient.commit( config.coreName() );
     }
 
@@ -516,7 +519,7 @@ public class RDFIndexer {
 
                 // did we resolve any of the references
                 if( objs.size( ) != 0 ) {
-                    log.info( "UPDATING isPartOf: " + objs.toString( ) );
+                    //log.info( "UPDATING isPartOf: " + objs.toString( ) );
                     json.addProperty( isPartOf, objs.toString( ) );
                 }
             }
@@ -543,7 +546,7 @@ public class RDFIndexer {
                 updated = true;
 
                 if( objs.size( ) != 0 ) {
-                    log.info( "UPDATING hasPart: " + objs.toString( ) );
+                    //log.info( "UPDATING hasPart: " + objs.toString( ) );
                     json.addProperty( hasPart, objs.toString( ) );
                 }
             }
@@ -570,11 +573,6 @@ public class RDFIndexer {
         json.remove( hasPart );
         json.remove( "text" );
         json.remove( "_version_" );
-
-        //for( Map.Entry m : json.entrySet( ) ) {
-        //   System.out.println( "REF field: " + m.getKey( ) );
-        //}
-        //System.out.println( "==========" );
 
         return( json );
     }
@@ -604,23 +602,22 @@ public class RDFIndexer {
 
     // async post JSON to SOLR using the worker pool
     private void postJson( ) {
-        this.solrExecutorService.execute( new SolrWorker( this.jsonPayload.toString( ), this.targetArchive, this.docCount ) );
+        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString( ), this.targetArchive, this.docCount ) );
         this.jsonPayload = new JsonArray();
         this.docCount = 0;
+        this.postCount++;
+        if( postCount % 5 == 0 ) {
+            this.solrExecutorService.execute( new SolrCommitter( this.targetArchive ) );
+        }
     }
 
-    /**
-     * Worker thread to post data to solr
-     * 
-     * @author loufoster
-     * 
-     */
-    private class SolrWorker implements Runnable {
+    // Worker thread to post data to solr
+    private class SolrPoster implements Runnable {
 
         private final String payload;
         private final String tgtArchive;
         
-        public SolrWorker(final String json, final String tgtArchive, int docCnt) {
+        public SolrPoster(final String json, final String tgtArchive, int docCnt) {
             this.tgtArchive = tgtArchive;
             this.payload = json;
 
@@ -637,4 +634,18 @@ public class RDFIndexer {
         }
     }
 
+    // Worker thread to commit data to solr
+    private class SolrCommitter implements Runnable {
+
+        private final String tgtArchive;
+
+        public SolrCommitter( final String tgtArchive ) {
+            this.tgtArchive = tgtArchive;
+            log.info("  committing to SOLR archive " + tgtArchive );
+        }
+
+        public void run( ) {
+            solrClient.commit( this.tgtArchive );
+        }
+    }
 }
