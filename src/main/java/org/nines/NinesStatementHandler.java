@@ -756,11 +756,11 @@ final class NinesStatementHandler implements RDFHandler {
             // add year_sort fields
             String year_sort_min = getFirstField(object, "year");
             if (year_sort_min.isEmpty() == false ) {
-                //String year_sort_max = getLastField(object, "year");
+                String year_sort_max = getLastField(object, "year");
 
                 addField(object, "year_sort", year_sort_min);
-                //addField(object, "year_sort_asc", year_sort_min);
-                //addField(object, "year_sort_desc", year_sort_max);
+                addField(object, "year_sort_asc", year_sort_min);
+                addField(object, "year_sort_desc", year_sort_max);
             }
 
             // add fulltext and ocr indicators
