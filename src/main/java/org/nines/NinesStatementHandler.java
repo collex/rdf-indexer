@@ -350,17 +350,22 @@ final class NinesStatementHandler implements RDFHandler {
         if ("http://purl.org/dc/elements/1.1/date".equals(predicate)) {
             String object = value.stringValue().trim();
             if (value instanceof LiteralImpl) {
+
                 // For backwards compatibility of simple <dc:date>, but also useful for cases where label and value are
                 // the same
-                if (object.matches("^[0-9]{4}$")) {
-                    addField(doc, "year", object.substring(0, 4));
-                }
+                //if (object.matches("^[0-9]{4}$")) {
+                //    addField(doc, "year", object.substring(0, 4));
+                //}
+
+                // add label
+                addField(doc, "date_label", object);
 
                 ArrayList<String> years = null;
                 try {
                    years = parseYears(object);
 
-                    if (years.size() == 0) {
+                    if( years.isEmpty() == true ) {
+                        addField( doc, "year", "Uncertain" );
                         addError("Invalid date format: " + object);
                         return false;
                     }
@@ -369,7 +374,6 @@ final class NinesStatementHandler implements RDFHandler {
                         addField(doc, "year", year);
                     }
 
-                    addField(doc, "date_label", object);
                 } catch (NumberFormatException e) {
                     addError( "Invalid date format: " + object);
                 }
@@ -397,6 +401,11 @@ final class NinesStatementHandler implements RDFHandler {
             if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#value".equals(predicate)) {
                 try {
                     ArrayList<String> years = parseYears(object);
+
+                    if( years.isEmpty( ) == true ) {
+                        addField( doc, "year", "Uncertain" );
+                    }
+
                     for (String year : years) {
                         addField(doc, "year", year);
                     }
@@ -598,7 +607,7 @@ final class NinesStatementHandler implements RDFHandler {
         ArrayList<String> years = new ArrayList<String>();
 
         if ("unknown".equalsIgnoreCase(value.trim()) || "uncertain".equalsIgnoreCase(value.trim())) {
-            years.add("Uncertain");
+            //years.add("Uncertain");
             return( years );
         }
 
@@ -699,8 +708,16 @@ final class NinesStatementHandler implements RDFHandler {
 
     private String getFirstField(HashMap<String, ArrayList<String>> object, String field) {
         ArrayList<String> objectArray = object.get(field);
-        if (objectArray != null) {
+        if (objectArray != null && objectArray.isEmpty( ) == false ) {
             return objectArray.get(0);
+        }
+        return "";
+    }
+
+    private String getLastField(HashMap<String, ArrayList<String>> object, String field) {
+        ArrayList<String> objectArray = object.get(field);
+        if (objectArray != null && objectArray.isEmpty( ) == false ) {
+            return objectArray.get( objectArray.size( ) - 1 );
         }
         return "";
     }
@@ -736,10 +753,14 @@ final class NinesStatementHandler implements RDFHandler {
             else if (engraver.length() > 0)
                 addField(object, "author_sort", engraver);
 
-            // add year_sort
-            String year_sort_field = getFirstField(object, "year");
-            if (year_sort_field.length() > 0) {
-                addField(object, "year_sort", year_sort_field);
+            // add year_sort fields
+            String year_sort_min = getFirstField(object, "year");
+            if (year_sort_min.isEmpty() == false ) {
+                //String year_sort_max = getLastField(object, "year");
+
+                addField(object, "year_sort", year_sort_min);
+                //addField(object, "year_sort_asc", year_sort_min);
+                //addField(object, "year_sort_desc", year_sort_max);
             }
 
             // add fulltext and ocr indicators
