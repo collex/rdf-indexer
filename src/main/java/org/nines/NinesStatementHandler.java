@@ -611,6 +611,12 @@ final class NinesStatementHandler implements RDFHandler {
             int range = token.indexOf(',');
             int wild = token.indexOf('u');
 
+            // if we have a leading alpha (e.g "Aug") it is ignored
+            if( Character.isLetter( token.charAt( 0 ) ) == true ) {
+                years.clear( );
+                return( years );
+            }
+
             // ranges containing wildcards are forbidden
             if( range != -1 && wild != -1 ) {
                 years.clear( );
