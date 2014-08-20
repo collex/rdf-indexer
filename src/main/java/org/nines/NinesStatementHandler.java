@@ -50,6 +50,8 @@ final class NinesStatementHandler implements RDFHandler {
     private LinkCollector linkCollector;
     private boolean hasCorrectedText = false;
 
+    private static String uncertain = "Uncertain";
+
     public NinesStatementHandler(ErrorReport errorReport, LinkCollector linkCollector, RDFIndexerConfig config) {
         this.errorReport = errorReport;
         this.config = config;
@@ -351,12 +353,6 @@ final class NinesStatementHandler implements RDFHandler {
             String object = value.stringValue().trim();
             if (value instanceof LiteralImpl) {
 
-                // For backwards compatibility of simple <dc:date>, but also useful for cases where label and value are
-                // the same
-                //if (object.matches("^[0-9]{4}$")) {
-                //    addField(doc, "year", object.substring(0, 4));
-                //}
-
                 // add label
                 addField(doc, "date_label", object);
 
@@ -365,7 +361,6 @@ final class NinesStatementHandler implements RDFHandler {
                    years = parseYears(object);
 
                     if( years.isEmpty() == true ) {
-                        addField( doc, "year", "Uncertain" );
                         addError("Invalid date format: " + object);
                         return false;
                     }
@@ -401,10 +396,6 @@ final class NinesStatementHandler implements RDFHandler {
             if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#value".equals(predicate)) {
                 try {
                     ArrayList<String> years = parseYears(object);
-
-                    if( years.isEmpty( ) == true ) {
-                        addField( doc, "year", "Uncertain" );
-                    }
 
                     for (String year : years) {
                         addField(doc, "year", year);
@@ -606,8 +597,7 @@ final class NinesStatementHandler implements RDFHandler {
     public static ArrayList<String> parseYears(String value) {
         ArrayList<String> years = new ArrayList<String>();
 
-        if ("unknown".equalsIgnoreCase(value.trim()) || "uncertain".equalsIgnoreCase(value.trim())) {
-            //years.add("Uncertain");
+        if ("unknown".equalsIgnoreCase(value.trim()) || uncertain.equalsIgnoreCase(value.trim())) {
             return( years );
         }
 
@@ -761,6 +751,11 @@ final class NinesStatementHandler implements RDFHandler {
                 addField(object, "year_sort", year_sort_min);
                 addField(object, "year_sort_asc", year_sort_min);
                 addField(object, "year_sort_desc", year_sort_max);
+            } else {
+                addField( object, "year", uncertain );
+                addField( object, "year_sort", uncertain );
+                addField( object, "year_sort_asc", uncertain );
+                addField( object, "year_sort_desc", uncertain );
             }
 
             // add fulltext and ocr indicators
