@@ -356,22 +356,19 @@ final class NinesStatementHandler implements RDFHandler {
                 // add label
                 addField(doc, "date_label", object);
 
-                ArrayList<String> years = null;
-                try {
-                   years = parseYears(object);
+                //System.out.println( "handleDate: " + object );
 
-                    if( years.isEmpty() == true ) {
-                        addError("Invalid date format: " + object);
-                        return false;
-                    }
+                ArrayList<String> years = parseYears(object);
 
-                    for (String year : years) {
-                        addField(doc, "year", year);
-                    }
-
-                } catch (NumberFormatException e) {
-                    addError( "Invalid date format: " + object);
+                if( years.isEmpty() == true ) {
+                    addError("Invalid date format: " + object);
+                    return false;
                 }
+
+                for (String year : years) {
+                    addField(doc, "year", year);
+                }
+
             } else {
                 BNodeImpl bnode = (BNodeImpl) value;
                 dateBNodeId = bnode.getID();
@@ -394,16 +391,18 @@ final class NinesStatementHandler implements RDFHandler {
             }
 
             if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#value".equals(predicate)) {
-                try {
-                    ArrayList<String> years = parseYears(object);
+                //System.out.println( "handleDateLabel: " + object );
+                ArrayList<String> years = parseYears(object);
 
-                    for (String year : years) {
-                        addField(doc, "year", year);
-                    }
-                } catch (NumberFormatException e) {
+                if( years.isEmpty() == true ) {
                     addError("Invalid date format: " + object);
+                    return false;
                 }
-                return true;
+
+                for (String year : years) {
+                   addField(doc, "year", year);
+                }
+               return true;
             }
         }
         return false;
