@@ -573,6 +573,15 @@ public class RDFIndexer {
         json.remove( hasPart );
         json.remove( "text" );
         json.remove( "_version_" );
+        json.remove( "year_sort_desc" );
+        json.remove( "federation" );
+        json.remove( "year" );
+        json.remove( "year_sort" );
+        json.remove( "year_sort_asc" );
+        json.remove( "title_sort" );
+        json.remove( "author_sort" );
+        json.remove( "date_created" );
+        json.remove( "date_updated" );
 
         return( json );
     }
