@@ -98,7 +98,7 @@ public final class SolrClient {
         } while (responseCode != 200 && solrRequestNumRetries > 0);
         
         if (responseCode != 200) {
-            throw new IOException("Non-OK response: " + responseCode + "\n\n" + request.getQueryString());
+            throw new IOException("Non-OK response: " + responseCode + "\n\n" + request.getResponseBodyAsString( ) );
         }
     }
     
@@ -151,7 +151,7 @@ public final class SolrClient {
 
             get = new GetMethod(query);
         } catch (UnsupportedEncodingException e) {
-            this.log.error("Unable to create solr request query", e);
+            this.log.error("Unable to create SOLR request query", e);
             return result;
         }
 
@@ -159,7 +159,7 @@ public final class SolrClient {
         try {
             execRequest(get);
         } catch (IOException e) {
-            this.log.error("Solr request failed", e);
+            this.log.error("SOLR request failed", e);
             get.releaseConnection();
             return result;
         }
@@ -177,7 +177,7 @@ public final class SolrClient {
                 result.add(i.next().getAsJsonObject());
             }
         } catch (IOException e ) {
-            this.log.error("Unable to read solr response", e);
+            this.log.error("Unable to read SOLR response", e);
         }
 
         get.releaseConnection();
@@ -200,17 +200,20 @@ public final class SolrClient {
 
         // Execute request
         try {
-            execRequest(post);
-            String response = getResponseString(post);
-            Pattern pattern = Pattern.compile("status=\\\"(\\d*)\\\">(.*)\\<\\/result\\>", Pattern.DOTALL);
-            Matcher matcher = pattern.matcher(response);
-            while (matcher.find()) {
-                String status = matcher.group(1);
-                String message = matcher.group(2);
-                if (!"0".equals(status)) {
-                    throw new IOException(message);
+            execRequest( post );
+            String response = getResponseString( post );
+            Pattern pattern = Pattern.compile( "status=\\\"(\\d*)\\\">(.*)\\<\\/result\\>", Pattern.DOTALL );
+            Matcher matcher = pattern.matcher( response );
+            while( matcher.find() ) {
+                String status = matcher.group( 1 );
+                String message = matcher.group( 2 );
+                if( !"0".equals( status ) ) {
+                    throw new IOException( message );
                 }
             }
+        } catch( IOException ex ) {
+            this.log.error( "SOLR request failed: ", ex);
+            this.log.error( "REQUEST: " + json );
         } finally {
             // Release current connection to the connection pool once you are done
             post.releaseConnection();

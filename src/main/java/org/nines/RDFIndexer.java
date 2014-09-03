@@ -49,7 +49,6 @@ public class RDFIndexer {
     private JsonArray jsonPayload = new JsonArray();
     private int docCount = 0;
     private int postCount = 0;
-    private String targetArchive;
     private SolrClient solrClient;
     private Date ts = new Date();
     private SimpleDateFormat ts2 = new SimpleDateFormat("yyyy-MM-dd");
@@ -340,7 +339,6 @@ public class RDFIndexer {
             newWorkerPool( 1 );
         }
 
-        this.targetArchive = "";
         this.docCount = 0;
         while (this.dataFileQueue.size() > 0) {
             File rdfFile = this.dataFileQueue.remove();
@@ -392,7 +390,6 @@ public class RDFIndexer {
 
         for (Map.Entry<String, HashMap<String, ArrayList<String>>> entry : objects.entrySet()) {
 
-            this.targetArchive = "";
             String uri = entry.getKey();
             HashMap<String, ArrayList<String>> object = entry.getValue();
 
@@ -400,7 +397,6 @@ public class RDFIndexer {
             ArrayList<String> objectArray = object.get("archive");
             if (objectArray != null) {
                 String objArchive = objectArray.get(0);
-                this.targetArchive = config.coreName( objArchive );
                 if (!objArchive.equals( config.archiveName)) {
                     this.errorReport.addError(new IndexerError(file.getName(), uri, "The wrong archive was found. "
                         + objArchive + " should be " + config.archiveName));
@@ -451,8 +447,8 @@ public class RDFIndexer {
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
         List<String> orList = new ArrayList<String>(  );
-        orList.add( isPartOf + "=*" );
-        orList.add( hasPart + "=*" );
+        //orList.add( isPartOf + "=http*" );
+        orList.add( hasPart + "=http*" );
         boolean done = false;
 
         newWorkerPool( 1 );
@@ -460,6 +456,7 @@ public class RDFIndexer {
         while( done == false ) {
            List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
 
+           log.info( "Got " + results.size( ) + " references to resolve" );
            for( JsonObject json : results ) {
               log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
               updateDocumentReferences( json );
@@ -498,12 +495,13 @@ public class RDFIndexer {
         try {
             if( json.has( isPartOf ) == true ) {
                 JsonArray refs = json.getAsJsonArray( isPartOf );
+                //log.info( "isPartOf: " + refs.toString( ) );
                 JsonArray objs = new JsonArray( );
                 for( int ix = 0; ix < refs.size(); ix++ ) {
                     List<String> andList = new ArrayList<String>();
                     andList.add( "uri=" + URLEncoder.encode( "\"" + refs.get( ix ).getAsString( ) + "\"", "UTF-8" ) );
                     List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
-                    if( results.size() == 1 ) {
+                    if( results.isEmpty( ) == false ) {
                         objs.add( removeExcessFields( results.get( 0 ) ) );
                     } else {
                         // reference to a non-existent object, note in the error log
@@ -526,12 +524,13 @@ public class RDFIndexer {
 
             if( json.has( hasPart ) == true ) {
                 JsonArray refs = json.getAsJsonArray( hasPart );
+                //log.info( "hasPart: " + refs.toString( ) );
                 JsonArray objs = new JsonArray( );
                 for( int ix = 0; ix < refs.size(); ix++ ) {
                     List<String> andList = new ArrayList<String>();
                     andList.add( "uri=" + URLEncoder.encode( "\"" + refs.get( ix ).getAsString( ) + "\"", "UTF-8" ) );
                     List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, 1, fl, andList, null );
-                    if( results.size() == 1 ) {
+                    if( results.isEmpty( ) == false ) {
                         objs.add( removeExcessFields( results.get( 0 ) ) );
                     } else {
                         // reference to a non-existent object, note in the error log
@@ -611,12 +610,12 @@ public class RDFIndexer {
 
     // async post JSON to SOLR using the worker pool
     private void postJson( ) {
-        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString( ), this.targetArchive, this.docCount ) );
+        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString( ), config.coreName( ), this.docCount ) );
         this.jsonPayload = new JsonArray();
         this.docCount = 0;
         this.postCount++;
         if( postCount % 5 == 0 ) {
-            this.solrExecutorService.execute( new SolrCommitter( this.targetArchive ) );
+            this.solrExecutorService.execute( new SolrCommitter( config.coreName( ) ) );
         }
     }
 
