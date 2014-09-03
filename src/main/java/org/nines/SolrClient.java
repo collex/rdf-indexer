@@ -83,6 +83,7 @@ public final class SolrClient {
         int solrRequestNumRetries = SOLR_REQUEST_NUM_RETRIES;
         do {
             responseCode = httpClient.executeMethod(request);
+
             if (responseCode != 200) {
                 try {
                     Thread.sleep(SOLR_REQUEST_RETRY_INTERVAL);
@@ -98,13 +99,18 @@ public final class SolrClient {
         } while (responseCode != 200 && solrRequestNumRetries > 0);
         
         if (responseCode != 200) {
-            throw new IOException("Non-OK response: " + responseCode + "\n\n" + request.getResponseBodyAsString( ) );
+            throw new IOException("Non-OK response: " + responseCode + "\n\n" + request.getResponseBodyAsString() );
         }
     }
     
     private final String getResponseString(HttpMethod httpMethod) throws IOException {
-        InputStream is = httpMethod.getResponseBodyAsStream();
-        return IOUtils.toString(is, "UTF-8");
+        InputStream is = httpMethod.getResponseBodyAsStream( );
+        if( is != null ) {
+            String s = IOUtils.toString( is, "UTF-8" );
+            is.close();
+            return ( s );
+        }
+        return( "" );
     }
     
     public final List<JsonObject> getResultsPage( final String core, final String archive,
@@ -167,22 +173,22 @@ public final class SolrClient {
         // read the result into an array of JSON objects
         try  {
             JsonParser parser = new JsonParser();
-            JsonElement parsed = parser.parse ( IOUtils.toString(get.getResponseBodyAsStream(), "UTF-8") );
+            String res = getResponseString( get );
+            JsonElement parsed = parser.parse( res );
             JsonObject data = parsed.getAsJsonObject();
-            JsonObject re = data.get("response").getAsJsonObject();
-            JsonElement de = re.get("docs");
+            JsonObject re = data.get( "response" ).getAsJsonObject();
+            JsonElement de = re.get( "docs" );
             JsonArray docs = de.getAsJsonArray();
             Iterator<JsonElement> i = docs.iterator();
-            while (i.hasNext()) {
-                result.add(i.next().getAsJsonObject());
+            while( i.hasNext() ) {
+                result.add( i.next().getAsJsonObject() );
             }
         } catch (IOException e ) {
             this.log.error("Unable to read SOLR response", e);
+        } finally {
+            get.releaseConnection( );
         }
-
-        get.releaseConnection();
         return result;
-        
     }
     
     /**
