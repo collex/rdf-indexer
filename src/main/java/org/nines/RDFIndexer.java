@@ -349,13 +349,12 @@ public class RDFIndexer {
 
            // if any remaining data
            if ( this.jsonPayload.size( ) > 0 ) {
-              postJson( );
+              postJson( false );
            }
 
            // wait for all the workers to complete and commit the changes
            shutdownWorkerPool( );
-           log.info("  committing to SOLR archive " + config.coreName() );
-           this.solrClient.commit( config.coreName() );
+           commit( );
 
            // if we actually processed any documents, process any isPartOf or hasPart references
            if( this.numObjects != 0 ) {
@@ -428,7 +427,7 @@ public class RDFIndexer {
             // once threshold met, post the data to solr
             if ( this.jsonPayload.toString().length() >= config.maxUploadSize ) {
                 if( config.isTestMode( ) == false ) {
-                    postJson( );
+                    postJson( false );
                 }
             }
         }
@@ -468,17 +467,16 @@ public class RDFIndexer {
               log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
               updateDocumentReferences( json );
            }
-        }
 
-        // if any remaining data
-        if ( this.jsonPayload.size( ) > 0 ) {
-            postJson( );
+           // always post with a commit after each block so we don't get them again next query
+           if ( this.jsonPayload.size( ) > 0 ) {
+              postJson( true );
+           }
         }
 
         // wait for all the workers to complete and commit the changes
         shutdownWorkerPool( );
-        log.info("  committing to SOLR archive " + config.coreName() );
-        this.solrClient.commit( config.coreName() );
+        commit( );
     }
 
     //
@@ -556,7 +554,7 @@ public class RDFIndexer {
 
                 // once threshold met, post the data to solr
                 if ( this.jsonPayload.toString().length( ) >= config.maxUploadSize ) {
-                    postJson( );
+                    postJson( false );
                 }
             }
         } catch( UnsupportedEncodingException ex ) {
@@ -609,14 +607,19 @@ public class RDFIndexer {
     }
 
     // async post JSON to SOLR using the worker pool
-    private void postJson( ) {
+    private void postJson( boolean forceCommit ) {
         this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString( ), config.coreName( ), this.docCount ) );
         this.jsonPayload = new JsonArray();
         this.docCount = 0;
         this.postCount++;
-        if( postCount % 5 == 0 ) {
+        if( forceCommit == true || postCount % 5 == 0 ) {
             this.solrExecutorService.execute( new SolrCommitter( config.coreName( ) ) );
         }
+    }
+
+    private void commit( ) {
+        log.info("  committing to SOLR archive " + config.coreName() );
+        this.solrClient.commit( config.coreName() );
     }
 
     // Worker thread to post data to solr
