@@ -11,6 +11,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -29,7 +30,8 @@ public final class SolrClient {
     
     private String baseUrl;
     private Logger log;
-    private SimpleHttpConnectionManager smp;
+    //private SimpleHttpConnectionManager smp;
+    private MultiThreadedHttpConnectionManager mgr;
 
     private static final int SOLR_REQUEST_NUM_RETRIES = 5;
     private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000;
@@ -41,16 +43,18 @@ public final class SolrClient {
         this.log = Logger.getLogger(RDFIndexer.class.getName());
 
         // force close of connections when done... this prevents FD leaks
-        this.smp = new SimpleHttpConnectionManager( true );
-        this.smp.getParams().setConnectionTimeout(
-                HTTP_CLIENT_TIMEOUT);
-        this.smp.getParams().setIntParameter(
-                HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
+        //this.mgr = new SimpleHttpConnectionManager( true );
+
+        this.mgr = new MultiThreadedHttpConnectionManager( );
+        mgr.getParams( ).setDefaultMaxConnectionsPerHost( 5 );
+        mgr.getParams( ).setMaxTotalConnections( 5 );
+        mgr.getParams( ).setConnectionTimeout( HTTP_CLIENT_TIMEOUT );
+        mgr.getParams( ).setIntParameter( HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024 );
     }
     
     private HttpClient newHttpClient( ) {
-        HttpClient httpClient = new HttpClient( smp );
-        return( httpClient );
+        //mgr.deleteClosedConnections( );
+        return( new HttpClient( mgr ) );
     }
     
     /**
