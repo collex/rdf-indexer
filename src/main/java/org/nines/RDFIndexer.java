@@ -341,8 +341,8 @@ public class RDFIndexer {
 
         this.docCount = 0;
         while (this.dataFileQueue.size() > 0) {
-            File rdfFile = this.dataFileQueue.remove();
-            indexFile(rdfFile);
+           File rdfFile = this.dataFileQueue.remove();
+           indexFile(rdfFile);
         }
 
         if( config.isTestMode( ) == false ) {
@@ -447,7 +447,7 @@ public class RDFIndexer {
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
         List<String> orList = new ArrayList<String>(  );
-        //orList.add( isPartOf + "=http*" );
+        orList.add( isPartOf + "=http*" );
         orList.add( hasPart + "=http*" );
         boolean done = false;
 
