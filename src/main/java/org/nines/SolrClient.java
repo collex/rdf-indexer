@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.httpclient.SimpleHttpConnectionManager;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -28,7 +29,8 @@ public final class SolrClient {
     
     private String baseUrl;
     private Logger log;
-    
+    private SimpleHttpConnectionManager smp;
+
     private static final int SOLR_REQUEST_NUM_RETRIES = 5;
     private static final int SOLR_REQUEST_RETRY_INTERVAL = 30 * 1000;
     public static final int HTTP_CLIENT_TIMEOUT = 2 * 60 * 1000; 
@@ -37,15 +39,18 @@ public final class SolrClient {
         
         this.baseUrl = baseUrl;
         this.log = Logger.getLogger(RDFIndexer.class.getName());
+
+        // force close of connections when done... this prevents FD leaks
+        this.smp = new SimpleHttpConnectionManager( true );
+        this.smp.getParams().setConnectionTimeout(
+                HTTP_CLIENT_TIMEOUT);
+        this.smp.getParams().setIntParameter(
+                HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024);
     }
     
-    private HttpClient newHttpClient() {
-        HttpClient httpClient = new HttpClient();
-        httpClient.getHttpConnectionManager().getParams().setConnectionTimeout(
-            HTTP_CLIENT_TIMEOUT);
-        httpClient.getHttpConnectionManager().getParams().setIntParameter(
-            HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 10000 * 1024); 
-        return httpClient;
+    private HttpClient newHttpClient( ) {
+        HttpClient httpClient = new HttpClient( smp );
+        return( httpClient );
     }
     
     /**
@@ -64,7 +69,10 @@ public final class SolrClient {
                 // The core doesn't exist: create it.
                 request = new GetMethod(this.baseUrl+"/admin/cores?action=CREATE&name=" 
                     + core + "&instanceDir=archives&dataDir=" + core);
+
                 execRequest( request );
+                getResponseString( request );
+
                 this.log.info(">>>> Created core: " + core);
             }
         } catch (IOException e ){
