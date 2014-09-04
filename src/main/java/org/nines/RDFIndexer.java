@@ -442,31 +442,31 @@ public class RDFIndexer {
     //
     private void updateReferenceFields( ) {
 
-        int page = 0;
         int size = config.pageSize;
+        int updated = 0;
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
+
         List<String> orList = new ArrayList<String>(  );
         orList.add( isPartOf + "=http*" );
         orList.add( hasPart + "=http*" );
-        boolean done = false;
 
         newWorkerPool( 1 );
 
-        while( done == false ) {
-           List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
+        while( true ) {
+           List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, size, fl, null, orList );
 
-           log.info( "Got " + results.size( ) + " references to resolve" );
+           if( results.isEmpty( ) == true ) {
+              log.info( "Done. " + updated + " references updated" );
+              break;
+           } else {
+              updated += results.size( );
+              log.info( "Got " + results.size( ) + " references to resolve" );
+           }
+
            for( JsonObject json : results ) {
               log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
               updateDocumentReferences( json );
-           }
-
-           // are there potentially more results?
-           if( results.size( ) == size ) {
-               page++;
-           } else {
-               done = true;
            }
         }
 
@@ -588,8 +588,8 @@ public class RDFIndexer {
     private JsonElement docToJson(String documentName, HashMap<String, ArrayList<String>> fields) {
         Gson gson = new Gson();
         JsonObject obj = gson.toJsonTree(fields).getAsJsonObject();
-        obj.addProperty("date_created", this.timeStamp);
-        obj.addProperty("date_updated", this.timeStamp);
+        obj.addProperty( "date_created", this.timeStamp );
+        obj.addProperty( "date_updated", this.timeStamp );
         return obj;
     }
 
