@@ -39,6 +39,7 @@ public class RDFIndexer {
 
     private int numFiles = 0;
     private int numObjects = 0;
+    private int numReferences = 0;
     private long largestTextSize = 0;
     private RDFIndexerConfig config;
     private Queue<File> dataFileQueue;
@@ -127,6 +128,9 @@ public class RDFIndexer {
             } else if (config.mode.equals(Mode.INDEX)) {
                 this.log.info("Index Mode");
                 doIndexing();
+            } else if (config.mode.equals(Mode.RESOLVE)) {
+                this.log.info("Resolve Mode");
+                doResolving();
             } else {
                 this.log.info("*** TEST MODE: Not committing changes to SOLR");
                 doIndexing();
@@ -213,7 +217,7 @@ public class RDFIndexer {
         Date start = new Date();
         log.info("Started indexing at " + start);
         System.out.println("Indexing " + config.sourceDir);
-        indexDirectory(config.sourceDir);
+        indexDirectory( config.sourceDir );
         System.out.println("Indexing DONE");
 
         // report indexing stats
@@ -227,6 +231,25 @@ public class RDFIndexer {
                 "Indexed " + numFiles + " files (" + numObjects + " objects) in %3.2f seconds.", durationSec));
         }
         this.log.info("Largest text field size: " + this.largestTextSize);
+    }
+
+    private void doResolving() {
+        Date start = new Date();
+        log.info("Started resolving at " + start);
+        System.out.println( "Started resolving at " + start);
+        updateReferenceFields( );
+        System.out.println("Resolving DONE");
+
+        // report indexing stats
+        Date end = new Date();
+        double durationSec = (end.getTime() - start.getTime()) / 1000.0;
+        if (durationSec >= 60) {
+            this.log.info(String.format(
+                    "Resolved/updated " + numReferences + " references in %3.2f minutes.", (durationSec / 60.0)));
+        } else {
+            this.log.info(String.format(
+                    "Resolved/updated " + numReferences + " references in %3.2f seconds.", durationSec));
+        }
     }
 
     private void doSpidering() {
@@ -449,24 +472,24 @@ public class RDFIndexer {
         List<String> orList = new ArrayList<String>(  );
         orList.add( isPartOf + "=http*" );
         orList.add( hasPart + "=http*" );
-        boolean done = false;
 
         newWorkerPool( 1 );
 
-        while( done == false ) {
+        while( true ) {
            List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
 
            log.info( "Got " + results.size( ) + " references to resolve" );
            for( JsonObject json : results ) {
               log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
               updateDocumentReferences( json );
+              this.numReferences++;
            }
 
            // are there potentially more results?
            if( results.size( ) == size ) {
-               page++;
+              page++;
            } else {
-               done = true;
+              break;
            }
         }
 
@@ -610,7 +633,7 @@ public class RDFIndexer {
 
     // async post JSON to SOLR using the worker pool
     private void postJson( ) {
-        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString( ), config.coreName( ), this.docCount ) );
+        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString(), config.coreName(), this.docCount ) );
         this.jsonPayload = new JsonArray();
         this.docCount = 0;
         this.postCount++;

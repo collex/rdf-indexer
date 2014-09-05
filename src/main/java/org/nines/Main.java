@@ -34,7 +34,7 @@ public class Main {
         options.addOption( source, true, "Path to the target RDF archive directory" );
         options.addOption( archive, true, "The name of of the archive");
         options.getOption( archive).setRequired(true);
-        options.addOption( mode, true, "Mode of operation [TEST, SPIDER, CLEAN_RAW, CLEAN_FULL, INDEX, COMPARE]" );
+        options.addOption( mode, true, "Mode of operation [TEST, SPIDER, CLEAN_RAW, CLEAN_FULL, INDEX, RESOLVE, COMPARE]" );
         options.getOption( mode).setRequired(true);
 
         // include/exclude field group
@@ -93,8 +93,16 @@ public class Main {
             }
 
             // if we are indexing, make sure source is present
-            if (config.mode.equals( RDFIndexerConfig.Mode.COMPARE) == false && config.sourceDir == null) {
-                throw new ParseException("Missing required -source parameter");
+            switch( config.mode ) {
+                case CLEAN_RAW:
+                case CLEAN_FULL:
+                case INDEX:
+                case COMPARE:
+                    if( config.sourceDir == null ) {
+                        throw new ParseException("Missing required -source parameter");
+                    }
+                default:
+                    break;
             }
 
             if (line.hasOption(encoding)) {

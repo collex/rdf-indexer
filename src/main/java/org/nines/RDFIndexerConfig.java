@@ -36,6 +36,7 @@ public class RDFIndexerConfig {
         CLEAN_RAW,  // cleanup the raw sipdered text and move to fulltext
         CLEAN_FULL, // cleanup the fulltext 
         INDEX,      // populate solr with rdf data Text will be pulled from the RDF or fulltext
+        RESOLVE,    // examine existing archive and resolve any references (isPartOf, hasPart)
         COMPARE     // compare the new arcive with the main index
     };
 
