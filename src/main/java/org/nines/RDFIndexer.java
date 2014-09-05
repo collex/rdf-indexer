@@ -22,9 +22,6 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
@@ -46,7 +43,7 @@ public class RDFIndexer {
     private ErrorReport errorReport;
     private LinkCollector linkCollector;
     private Logger log;
-    private ExecutorService solrExecutorService;
+    private AsyncPoster asyncPoster;
     private JsonArray jsonPayload = new JsonArray();
     private int docCount = 0;
     private int postCount = 0;
@@ -93,6 +90,7 @@ public class RDFIndexer {
 
         this.linkCollector = new LinkCollector(this.config.getLogfileBaseName("links"));
         this.solrClient = new SolrClient(this.config.solrBaseURL);
+        this.asyncPoster = new AsyncPoster( 1 );
     }
 
     /**
@@ -137,8 +135,9 @@ public class RDFIndexer {
             }
         }
 
-        this.errorReport.close();
-        this.linkCollector.close();
+        this.asyncPoster.shutdown( );
+        this.errorReport.close( );
+        this.linkCollector.close( );
     }
 
     private void doFullTextCleanup() {
@@ -236,8 +235,8 @@ public class RDFIndexer {
     private void doResolving() {
         Date start = new Date();
         log.info("Started resolving at " + start);
-        System.out.println( "Started resolving at " + start);
-        updateReferenceFields( );
+        System.out.println( "Started resolving at " + start );
+        updateReferenceFields();
         System.out.println("Resolving DONE");
 
         // report indexing stats
@@ -265,7 +264,7 @@ public class RDFIndexer {
         if (durationSec >= 60) {
             this.log.info(String.format("Spidered " + numFiles + " files in %3.2f minutes.", (durationSec / 60.0)));
         } else {
-            this.log.info(String.format("Spidered " + numFiles + " files in %3.2f seconds.", durationSec));
+            this.log.info( String.format( "Spidered " + numFiles + " files in %3.2f seconds.", durationSec ) );
         }
     }
 
@@ -357,10 +356,7 @@ public class RDFIndexer {
         this.dataFileQueue = new LinkedList<File>();
         recursivelyQueueFiles(rdfDir, true);
         this.numFiles = this.dataFileQueue.size();
-        log.info("=> Indexing " + rdfDir + " total files: " + this.numFiles);
-        if( config.isTestMode() == false ) {
-            newWorkerPool( 1 );
-        }
+        log.info( "=> Indexing " + rdfDir + " total files: " + this.numFiles );
 
         this.docCount = 0;
         while (this.dataFileQueue.size() > 0) {
@@ -370,15 +366,12 @@ public class RDFIndexer {
 
         if( config.isTestMode( ) == false ) {
 
-           // if any remaining data
-           if ( this.jsonPayload.size( ) > 0 ) {
-              postJson( );
-           }
+            // flush any remaining data
+            flush( );
 
-           // wait for all the workers to complete and commit the changes
-           shutdownWorkerPool( );
-           log.info("  committing to SOLR archive " + config.coreName() );
-           this.solrClient.commit( config.coreName() );
+            // commit the changes and wait for all the workers to complete
+            this.asyncPoster.asyncCommit( this.solrClient, config.coreName( ) );
+            this.asyncPoster.waitForPending( );
 
            // if we actually processed any documents, process any isPartOf or hasPart references
            if( this.numObjects != 0 ) {
@@ -448,11 +441,8 @@ public class RDFIndexer {
             this.jsonPayload.add(jsonDoc);
             this.docCount++;
 
-            // once threshold met, post the data to solr
-            if ( this.jsonPayload.toString().length() >= config.maxUploadSize ) {
-                if( config.isTestMode( ) == false ) {
-                    postJson( );
-                }
+            if( config.isTestMode( ) == false ) {
+                flushIfEnough( );
             }
         }
 
@@ -465,7 +455,6 @@ public class RDFIndexer {
     //
     private void updateReferenceFields( ) {
 
-        int page = 0;
         int size = config.pageSize;
         String fl = config.getFieldList( );
         String coreName = config.coreName( );
@@ -473,35 +462,28 @@ public class RDFIndexer {
         orList.add( isPartOf + "=http*" );
         orList.add( hasPart + "=http*" );
 
-        newWorkerPool( 1 );
-
         while( true ) {
-           List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, page, size, fl, null, orList );
+           List<JsonObject> results = this.solrClient.getResultsPage( coreName, config.archiveName, 0, size, fl, null, orList );
 
-           log.info( "Got " + results.size( ) + " references to resolve" );
+           if( results.isEmpty( ) == true ) {
+              log.info( "No more references to resolve" );
+              break;
+           }
+
+           log.info( "Got " + results.size() + " references to resolve" );
            for( JsonObject json : results ) {
               log.info( "Resolving references for " + json.get( "uri" ).getAsString( ) );
               updateDocumentReferences( json );
               this.numReferences++;
            }
 
-           // are there potentially more results?
-           if( results.size( ) == size ) {
-              page++;
-           } else {
-              break;
-           }
-        }
+            // flush any data and wait for completion...
+            flush( );
 
-        // if any remaining data
-        if ( this.jsonPayload.size( ) > 0 ) {
-            postJson( );
+            // commit the changes and wait for all the workers to complete
+            this.asyncPoster.asyncCommit( this.solrClient, config.coreName() );
+            this.asyncPoster.waitForPending( );
         }
-
-        // wait for all the workers to complete and commit the changes
-        shutdownWorkerPool( );
-        log.info("  committing to SOLR archive " + config.coreName() );
-        this.solrClient.commit( config.coreName() );
     }
 
     //
@@ -510,7 +492,7 @@ public class RDFIndexer {
     private void updateDocumentReferences( final JsonObject json ) {
 
         String fl = config.getFieldList( );
-        String coreName = config.coreName( );
+        String coreName = config.coreName();
         String uri = json.get( "uri" ).getAsString( );
 
         boolean updated = false;
@@ -577,10 +559,7 @@ public class RDFIndexer {
                 this.jsonPayload.add( json );
                 this.docCount++;
 
-                // once threshold met, post the data to solr
-                if ( this.jsonPayload.toString().length( ) >= config.maxUploadSize ) {
-                    postJson( );
-                }
+                flushIfEnough( );
             }
         } catch( UnsupportedEncodingException ex ) {
             // should never happen
@@ -616,67 +595,22 @@ public class RDFIndexer {
         return obj;
     }
 
-    private void newWorkerPool( int poolsize ) {
-        this.solrExecutorService = Executors.newFixedThreadPool( poolsize );
+    private void flushIfEnough( ) {
+        if ( this.jsonPayload.toString().length( ) >= config.maxUploadSize ) flushPending( );
     }
 
-    private void shutdownWorkerPool( ) {
-
-        // signal shutdown and wait until it is complete
-        this.solrExecutorService.shutdown( );
-        try {
-            this.solrExecutorService.awaitTermination( 15, TimeUnit.MINUTES );
-        } catch (InterruptedException e) {
-            // do nothing...
-        }
+    private void flush( ) {
+        if ( this.jsonPayload.size( ) > 0 ) flushPending( );
     }
 
-    // async post JSON to SOLR using the worker pool
-    private void postJson( ) {
-        this.solrExecutorService.execute( new SolrPoster( this.jsonPayload.toString(), config.coreName(), this.docCount ) );
-        this.jsonPayload = new JsonArray();
+    // flush pending data to SOLR
+    private void flushPending( ) {
+        this.asyncPoster.asyncPost( this.solrClient, config.coreName( ), this.jsonPayload.toString( ) );
+        this.jsonPayload = new JsonArray( );
         this.docCount = 0;
         this.postCount++;
         if( postCount % 5 == 0 ) {
-            this.solrExecutorService.execute( new SolrCommitter( config.coreName( ) ) );
-        }
-    }
-
-    // Worker thread to post data to solr
-    private class SolrPoster implements Runnable {
-
-        private final String payload;
-        private final String tgtArchive;
-        
-        public SolrPoster(final String json, final String tgtArchive, int docCnt) {
-            this.tgtArchive = tgtArchive;
-            this.payload = json;
-
-            log.info("  posting: payload size " + this.payload.length( ) + " with " + docCnt + " documents to SOLR archive " + tgtArchive );
-        }
-
-        public void run() {
-            try {
-                solrClient.postJSON(this.payload, this.tgtArchive);
-            } catch (IOException e) {
-                Logger.getLogger(RDFIndexer.class.getName()).error("Post to SOLR FAILED: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-    }
-
-    // Worker thread to commit data to solr
-    private class SolrCommitter implements Runnable {
-
-        private final String tgtArchive;
-
-        public SolrCommitter( final String tgtArchive ) {
-            this.tgtArchive = tgtArchive;
-            log.info("  committing to SOLR archive " + tgtArchive );
-        }
-
-        public void run( ) {
-            solrClient.commit( this.tgtArchive );
+            this.asyncPoster.asyncCommit( this.solrClient, config.coreName( ) );
         }
     }
 }
