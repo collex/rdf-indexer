@@ -4,6 +4,7 @@ import java.util.concurrent.*;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Iterator;
 import org.apache.log4j.Logger;
 import java.io.IOException;
 
@@ -30,10 +31,12 @@ public class AsyncPoster {
     }
 
     public void asyncPost( final SolrClient client, final String archive, final String payload ) {
+        removeDone( );
         pending.add( this.service.submit( new SolrPoster( client, payload, archive ) ) );
     }
 
     public void asyncCommit( final SolrClient client, final String archive ) {
+        removeDone( );
         pending.add( this.service.submit( new SolrCommitter( client, archive ) ) );
     }
 
@@ -52,6 +55,15 @@ public class AsyncPoster {
             }
         }
         log.info( "All pending tasks complete" );
+    }
+
+    public void removeDone( ) {
+       for( Iterator<Future> f = pending.iterator( ); f.hasNext( ); ) {
+          if( f.next( ).isDone( ) == true ) {
+              log.info( "Removing a future...");
+              f.remove( );
+          }
+       }
     }
 
     // Worker thread to post data to solr
