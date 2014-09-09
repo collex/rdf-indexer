@@ -103,7 +103,7 @@ final class NinesStatementHandler implements RDFHandler {
                 || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
                 || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image")
-                || attribute.equals("discipline"))) {
+                || attribute.equals("discipline")||attribute.equals("typewright"))) {
 
                 addError("Collex does not support this property: " + predicate );
                 return;
@@ -114,6 +114,8 @@ final class NinesStatementHandler implements RDFHandler {
         if (handleFederation(predicate, object))
             return;
         if (handleOcr(predicate, object))
+            return;
+        if (handleTypewright(predicate, object))
             return;
         if (handleFullText(predicate, object))
             return;
@@ -188,6 +190,17 @@ final class NinesStatementHandler implements RDFHandler {
             if ("true".equalsIgnoreCase(object)) {
                 // only add a ocr field if it's true. No field set implies "F"alse
                 addField(doc, "is_ocr", "T");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean handleTypewright(String predicate, String object) {
+        if ("http://www.collex.org/schema#typewright".equals(predicate)) {
+            if ("true".equalsIgnoreCase(object)) {
+                // only add a typewright field if it's true. No field set implies "F"alse
+                addField(doc, "typewright", "T");
                 return true;
             }
         }

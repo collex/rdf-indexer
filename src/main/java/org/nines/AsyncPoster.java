@@ -60,7 +60,6 @@ public class AsyncPoster {
     public void removeDone( ) {
        for( Iterator<Future> f = pending.iterator( ); f.hasNext( ); ) {
           if( f.next( ).isDone( ) == true ) {
-              log.info( "Removing a future...");
               f.remove( );
           }
        }
