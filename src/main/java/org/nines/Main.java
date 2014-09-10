@@ -97,7 +97,6 @@ public class Main {
                 case CLEAN_RAW:
                 case CLEAN_FULL:
                 case INDEX:
-                case COMPARE:
                     if( config.sourceDir == null ) {
                         throw new ParseException("Missing required -source parameter");
                     }
