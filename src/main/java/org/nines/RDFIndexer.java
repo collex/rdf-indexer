@@ -577,6 +577,7 @@ public class RDFIndexer {
         json.remove( "year_sort_desc" );
         json.remove( "federation" );
         json.remove( "year" );
+        json.remove( "decade" );
         json.remove( "year_sort" );
         json.remove( "year_sort_asc" );
         json.remove( "title_sort" );

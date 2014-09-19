@@ -22,7 +22,10 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
@@ -378,10 +381,16 @@ final class NinesStatementHandler implements RDFHandler {
                     return false;
                 }
 
+                // generate the decade list too
+                Set<String> decades = generateDecades( years );
+
                 for (String year : years) {
-                    addField(doc, "year", year);
+                    addFieldIfUnique(doc, "year", year);
                 }
 
+                for (String decade : decades) {
+                    addFieldIfUnique(doc, "decade", decade);
+                }
             } else {
                 BNodeImpl bnode = (BNodeImpl) value;
                 dateBNodeId = bnode.getID();
@@ -412,9 +421,17 @@ final class NinesStatementHandler implements RDFHandler {
                     return false;
                 }
 
+                // generate the decade list too
+                Set<String> decades = generateDecades( years );
+
                 for (String year : years) {
-                   addField(doc, "year", year);
+                    addFieldIfUnique(doc, "year", year);
                 }
+
+                for (String decade : decades) {
+                    addFieldIfUnique(doc, "decade", decade);
+                }
+
                return true;
             }
         }
@@ -651,7 +668,26 @@ final class NinesStatementHandler implements RDFHandler {
         return( years );
     }
 
+    public static Set<String> generateDecades( final ArrayList<String> years ) {
+
+        HashSet<String> decades = new HashSet<String>( );
+        Pattern p = Pattern.compile( "\\d{4}" );
+        for( String year : years ) {
+            Matcher m = p.matcher( year );
+            if( m.matches( ) == true ) {
+                decades.add( makeDecade( year ) );
+            }
+        }
+
+        return( decades );
+    }
+
+    public static String makeDecade( final String year ) {
+        return( year.substring( 0, 3 ) + "0" );
+    }
+
     public void addField(HashMap<String, ArrayList<String>> map, String name, String value) {
+
         // skip null fields
         if (value == null || name == null)
             return;
@@ -664,7 +700,19 @@ final class NinesStatementHandler implements RDFHandler {
 
         addFieldEntry(map, name, value, false);
     }
-    
+
+    public void addFieldIfUnique(HashMap<String, ArrayList<String>> map, String name, String value) {
+
+        // skip null fields
+        if (value == null || name == null)
+            return;
+
+        ArrayList<String> objectArray = map.get( name );
+        if( objectArray == null || objectArray.contains( value ) == false ) {
+            addFieldEntry(map, name, value, false);
+        }
+    }
+
     /**
      * Add a CLEANED field entry. The entry will be normalize, escape sequences stripped
      * and invalid utf-8 chars stripped
