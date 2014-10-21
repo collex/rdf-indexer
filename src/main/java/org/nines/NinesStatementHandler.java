@@ -381,16 +381,13 @@ final class NinesStatementHandler implements RDFHandler {
                     return false;
                 }
 
-                // generate the decade list too
-                Set<String> decades = generateDecades( years );
-
+                // add the years
                 for (String year : years) {
                     addFieldIfUnique(doc, "year", year);
                 }
 
-                for (String decade : decades) {
-                    addFieldIfUnique(doc, "decade", decade);
-                }
+                // and any fields that are derived from the years
+                addDerivedDateFields( years );
             } else {
                 BNodeImpl bnode = (BNodeImpl) value;
                 dateBNodeId = bnode.getID();
@@ -421,16 +418,13 @@ final class NinesStatementHandler implements RDFHandler {
                     return false;
                 }
 
-                // generate the decade list too
-                Set<String> decades = generateDecades( years );
-
+                // add the years
                 for (String year : years) {
                     addFieldIfUnique(doc, "year", year);
                 }
 
-                for (String decade : decades) {
-                    addFieldIfUnique(doc, "decade", decade);
-                }
+                // and any fields that are derived from the years
+                addDerivedDateFields( years );
 
                return true;
             }
@@ -668,22 +662,43 @@ final class NinesStatementHandler implements RDFHandler {
         return( years );
     }
 
-    public static Set<String> generateDecades( final ArrayList<String> years ) {
+    private void addDerivedDateFields( final ArrayList<String> years ) {
 
-        HashSet<String> decades = new HashSet<String>( );
+        // only process years that are in the correct format...
         Pattern p = Pattern.compile( "\\d{4}" );
         for( String year : years ) {
             Matcher m = p.matcher( year );
             if( m.matches( ) == true ) {
-                decades.add( makeDecade( year ) );
+                //System.out.println( "YEAR [" + year + "] quarter [" + makeQuarterCentury( year ) + "] half [" + makeHalfCentury( year ) + "] full [" + makeCentury( year ) + "]" );
+                addFieldIfUnique( doc, "decade", makeDecade( year ) );
+                addFieldIfUnique( doc, "quarter_century", makeQuarterCentury( year ) );
+                addFieldIfUnique( doc, "half_century", makeHalfCentury( year ) );
+                addFieldIfUnique( doc, "century", makeCentury( year ) );
             }
         }
-
-        return( decades );
     }
 
     public static String makeDecade( final String year ) {
         return( year.substring( 0, 3 ) + "0" );
+    }
+
+    public static String makeQuarterCentury( final String year ) {
+        Integer sub = Integer.parseInt( year.substring( 2, 4 ) );
+        String quarter = "00";
+        if( sub >= 75 ) quarter = "75";
+        else if( sub >= 50 ) quarter = "50";
+        else if( sub >= 25 ) quarter = "25";
+        return( year.substring( 0, 2 ) + quarter );
+    }
+
+    public static String makeHalfCentury( final String year ) {
+        Integer sub = Integer.parseInt( year.substring( 2, 4 ) );
+        String half = ( sub >= 50 ) ? "50" : "00";
+        return( year.substring( 0, 2 ) + half );
+    }
+
+    public static String makeCentury( final String year ) {
+        return( year.substring( 0, 2 ) + "00" );
     }
 
     public void addField(HashMap<String, ArrayList<String>> map, String name, String value) {
