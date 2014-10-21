@@ -584,6 +584,9 @@ public class RDFIndexer {
         json.remove( "author_sort" );
         json.remove( "date_created" );
         json.remove( "date_updated" );
+        json.remove( "century" );
+        json.remove( "half_century" );
+        json.remove( "quarter_century" );
 
         return( json );
     }

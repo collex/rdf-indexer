@@ -73,8 +73,8 @@ public class RDFIndexerConfig {
             "role_BRD", "role_CNG", "role_CND", "role_DRT", "role_IVR", "role_IVE", "role_OWN", "role_FMO", "role_PRF", "role_PRO", "role_PRN",
             "role_EDT", "role_PBL", "role_TRL", "role_EGR", "role_ETR", "role_CRE", "freeculture", "is_ocr", "federation",
             "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
-            "text_url", "year", "decade", "type", "date_created", "date_updated", "title_sort", "author_sort",
-            "year_sort", "year_sort_asc", "year_sort_desc", "source_html",
+            "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort",
+            "year_sort", "source_html",
             "hasPart", "isPartOf",
             "source_sgml", "person", "format", "language", "geospacial", "text" ));
 
