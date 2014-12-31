@@ -105,7 +105,8 @@ final class NinesStatementHandler implements RDFHandler {
                 || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
                 || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image")
-                || attribute.equals("discipline")||attribute.equals("typewright"))) {
+                || attribute.equals("pages") || attribute.equals("pagenum") 
+                || attribute.equals("discipline") || attribute.equals("typewright"))) {
 
                 addError("Collex does not support this property: " + predicate );
                 return;
