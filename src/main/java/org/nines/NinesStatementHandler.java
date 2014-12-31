@@ -117,6 +117,10 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleOcr(predicate, object))
             return;
+        if (handlePages(predicate, object))
+            return;
+        if (handlePageNum(predicate, object))
+            return;
         if (handleTypewright(predicate, object))
             return;
         if (handleFullText(predicate, object))
@@ -280,6 +284,26 @@ final class NinesStatementHandler implements RDFHandler {
             } else if ("true".equalsIgnoreCase(object)) {
                 addFieldEntry(doc, "freeculture", "T", true); // "T"rue
             }
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean handlePages(String predicate, String object) {
+        if ("http://www.collex.org/schema#pages".equals(predicate)) {
+            if ("false".equalsIgnoreCase(object)) {
+                addFieldEntry(doc, "has_pages", "F", true); // "F"alse
+            } else if ("true".equalsIgnoreCase(object)) {
+                addFieldEntry(doc, "has_pages", "T", true); // "T"rue
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean handlePageNum(String predicate, String object) {
+        if ("http://www.collex.org/schema#pagenum".equals(predicate)) {
+            addField(doc, "page_num", object);
             return true;
         }
         return false;
@@ -535,7 +559,7 @@ final class NinesStatementHandler implements RDFHandler {
         String path = this.config.sourceDir.toString();
         int pos = path.indexOf("/rdf/");
         path = path.substring(0, pos) + "/fulltext/";
-        path += config.safeArchive(this.config.archiveName) + "/";
+        path += RDFIndexerConfig.safeArchive(this.config.archiveName) + "/";
         return path;
     }
     
