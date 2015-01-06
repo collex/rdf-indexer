@@ -71,7 +71,7 @@ final class NinesStatementHandler implements RDFHandler {
         String subject = statement.getSubject().stringValue();
         String predicate = statement.getPredicate().stringValue();
         String object = statement.getObject().stringValue();
-
+        
         // if the object of the triple is blank, skip it, it is nothing worth indexing
         if (object == null || object.length() == 0)
             return;
@@ -105,7 +105,7 @@ final class NinesStatementHandler implements RDFHandler {
                 || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
                 || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image")
-                || attribute.equals("pages") || attribute.equals("pagenum") 
+                || attribute.equals("pages") || attribute.equals("pagenum") || attribute.equals("pageof") 
                 || attribute.equals("discipline") || attribute.equals("typewright"))) {
 
                 addError("Collex does not support this property: " + predicate );
@@ -121,6 +121,8 @@ final class NinesStatementHandler implements RDFHandler {
         if (handlePages(predicate, object))
             return;
         if (handlePageNum(predicate, object))
+            return;
+        if (handlePageOf(predicate, object))
             return;
         if (handleTypewright(predicate, object))
             return;
@@ -297,6 +299,14 @@ final class NinesStatementHandler implements RDFHandler {
             } else if ("true".equalsIgnoreCase(object)) {
                 addFieldEntry(doc, "has_pages", "T", true); // "T"rue
             }
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean handlePageOf(String predicate, String object) {
+        if ("http://www.collex.org/schema#pageof".equals(predicate)) {
+            addField(doc, "page_of", object);
             return true;
         }
         return false;
@@ -811,7 +821,11 @@ final class NinesStatementHandler implements RDFHandler {
         return "";
     }
 
-    public HashMap<String, HashMap<String, ArrayList<String>>> getDocuments() {
+    public HashMap<String, HashMap<String, ArrayList<String>>> getDocuments( boolean isPageData ) {
+        if ( isPageData ) {
+            return documents;
+        }
+        
         // add author_sort: we do that here because we have a few different fields we look at and the order they appear
         // shouldn't matter, so we wait to the end to find them.
         Set<String> keys = documents.keySet();

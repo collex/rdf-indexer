@@ -62,6 +62,10 @@ public class RDFIndexerConfig {
     public String ignoreFields = "";
     public String includeFields = "*";
     public int pageSize = 500;
+    
+    public boolean isPagesArchive() {
+        return (this.archiveName.indexOf("pages_") == 0);
+    }
 
     public final boolean isTestMode() {
         return this.mode.equals(Mode.TEST);
@@ -77,6 +81,9 @@ public class RDFIndexerConfig {
             "year_sort", "source_html",
             "hasPart", "isPartOf",
             "source_sgml", "person", "format", "language", "geospacial", "text" ));
+    
+    private static final ArrayList<String> ALL_PAGE_FIELDS = new ArrayList<String>( Arrays.asList( "uri", "archive",
+        "date_created", "date_updated", "page_num", "page_of", "text" ));
 
 
     /**
@@ -99,12 +106,17 @@ public class RDFIndexerConfig {
      * suitable for submission to Solr:
      * @return List in the form: field1+field2+...
      */
-    public final String getFieldList( ) {
+    public final String getFieldList() {
 
+        ArrayList<String> fields = ALL_FIELDS;
+        if ( isPagesArchive() ) {
+            fields = ALL_PAGE_FIELDS;
+        }
+        
         // if the ignored list has anything assume all fields and skip requested
         if (ignoreFields.trim().length() > 0) {
             List<String> ignored = new ArrayList<String>(Arrays.asList(ignoreFields.split(",")));
-            List<String> fl = new ArrayList<String>(ALL_FIELDS);
+            List<String> fl = new ArrayList<String>( fields );
             for (String ignore : ignored) {
                 fl.remove(ignore);
             }
@@ -133,6 +145,9 @@ public class RDFIndexerConfig {
     }
 
     public final String coreName( final String archive ) {
+        if (archive.indexOf("pages_") == 0) {
+            return  safeArchive( archive );
+        }
         return "archive_" + safeArchive( archive );
     }
 

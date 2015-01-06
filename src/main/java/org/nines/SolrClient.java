@@ -10,10 +10,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.httpclient.SimpleHttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
@@ -30,7 +29,6 @@ public final class SolrClient {
     
     private String baseUrl;
     private Logger log;
-    //private SimpleHttpConnectionManager smp;
     private MultiThreadedHttpConnectionManager mgr;
 
     private static final int SOLR_REQUEST_NUM_RETRIES = 5;
@@ -41,10 +39,6 @@ public final class SolrClient {
         
         this.baseUrl = baseUrl;
         this.log = Logger.getLogger(RDFIndexer.class.getName());
-
-        // force close of connections when done... this prevents FD leaks
-        //this.mgr = new SimpleHttpConnectionManager( true );
-
         this.mgr = new MultiThreadedHttpConnectionManager( );
         mgr.getParams( ).setDefaultMaxConnectionsPerHost( 5 );
         mgr.getParams( ).setMaxTotalConnections( 5 );
@@ -70,9 +64,12 @@ public final class SolrClient {
             String response = getResponseString( request );
             int exists = response.indexOf(">" + core + "<");
             if (exists <= 0) {
-                // The core doesn't exist: create it.
+                String instanceDir = "archives";
+                if (core.indexOf("pages_") == 0) {
+                    instanceDir = "pages";
+                }
                 request = new GetMethod(this.baseUrl+"/admin/cores?action=CREATE&name=" 
-                    + core + "&instanceDir=archives&dataDir=" + core);
+                    + core + "&instanceDir="+instanceDir+"&dataDir=" + core);
 
                 execRequest( request );
                 getResponseString( request );

@@ -225,7 +225,7 @@ final class RawTextCleaner {
 
     private File toFullTextFile(File rawTextFile) {
         String cleanedFile = this.config.sourceDir.toString().replace("rawtext", "fulltext") 
-            + "/" + config.safeArchive(this.config.archiveName);
+            + "/" + RDFIndexerConfig.safeArchive(this.config.archiveName);
         return new File(cleanedFile +"/" + rawTextFile.getName());   
     }
     

@@ -73,7 +73,7 @@ public class RdfDocumentParser {
         }
 
         // retrieve parsed data
-        HashMap<String, HashMap<String, ArrayList<String>>> docHash = statementHandler.getDocuments();
+        HashMap<String, HashMap<String, ArrayList<String>>> docHash = statementHandler.getDocuments( config.isPagesArchive() );
 
         // process tags
         Collection<HashMap<String, ArrayList<String>>> documents = docHash.values();

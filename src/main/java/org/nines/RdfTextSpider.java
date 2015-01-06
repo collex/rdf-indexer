@@ -124,7 +124,7 @@ final class RdfTextSpider implements RDFHandler {
         rawFile = rawFile.replace("&", "AMP");
         rawFile = rawFile + ".txt";
         String rawRoot = findRawTextRoot();
-        rawRoot += config.safeArchive( this.config.archiveName );
+        rawRoot += RDFIndexerConfig.safeArchive( this.config.archiveName );
         File urlFile = new File(rawRoot + "/"+ rawFile );
         
         // scrape the content from remote host...

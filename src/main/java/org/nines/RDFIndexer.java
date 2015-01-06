@@ -45,7 +45,6 @@ public class RDFIndexer {
     private Logger log;
     private AsyncPoster asyncPoster;
     private JsonArray jsonPayload = new JsonArray();
-    private int docCount = 0;
     private int postCount = 0;
     private SolrClient solrClient;
     private Date ts = new Date();
@@ -98,11 +97,6 @@ public class RDFIndexer {
      */
     public void execute() {
 
-        // if a purge was requested, it must be done FIRST
-        if (config.deleteAll) {
-            purgeArchive( config.coreName() );
-        }
-
         // There is only something else to do if a MODE was configured
         if (config.mode.equals(Mode.NONE) == false) {
 
@@ -111,6 +105,11 @@ public class RDFIndexer {
                 this.solrClient.validateCore( config.coreName( ) );
             } catch (IOException e) {
                 this.errorReport.addError(new IndexerError("Validate core", "", e.getMessage()));
+            }
+            
+            // if a purge was requested, it must be done FIRST
+            if (config.deleteAll) {
+                purgeArchive( config.coreName() );
             }
 
             // execute based on mode setting
@@ -145,7 +144,7 @@ public class RDFIndexer {
         this.log.info("Started raw text cleanup at " + start);
 
         this.dataFileQueue = new LinkedList<File>();
-        String fullPath = config.sourceDir.toString() + "/" + config.safeArchive( config.archiveName );
+        String fullPath = config.sourceDir.toString() + "/" + RDFIndexerConfig.safeArchive( config.archiveName );
         recursivelyQueueFiles(new File(fullPath), false);
         int totalFiles = this.dataFileQueue.size();
 
@@ -175,7 +174,7 @@ public class RDFIndexer {
         log.info("Started raw text cleanup at " + start);
 
         this.dataFileQueue = new LinkedList<File>();
-        String rawPath = config.sourceDir.toString() + "/" + config.safeArchive( config.archiveName );
+        String rawPath = config.sourceDir.toString() + "/" + RDFIndexerConfig.safeArchive( config.archiveName );
         recursivelyQueueFiles(new File(rawPath), false);
         int totalFiles = this.dataFileQueue.size();
 
@@ -208,7 +207,7 @@ public class RDFIndexer {
         String path = config.sourceDir.toString();
         int pos = path.indexOf("/rdf/");
         path = path.substring(0, pos) + "/correctedtext/";
-        path += config.safeArchive( config.archiveName ) + "/";
+        path += RDFIndexerConfig.safeArchive( config.archiveName ) + "/";
         return path;
     }
 
@@ -358,7 +357,6 @@ public class RDFIndexer {
         this.numFiles = this.dataFileQueue.size();
         log.info( "=> Indexing " + rdfDir + " total files: " + this.numFiles );
 
-        this.docCount = 0;
         while (this.dataFileQueue.size() > 0) {
            File rdfFile = this.dataFileQueue.remove();
            indexFile(rdfFile);
@@ -374,7 +372,7 @@ public class RDFIndexer {
             this.asyncPoster.waitForPending( );
 
            // if we actually processed any documents, process any isPartOf or hasPart references
-           if( this.numObjects != 0 ) {
+           if( this.numObjects != 0 && this.config.isPagesArchive() == false ) { 
                updateReferenceFields( );
            }
         }
@@ -424,7 +422,7 @@ public class RDFIndexer {
 
             // validate all other parts of object and generate error report
             try {
-                ArrayList<String> messages = ValidationUtility.validateObject(object);
+                ArrayList<String> messages = ValidationUtility.validateObject(this.config.isPagesArchive(), object);
                 for (String message : messages) {
                     IndexerError e = new IndexerError(file.getName(), uri, message);
                     errorReport.addError(e);
@@ -439,7 +437,6 @@ public class RDFIndexer {
             // turn this object into an XML solr docm then xml string. Add this to the curr payload
             JsonElement jsonDoc = docToJson(uri, object);
             this.jsonPayload.add(jsonDoc);
-            this.docCount++;
 
             if( config.isTestMode( ) == false ) {
                 flushIfEnough( );
@@ -557,8 +554,6 @@ public class RDFIndexer {
 
             if( updated == true ) {
                 this.jsonPayload.add( json );
-                this.docCount++;
-
                 flushIfEnough( );
             }
         } catch( UnsupportedEncodingException ex ) {
@@ -611,7 +606,6 @@ public class RDFIndexer {
     private void flushPending( ) {
         this.asyncPoster.asyncPost( this.solrClient, config.coreName( ), this.jsonPayload.toString( ) );
         this.jsonPayload = new JsonArray( );
-        this.docCount = 0;
         this.postCount++;
         if( postCount % 5 == 0 ) {
             this.asyncPoster.asyncCommit( this.solrClient, config.coreName( ) );
