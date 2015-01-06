@@ -57,6 +57,9 @@ public class ValidationUtility {
     // Any change above must be reflected here
     private static final String[] RDF_TERM = new String[] { "collex:archive", "dc:title", "dc:date", "dc:type", "collex:genre", "collex:discipline",
         "collex:freeculture", "collex:full_text", "collex:is_ocr", "collex:federation", "rdfs:seeAlso"};
+    
+    public static final String[] REQUIRED_PAGE_FIELDS = new String[] { "text", "page_of", "page_num" };
+    private static final String[] RDF_PAGE_TERM = new String[] { "collex:text", "collex:pageof", "collex:pagenum"};
 
     private static final String[] ROLE_FIELDS = new String[] { "role_ART", "role_AUT", "role_EDT", "role_PBL", "role_CRE",
 		"role_BRD","role_CNG","role_CND","role_DRT","role_IVR","role_IVE","role_OWN","role_FMO","role_PRF","role_PRO","role_PRN",
@@ -65,15 +68,20 @@ public class ValidationUtility {
         "role_PRT", "role_POP", "role_PRM", "role_RPS", "role_RBR", "role_SCR", "role_SCL", "role_TYD", "role_TYG", "role_WDE",
         "role_WDC", "role_OWN" };
 
-    public static ArrayList<String> validateObject(HashMap<String, ArrayList<String>> object) {
+    public static ArrayList<String> validateObject(boolean isPagesArchive, HashMap<String, ArrayList<String>> object) {
         ArrayList<String> messages = new ArrayList<String>();
 
-        messages.addAll(ValidationUtility.validateRequired(object));
-        messages.addAll(ValidationUtility.validateGenre(object));
-        messages.addAll(ValidationUtility.validateDiscipline(object));
-        messages.addAll(ValidationUtility.validateRole(object));
-        messages.addAll(ValidationUtility.validateType(object));
-        messages.addAll(ValidationUtility.validateUri(object));
+        if ( !isPagesArchive ) {
+            messages.addAll(ValidationUtility.validateRequired(object));
+            messages.addAll(ValidationUtility.validateGenre(object));
+            messages.addAll(ValidationUtility.validateDiscipline(object));
+            messages.addAll(ValidationUtility.validateRole(object));
+            messages.addAll(ValidationUtility.validateType(object));
+            messages.addAll(ValidationUtility.validateUri(object));
+        } else {
+            messages.addAll(ValidationUtility.validatePagesRequired(object));
+            messages.addAll(ValidationUtility.validateUri(object));  
+        }
 
         return messages;
     }
@@ -124,6 +132,20 @@ public class ValidationUtility {
             	fields.remove(1);
         }
 	}
+	
+	/**
+     * Confirms that required fields for PAGES archives are present and non-null
+     */
+    public static ArrayList<String> validatePagesRequired(HashMap<String, ArrayList<String>> object) {
+        ArrayList<String> messages = new ArrayList<String>();
+
+        for (int i = 0; i < REQUIRED_PAGE_FIELDS.length; i++) {
+            if (!object.containsKey(REQUIRED_PAGE_FIELDS[i])) {
+                messages.add("object must contain the " + RDF_PAGE_TERM[i] + " field");
+            }
+        }
+        return messages;
+    }
 	
     /**
      * Confirms that required fields are present and non-null
