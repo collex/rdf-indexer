@@ -50,6 +50,7 @@ public class RDFCompare {
 
     private static final ArrayList<String> REQUIRED_FIELDS = new ArrayList<String>(Arrays.asList("title_sort", "title",
         "genre", "archive", "url", "federation", "year_sort", "year_sort_asc", "year_sort_desc", "freeculture", "is_ocr"));
+    private static final ArrayList<String> REQUIRED_PAGES_FIELDS = new ArrayList<String>(Arrays.asList("text", "page_num", "page_of"));
 
     /**
      * Construct an instance of the RDFCompare with the specified config
@@ -243,7 +244,11 @@ public class RDFCompare {
 
             // get index docs
             if ( indexDone == false) {
-                pageHits = this.solrClient.getResultsPage( "resources", config.archiveName, page, size, fl, null, null );
+                String core = "resources";
+                if ( this.config.isPagesArchive() ) {
+                    core = "pages";
+                }
+                pageHits = this.solrClient.getResultsPage( core, config.archiveName, page, size, fl, null, null );
                 if (pageHits.size() < size) {
                     indexDone = true;
                 }
@@ -566,34 +571,56 @@ public class RDFCompare {
 
         // log additional errors if no new text and doc is flagged
         // such that it must have text (ocr or full text)
-        if (newTxt == null) {
-            String val = doc.get("has_full_text").toString();
-            if (val.equalsIgnoreCase("false")) {
-                this.txtLog.error(uri + ": field has_full_text is " + val + " but full text does not exist.");
+        boolean compareTexts = true;
+        if ( this.config.isPagesArchive() ) {
+            if (newTxt == null ) {
+                this.txtLog.error(uri + ": is page data, but is missing page text in the new index.");
                 this.txtErrorCount++;
+                compareTexts = false;
+            } 
+            if ( oldTxt == null ) {
+                this.txtLog.error(uri + ": is page data, but is missing page text in the pages core.");
+                this.txtErrorCount++;
+                compareTexts = false;
             }
-
-            val = doc.get("is_ocr").toString();
-            if (val.equalsIgnoreCase("false")) {
-                this.txtLog.error(uri + ": field is_ocr is " + val + " but full text does not exist.");
+        } else {
+            if (newTxt == null) {
+                String val = doc.get("has_full_text").toString();
+                if (val.equalsIgnoreCase("false")) {
+                    this.txtLog.error(uri + ": field has_full_text is " + val + " but full text does not exist.");
+                    this.txtErrorCount++;
+                    compareTexts = false;
+                }
+    
+                val = doc.get("is_ocr").toString();
+                if (val.equalsIgnoreCase("false")) {
+                    this.txtLog.error(uri + ": field is_ocr is " + val + " but full text does not exist.");
+                    this.txtErrorCount++;
+                    compareTexts = false;
+                }
+            }
+    
+            if (newTxt == null && oldTxt != null) {
+                this.txtLog.error(uri + ":text field has disappeared from the new index. (old text size = "
+                    + oldTxt.length());
                 this.txtErrorCount++;
+                compareTexts = false;
+            } else if (newTxt != null && oldTxt == null) {
+                this.txtLog.error(uri + ":text field has appeared in the new index.");
+                this.txtErrorCount++;
+                compareTexts = false;
             }
         }
-
-        if (newTxt == null && oldTxt != null) {
-            this.txtLog.error(uri + ":text field has disappeared from the new index. (old text size = "
-                + oldTxt.length());
-            this.txtErrorCount++;
-        } else if (newTxt != null && oldTxt == null) {
-            this.txtLog.error(uri + ":text field has appeared in the new index.");
-            this.txtErrorCount++;
-        } else if (newTxt.equals(oldTxt) == false) {
-
-            newTxt = getProcessedReindexedText(newTxt);
-            oldTxt = getProcessedOrigText(oldTxt);
-
-            if (oldTxt.equals(newTxt) == false) {
-                logMismatchedText(uri, oldTxt, newTxt);
+        
+        if ( compareTexts ) {
+            if (newTxt.equals(oldTxt) == false) {
+            
+                newTxt = getProcessedReindexedText(newTxt);
+                oldTxt = getProcessedOrigText(oldTxt);
+    
+                if (oldTxt.equals(newTxt) == false) {
+                    logMismatchedText(uri, oldTxt, newTxt);
+                }
             }
         }
     }
@@ -709,7 +736,11 @@ public class RDFCompare {
      */
     private void validateRequiredFields(JsonObject doc) {
 
-        for (String fieldName : REQUIRED_FIELDS) {
+        ArrayList<String> reqFields = REQUIRED_FIELDS;
+        if ( this.config.isPagesArchive()) {
+            reqFields = REQUIRED_PAGES_FIELDS;
+        }
+        for (String fieldName : reqFields ) {
 
             // find the first element in the correct doc that
             // has a name attribute matching the  required field
