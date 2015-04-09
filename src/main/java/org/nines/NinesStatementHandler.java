@@ -184,7 +184,8 @@ final class NinesStatementHandler implements RDFHandler {
 
     private boolean handleFederation(String predicate, String object) {
         if ("http://www.collex.org/schema#federation".equals(predicate)) {
-            if (object.equals("NINES") || object.equals("18thConnect") || object.equals("MESA") || object.equals("ModNets") || object.equals("SiRO") || object.equals("estc")) {
+            if (object.equals("NINES") || object.equals("18thConnect") || object.equals("MESA") || 
+                object.equals("ModNets") || object.equals("SiRO") || object.equals("estc") || object.equals("GLA") ) {
                 addField(doc, "federation", object);
             } else {
                 addError("Unknown federation: " + object);

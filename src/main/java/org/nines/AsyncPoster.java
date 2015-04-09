@@ -1,13 +1,16 @@
 package org.nines;
 
 import java.util.concurrent.*;
-
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Iterator;
+
 import org.apache.log4j.Logger;
+
 import java.io.IOException;
 
+
+@SuppressWarnings("rawtypes")
 public class AsyncPoster {
 
     private ExecutorService service = null;
