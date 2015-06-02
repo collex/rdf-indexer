@@ -73,8 +73,14 @@ final class NinesStatementHandler implements RDFHandler {
         String object = statement.getObject().stringValue();
         
         // if the object of the triple is blank, skip it, it is nothing worth indexing
-        if (object == null || object.length() == 0)
-            return;
+        // EXCEPT for text in page-level RDF. There are valid cases where the collex:text
+        // for a page is blank. To avoid streaming out validation errors on these
+        // cases, let blanks through. There is matching code in handleText.
+        if ( object == null || object.length() == 0 ) {
+            if ( !(this.config.isPagesArchive() && "http://www.collex.org/schema#text".equals(predicate)) ) {
+                return;
+            }
+        }
 
         // start of a new document
         if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#type".equals(predicate)
@@ -550,7 +556,7 @@ final class NinesStatementHandler implements RDFHandler {
                 }
             }
 
-            if (text.length() > 0) {
+            if ( text.length() > 0 || this.config.isPagesArchive() ) {
                 this.largestTextField = Math.max(this.largestTextField, text.length());
                 // NOTE: the !externalText signals to the add method that it
                 // should NOT perform any cleanup. Text goes in untouched.

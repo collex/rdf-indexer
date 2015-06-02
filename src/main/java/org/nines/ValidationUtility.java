@@ -144,6 +144,12 @@ public class ValidationUtility {
                 messages.add("object must contain the " + RDF_PAGE_TERM[i] + " field");
             }
         }
+        
+        ArrayList<String> txtVal = object.get("text");
+        if ( txtVal.get(0).length() == 0) {
+            object.remove("text");
+            messages.add("Warning - collex:text is blank");
+        }
         return messages;
     }
 	
@@ -306,3 +312,5 @@ public class ValidationUtility {
             return false;
     }
 }
+
+
