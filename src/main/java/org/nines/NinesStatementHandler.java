@@ -186,6 +186,12 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleIsPartOf(predicate, object))
             return;
+        if (handleCoverage(predicate, object))
+        	return;
+        if (handleDescription(predicate, object))
+        	return;
+        if (handleReviewDate(predicate, object))
+        	return;
     }
 
     private boolean handleFederation(String predicate, String object) {
@@ -567,6 +573,31 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
+    
+    private boolean handleCoverage(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/coverage".equals(predicate)) {
+            addField(doc, "coverage", object);
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean handleDescription(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/description".equals(predicate)) {
+            addField(doc, "description", object);
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean handleReviewDate(String predicate, String object) {
+        if ("http://www.collex.org/schema#review_date".equals(predicate)) {
+            addField(doc, "review_date", object);
+            return true;
+        }
+        return false;	
+    }
+
     
     /**
      * find the full path to the full text root baseed on 
