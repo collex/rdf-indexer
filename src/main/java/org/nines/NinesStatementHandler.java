@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -650,6 +652,13 @@ final class NinesStatementHandler implements RDFHandler {
     private boolean handleCoverage(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/coverage".equals(predicate)) {
             addField(doc, "coverage", object);
+
+            ArrayList<String> places = parsePlaces(object);
+
+            if (places.size() > 0) addFieldIfUnique(doc, "publication_city", places.get(0));
+            if (places.size() > 1) addFieldIfUnique(doc, "publication_state", places.get(1));
+            if (places.size() > 2) addFieldIfUnique(doc, "publication_country", places.get(2));
+
             return true;
         }
         return false;
@@ -760,6 +769,17 @@ final class NinesStatementHandler implements RDFHandler {
             return true;
         }
         return false;
+    }
+
+    public static ArrayList<String> parsePlaces(String value) {
+      String stripped = value;
+      if (value.charAt(value.length() - 1) == '.') stripped = value.substring(0, value.length() - 1);
+
+      String[] parts = stripped.split("--");
+      ArrayList<String> places = new ArrayList<String>(Arrays.asList(parts));
+      Collections.reverse(places);
+
+      return places;
     }
 
     public static ArrayList<String> parseYears(String value) {

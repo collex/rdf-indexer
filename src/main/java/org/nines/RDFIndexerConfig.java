@@ -23,18 +23,18 @@ import java.util.*;
 
 /**
  * Configuration for the RDFFileIndexer
- * 
+ *
  * @author nicklaiacona
  */
 public class RDFIndexerConfig {
 
     // mode of operation
     public enum Mode {
-        NONE,       // No mode.. do nothing. 
+        NONE,       // No mode.. do nothing.
         TEST,       // Testing mode: ignore all ext text, dont post to solr
         SPIDER,     // retrieve full text from external source - no post to solr
         CLEAN_RAW,  // cleanup the raw sipdered text and move to fulltext
-        CLEAN_FULL, // cleanup the fulltext 
+        CLEAN_FULL, // cleanup the fulltext
         INDEX,      // populate solr with rdf data Text will be pulled from the RDF or fulltext
         RESOLVE,    // examine existing archive and resolve any references (isPartOf, hasPart)
         COMPARE     // compare the new arcive with the main index
@@ -48,7 +48,7 @@ public class RDFIndexerConfig {
     public Mode mode = Mode.NONE;
     public String defaultEncoding = "UTF-8";
     public String customCleanClass = "";
-    
+
     // corrected text map: URI -> filename
     public Map<String,String> correctedTextMap =  new HashMap<String,String>();
     public File correctedTextDir = null;
@@ -62,7 +62,7 @@ public class RDFIndexerConfig {
     public String ignoreFields = "";
     public String includeFields = "*";
     public int pageSize = 500;
-    
+
     public boolean isPagesArchive() {
         return (this.archiveName.indexOf("pages_") == 0);
     }
@@ -73,7 +73,7 @@ public class RDFIndexerConfig {
 
     // all of the solr instance fields. Text is the last field
     private static final ArrayList<String> ALL_FIELDS = new ArrayList<String>( Arrays.asList( "uri", "archive",
-            "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url", 
+            "date_label", "genre", "source", "image", "thumbnail", "title", "alternative", "url",
             "role_ABR", "role_ACP", "role_ACT", "role_ADI", "role_ADP", "role_AFT", "role_ANL", "role_ANM", "role_ANN", "role_ANT",
         	"role_APE", "role_APL", "role_APP", "role_AQT", "role_ARC", "role_ARD", "role_ARR", "role_ART", "role_ASG", "role_ASN",
         	"role_ATO", "role_ATT", "role_AUC", "role_AUD", "role_AUI", "role_AUS", "role_AUT", "role_BDD", "role_BJD", "role_BKD",
@@ -105,10 +105,11 @@ public class RDFIndexerConfig {
             "has_full_text", "source_xml", "typewright", "publisher", "agent", "agent_facet", "author", "editor",
             "text_url", "year", "type", "date_created", "date_updated", "title_sort", "author_sort",
             "year_sort", "source_html",
-            "hasPart", "isPartOf", 
+            "hasPart", "isPartOf",
             "coverage", "description", "review_date", "edition_date_label", "edition_year",
+            "publication_country", "publication_state", "publication_city",
             "source_sgml", "person", "format", "language", "geospacial", "text"));
-    
+
     private static final ArrayList<String> ALL_PAGE_FIELDS = new ArrayList<String>( Arrays.asList( "uri", "archive",
         "date_created", "date_updated", "page_num", "page_of", "text" ));
 
@@ -117,7 +118,7 @@ public class RDFIndexerConfig {
      * Gets the path and partial name of the logfile. The partial name
      * just includes the cleaned arhive name. To this must be appended
      * the log type and extension (ex: _progress.log)
-     * 
+     *
      * @return Full path and base name of logfile
      */
     public final String getLogfileBaseName(String subFolder) {
@@ -139,7 +140,7 @@ public class RDFIndexerConfig {
         if ( isPagesArchive() ) {
             fields = ALL_PAGE_FIELDS;
         }
-        
+
         // if the ignored list has anything assume all fields and skip requested
         if (ignoreFields.trim().length() > 0) {
             List<String> ignored = new ArrayList<String>(Arrays.asList(ignoreFields.split(",")));
