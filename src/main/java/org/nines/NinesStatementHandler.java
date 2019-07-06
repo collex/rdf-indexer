@@ -1,10 +1,10 @@
-/** 
+/**
  *  Copyright 2007 Applied Research in Patacriticism and the University of Virginia
- * 
+ *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -42,6 +44,7 @@ final class NinesStatementHandler implements RDFHandler {
 
     private HashMap<String, HashMap<String, ArrayList<String>>> documents;
     private String dateBNodeId;
+    private String editionDateBNodeId;
     private HashMap<String, ArrayList<String>> doc;
     private Boolean title_sort_added = false;
     private File file;
@@ -71,7 +74,7 @@ final class NinesStatementHandler implements RDFHandler {
         String subject = statement.getSubject().stringValue();
         String predicate = statement.getPredicate().stringValue();
         String object = statement.getObject().stringValue();
-        
+
         // if the object of the triple is blank, skip it, it is nothing worth indexing
         // EXCEPT for text in page-level RDF. There are valid cases where the collex:text
         // for a page is blank. To avoid streaming out validation errors on these
@@ -98,7 +101,7 @@ final class NinesStatementHandler implements RDFHandler {
             log.info("Parsing RDF for document: " + subject);
             errorReport.flush();
         }
-        
+
         // Check for any unsupported nines:* attributes and issue error if any exist
         if (predicate.startsWith("http://www.nines.org/schema#")) {
             addError( "NINES is no longer a valid attribute: "+ predicate);
@@ -111,8 +114,9 @@ final class NinesStatementHandler implements RDFHandler {
                 || attribute.equals("source_html") || attribute.equals("source_sgml") || attribute.equals("federation")
                 || attribute.equals("ocr") || attribute.equals("genre") || attribute.equals("thumbnail")
                 || attribute.equals("text") || attribute.equals("fulltext") || attribute.equals("image")
-                || attribute.equals("pages") || attribute.equals("pagenum") || attribute.equals("pageof") 
-                || attribute.equals("discipline") || attribute.equals("typewright"))) {
+                || attribute.equals("pages") || attribute.equals("pagenum") || attribute.equals("pageof")
+                || attribute.equals("discipline") || attribute.equals("typewright")
+                || attribute.equals("reviewdate") || attribute.equals("dateofedition"))) {
 
                 addError("Collex does not support this property: " + predicate );
                 return;
@@ -154,6 +158,10 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleDateLabel(subject, predicate, object))
             return;
+        if (handleEditionDate(subject, predicate, statement.getObject()))
+        	return;
+        if (handleEditionDateLabel(subject, predicate, object))
+        	return;
         if (handleSource(predicate, object))
             return;
         if (handleThumbnail(predicate, object))
@@ -186,12 +194,19 @@ final class NinesStatementHandler implements RDFHandler {
             return;
         if (handleIsPartOf(predicate, object))
             return;
+        if (handleCoverage(predicate, object))
+        	return;
+        if (handleDescription(predicate, object))
+        	return;
+        if (handleReviewDate(predicate, object))
+        	return;
     }
 
     private boolean handleFederation(String predicate, String object) {
         if ("http://www.collex.org/schema#federation".equals(predicate)) {
-            if (object.equals("NINES") || object.equals("18thConnect") || object.equals("MESA") || 
-                object.equals("ModNets") || object.equals("SiRO") || object.equals("estc") || object.equals("GLA") ) {
+            if (object.equals("NINES") || object.equals("18thConnect") || object.equals("MESA") ||
+                object.equals("ModNets") || object.equals("SiRO") || object.equals("estc") || object.equals("GLA") ||
+                object.equals("REKN") || object.equals("NEAR") || object.equals("CWRC")) {
                 addField(doc, "federation", object);
             } else {
                 addError("Unknown federation: " + object);
@@ -298,7 +313,7 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
-    
+
     private boolean handlePages(String predicate, String object) {
         if ("http://www.collex.org/schema#pages".equals(predicate)) {
             if ("false".equalsIgnoreCase(object)) {
@@ -310,7 +325,7 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
-    
+
     private boolean handlePageOf(String predicate, String object) {
         if ("http://www.collex.org/schema#pageof".equals(predicate)) {
             addField(doc, "page_of", object);
@@ -318,7 +333,7 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
-    
+
     private boolean handlePageNum(String predicate, String object) {
         if ("http://www.collex.org/schema#pagenum".equals(predicate)) {
             addField(doc, "page_num", object);
@@ -330,7 +345,7 @@ final class NinesStatementHandler implements RDFHandler {
     private boolean handleFullText(String predicate, String object) {
         if ("http://www.collex.org/schema#fulltext".equals(predicate)) {
             if ( this.hasCorrectedText ) {
-                addField(doc, "has_full_text", "T"); 
+                addField(doc, "has_full_text", "T");
             } else {
                 if ("false".equalsIgnoreCase(object)) {
                     // only add a fulltext field if its false. No field set implies "T"rue
@@ -473,6 +488,72 @@ final class NinesStatementHandler implements RDFHandler {
         return false;
     }
 
+    private boolean handleEditionDate(String subject, String predicate, Value value) {
+        if ("http://www.collex.org/schema#dateofedition".equals(predicate)) {
+            String object = value.stringValue().trim();
+            if (value instanceof LiteralImpl) {
+
+                // add label
+                addField(doc, "edition_date_label", object);
+
+                ArrayList<String> years = parseYears(object);
+
+                if( years.isEmpty() == true ) {
+                    addError("Invalid date format in date of edition: " + object);
+                    return false;
+                }
+
+                // add the years
+                for (String year : years) {
+                    addFieldIfUnique(doc, "edition_year", year);
+                }
+
+                // and any fields that are derived from the years
+                addDerivedEditionDateFields( years );
+            } else {
+                BNodeImpl bnode = (BNodeImpl) value;
+                editionDateBNodeId = bnode.getID();
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean handleEditionDateLabel(String subject, String predicate, String object) {
+        if (subject.equals(editionDateBNodeId)) {
+            // if dateBNodeId matches, we assume we're under a <collex:date> and simply
+            // look for <rdfs:label> and <rdf:value>
+
+            if ("http://www.w3.org/2000/01/rdf-schema#label".equals(predicate)) {
+                addField(doc, "date_label", object);
+                return true;
+            }
+
+            if ("http://www.w3.org/1999/02/22-rdf-syntax-ns#value".equals(predicate)) {
+                //System.out.println( "handleDateLabel: " + object );
+                ArrayList<String> years = parseYears(object);
+
+                if( years.isEmpty() == true ) {
+                    addError("Invalid date format: " + object);
+                    return false;
+                }
+
+                // add the years
+                for (String year : years) {
+                    addFieldIfUnique(doc, "year", year);
+                }
+
+                // and any fields that are derived from the years
+                addDerivedEditionDateFields( years );
+
+               return true;
+            }
+        }
+        return false;
+    }
+
     private boolean handleSource(String predicate, String object) {
         if ("http://purl.org/dc/elements/1.1/source".equals(predicate)) {
             addField(doc, "source", object);
@@ -530,7 +611,7 @@ final class NinesStatementHandler implements RDFHandler {
             String text = object;
             boolean externalText = false;
             if ( this.hasCorrectedText ) {
-                // only in index mode do we attempt to grab 
+                // only in index mode do we attempt to grab
                 // corrected text from the full text folder
                 if (config.mode == Mode.INDEX) {
                     externalText = true;
@@ -538,14 +619,14 @@ final class NinesStatementHandler implements RDFHandler {
                 } else {
                     text = "";
                 }
-                
+
             } else {
                 // Objects with external content will have some form of
                 // http url as the content.
                 if (object.trim().startsWith("http://") && object.trim().indexOf(" ") == -1) {
                     addFieldEntry(doc, "text_url", text, false);
-    
-                    // only in index mode do we attempt to grab 
+
+                    // only in index mode do we attempt to grab
                     // full text from the full text folder
                     if (config.mode == Mode.INDEX) {
                         externalText = true;
@@ -567,9 +648,41 @@ final class NinesStatementHandler implements RDFHandler {
         }
         return false;
     }
-    
+
+    private boolean handleCoverage(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/coverage".equals(predicate)) {
+            addField(doc, "coverage", object);
+
+            ArrayList<String> places = parsePlaces(object);
+
+            if (places.size() > 0) addFieldIfUnique(doc, "publication_city", places.get(0));
+            if (places.size() > 1) addFieldIfUnique(doc, "publication_state", places.get(1));
+            if (places.size() > 2) addFieldIfUnique(doc, "publication_country", places.get(2));
+
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleDescription(String predicate, String object) {
+        if ("http://purl.org/dc/elements/1.1/description".equals(predicate)) {
+            addField(doc, "description", object);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleReviewDate(String predicate, String object) {
+        if ("http://www.collex.org/schema#reviewdate".equals(predicate)) {
+            addField(doc, "reviewdate", object);
+            return true;
+        }
+        return false;
+    }
+
+
     /**
-     * find the full path to the full text root baseed on 
+     * find the full path to the full text root baseed on
      * the path to the original rdf sources
      * @return
      */
@@ -580,7 +693,7 @@ final class NinesStatementHandler implements RDFHandler {
         path += RDFIndexerConfig.safeArchive(this.config.archiveName) + "/";
         return path;
     }
-    
+
     /**
      * Get the corrected text for the current document
      * @return
@@ -604,11 +717,11 @@ final class NinesStatementHandler implements RDFHandler {
             IOUtils.closeQuietly(is);
         }
     }
-    
+
     /**
      * Read the full text for <code>uri</code> from the fulltext area of the solr sources.
      * If any errors are encountered, log them and return an empty string
-     * 
+     *
      * @param uri
      * @return A string containing the full text - or an empty string if errors occur.
      */
@@ -656,6 +769,17 @@ final class NinesStatementHandler implements RDFHandler {
             return true;
         }
         return false;
+    }
+
+    public static ArrayList<String> parsePlaces(String value) {
+      String stripped = value;
+      if (value.charAt(value.length() - 1) == '.') stripped = value.substring(0, value.length() - 1);
+
+      String[] parts = stripped.split("--");
+      ArrayList<String> places = new ArrayList<String>(Arrays.asList(parts));
+      Collections.reverse(places);
+
+      return places;
     }
 
     public static ArrayList<String> parseYears(String value) {
@@ -715,6 +839,20 @@ final class NinesStatementHandler implements RDFHandler {
                 addFieldIfUnique( doc, "quarter_century", makeQuarterCentury( year ) );
                 addFieldIfUnique( doc, "half_century", makeHalfCentury( year ) );
                 addFieldIfUnique( doc, "century", makeCentury( year ) );
+            }
+        }
+    }
+
+    private void addDerivedEditionDateFields( final ArrayList<String> years ) {
+    	Pattern p = Pattern.compile( "\\d{4}" );
+        for( String year : years ) {
+            Matcher m = p.matcher( year );
+            if( m.matches( ) == true ) {
+                //System.out.println( "YEAR [" + year + "] quarter [" + makeQuarterCentury( year ) + "] half [" + makeHalfCentury( year ) + "] full [" + makeCentury( year ) + "]" );
+                addFieldIfUnique( doc, "edition_decade", makeDecade( year ) );
+                addFieldIfUnique( doc, "edition_quarter_century", makeQuarterCentury( year ) );
+                addFieldIfUnique( doc, "edition_half_century", makeHalfCentury( year ) );
+                addFieldIfUnique( doc, "edition_century", makeCentury( year ) );
             }
         }
     }
@@ -791,14 +929,14 @@ final class NinesStatementHandler implements RDFHandler {
      */
     private void addFieldEntry(HashMap<String, ArrayList<String>> map, String name, String value, boolean replace, boolean clean) {
 
-        // clean everything going in? 
+        // clean everything going in?
         String data = value;
         if ( clean ) {
             data = TextUtils.stripEscapeSequences(data, this.errorReport, this.file, this.documentURI);
             data = TextUtils.normalizeWhitespace(data);
             data = TextUtils.stripUnknownUTF8(data, this.errorReport, this.file, this.documentURI);
         }
-       
+
         // make sure we add to array for already existing fields
         if (map.containsKey(name) && replace == false) {
             ArrayList<String> pastValues = map.get(name);
@@ -832,7 +970,7 @@ final class NinesStatementHandler implements RDFHandler {
         if ( isPageData ) {
             return documents;
         }
-        
+
         // add author_sort: we do that here because we have a few different fields we look at and the order they appear
         // shouldn't matter, so we wait to the end to find them.
         Set<String> keys = documents.keySet();
@@ -959,7 +1097,7 @@ final class NinesStatementHandler implements RDFHandler {
 
         return years;
     }
-    
+
     private void addError( final String message ) {
         this.errorReport.addError(new IndexerError(this.file.toString(), this.documentURI, message));
     }
@@ -967,7 +1105,7 @@ final class NinesStatementHandler implements RDFHandler {
     public void setFile(final File file) {
         this.file = file;
     }
-    
+
     public long getLargestTextSize() {
         return this.largestTextField;
     }
